@@ -1,0 +1,56 @@
+#
+# Backup configuration example. 
+#
+# Please adapt it to reflect your own configuration. 
+# 
+
+######## Default global settings ########
+# You SHOULD have a global section
+<global>
+	use_duplicity = no                           # By default, don't use duplicity but simply rsync. 
+	#log_file      = /tmp/backup.log              # location of the log file
+	patternfile_exclude  = $HOME/.rsync_exclude  # the file containing file patterns that should NOT be synchronized
+			       			     # be synchronized
+	#ssh_auth_sock = /tmp/502/SSHKeychain.socket  # ssh-agent configuration 
+
+	# Default backup configuration 
+	src_rootdir   = $HOME                        # Root directory on the (local) source
+	dst_rootdir   = /                            # Root directory on destination
+	# Space separated list of directories to include or exclude from synchronization 
+	# (relative to src_rootdir). 
+	# The use of the wildcards * is supported (for instance '*' select all subdirectories 
+	# (including the hidden one) of src_rootdir. 
+	# You may use more complicated pattern mixing ^, * and $ special characters such as
+	#     ^AR* : all directories that start with AR
+	#     *ES$ : all directories that ends with  ES
+	#     ^.*  : all hidden directories (the one that start by '.')
+	include_dir           = *
+	exclude_dir           = ^.* Downloads  Library   Music  Public  Movies   Pictures  Sites
+	# Eventually, add exception to exclude_dir (nice if you used wildcards in it)
+	exclude_dir_exception = .emacs.d  .ssh   .gnupg
+	<Directory .ssh>
+		 src_in_subfolder = MacBookpro 
+	</Directory>
+</global>
+
+############ Configuration of your backups ############
+# You SHOULD have a default backup definition (here on a external harddrive)
+<default>
+	target_url  = drive:///Volumes/FalkorDrive/Backup
+</default>
+
+# example of a backup on a remote server through ssh
+<gandalf>
+	restrict_on_subnet = 10.91              # backup only when your machine is connected on a given subnet
+	target_url         = ssh://seb@gandalf  # ssh connection on the default port (22)
+	dst_rootdir        = /home/seb/`whoami`@FalkorMacbook
+	# Special treatment of the "Music" directory
+	<Directory Music>
+		 dst_rootdir = /multimedia  
+	</Directory>
+</gandalf>
+
+
+
+
+

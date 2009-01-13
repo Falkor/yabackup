@@ -1,0 +1,2 @@
+- Expand wildcard not only relative to $src_rootdir but also $dst_rootdir in retrieve mode
+
