@@ -37,9 +37,19 @@ AC_PROG_SSH
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
-AC_PROG_PERL_MODULES(Storage,, AC_MSG_ERROR(Can't find the Perl modules Storage))
-
-
+AC_CHECK_CPAN_MODULES(
+    Switch 
+    Storable 
+    Hash::Util 
+    Time::localtime 
+    Getopt::Long 
+    POSIX 
+    Getopt::Long 
+    Config::General 
+    Term::ANSIColor 
+    Data::Dumper 
+    Pod::Usage
+)
 
 # ----------------------------------------------------------------
 # Checks for header files. 

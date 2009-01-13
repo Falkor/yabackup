@@ -64,3 +64,13 @@ if test "x$PERL" != x; then
 else
   AC_MSG_WARN(could not find perl)
 fi])dnl
+
+
+# Added by Sebastien Varrette
+AC_DEFUN([AC_CHECK_CPAN_MODULES],[dnl
+ac_perl_modules="$1"
+for ac_perl_module in $ac_perl_modules; do
+   AC_PROG_PERL_MODULES($ac_perl_module,,          
+   			AC_MSG_ERROR(Can't find the Perl modules $ac_perl_module, please install it through cpan -- see http://search.cpan.org/))
+done
+])dnl
