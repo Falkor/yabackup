@@ -8,12 +8,15 @@
 # ----------------------------------------------------------------
 
 AC_INIT([backup],[0.1],[sebastien.varrette@uni.lu])
+
+#AC_SUBST(VERSION)
+
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall])	
 
 # Make automake clean emacs ~ files for "make clean"
-CLEANFILES="*~"
+CLEANFILES="*~ bin/backup backup.3 backup.html"
 AC_SUBST(CLEANFILES)
 
 PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
@@ -24,7 +27,8 @@ AC_SUBST(PACKAGE_SUMMARY)
 # ----------------------------------------------------------------
 AC_PROG_INSTALL
 AC_PROG_SSH
-
+AC_PATH_PROGS(PERL, perl perl5, false)
+AC_PATH_PROGS(POD2MAN, pod2man, pod2man)
 
 # ----------------------------------------------------------------
 # Macros that should be defined to compile:
@@ -33,7 +37,14 @@ AC_PROG_SSH
 # ----------------------------------------------------------------
 # --with && --enable OPTIONS
 # ----------------------------------------------------------------
-
+AC_MSG_CHECKING(for html doc generation)
+AC_ARG_ENABLE(
+    htmldoc, 
+    [AS_HELP_STRING([--enable--htmldoc],[enable the generation of html doc using pod2html [default=no]])],
+    [AC_MSG_RESULT([on])
+     AC_PATH_PROGS(POD2HTML, pod2html, pod2html)],
+    [AC_MSG_RESULT([off])]
+)
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
@@ -72,10 +83,11 @@ AC_CHECK_CPAN_MODULES(
 # ----------------------------------------------------------------
 
 
-AC_CONFIG_SRCDIR([bin/backup])
+AC_CONFIG_SRCDIR([bin/backup.in])
 AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
+	bin/backup
 ])
 #	doc/Makefile
 #	doc/man/Makefile

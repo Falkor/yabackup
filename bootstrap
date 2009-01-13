@@ -223,6 +223,7 @@ clean() {
     if  [ -f "Makefile" ]; then
 	info "found a Makefile in the current directory"
 	info "running 'make distclean'"
+	make clean
 	make distclean
     fi
 

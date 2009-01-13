@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!@PERL@ -w
 
 ##############################################################################
 # File   : backup
@@ -46,7 +46,7 @@ use Data::Dumper;
 use Pod::Usage;
 
 # Generic variables
-my $VERSION = 0.1;            # Script version
+my $VERSION = '@VERSION@';            # Script version
 my $VERBOSE = 0;              # option variable for verbose mode with default value (false)
 my $DEBUG   = 0;              # option variable for debug mode with default value (false)
 my $QUIET   = 0;              # By default, display all informations
@@ -771,59 +771,6 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 EOF
 }
 
-####
-# Print help
-##
-sub HELP_MESSAGE {
-    print <<EOF;
-NAME
-      $command - backup and restore utility based on rsync and duplicity. 
-      The target can be either a local disk or a remote server available through ssh. 
-
-SYNOPSIS
-      $command [-q] [-l] [-p|-r] [-f config_file] [--dry-run] [-t] [-e][dir]
-
-DESCRIPTION
-
-AVAILABLE OPTIONS
-	-h --help
-		Display a help screen and quit.
-	-f --force-exact-sync
-		Exact synchronization mode. Causes $command to delete files on the target 
-                computer if absent in the source directory. 
-                This ensure an exact replica but you may loose files so use this option with caution. 
-        -p --push
-                push mode (default). rsync local dir on the remote server.
-        -r --retrieve
-                retrieve mode. rsync remote dir on the local machine.
- 	-s --dry-run
-		simulate the operations to show what would have been transferred.
-        -t --test
-                display various information only used for debugging purpose. This should be the last option.
-        -q --quiet
-                quiet mode. Minimize the number of printed messages. If used, this should be the first option.
-	-v --verbose
-		Verbose mode. 
-	-d --debug
-		Verbose mode. Causes $command to print debugging messages.
-	-V --version
-		Display the version number then quit. 
-
-AUTHOR
-      Sebastien Varrette <Sebastien.Varrette\@uni.lu> http://www-id.imag.fr/~svarrett/
-      Please report bugs to <Sebastien.Varrette\@uni.lu>
-
-COPYRIGHT
-      This  is a free software. There is NO warranty; not even for
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-SEE ALSO
-      Other scripts are also available on my web site http://www-id.imag.fr/~svarrett/
-EOF
-    exit 0;
-}
-
-
 ######################## POD documentation ########################
 =pod
 
@@ -1119,8 +1066,9 @@ To setup public key authentication, please refer to L<http://sial.org/howto/open
 
 =head1 AUTHOR
 
-Sebastien Varrette L<mailto:Sebastien.Varrette@uni.lu> L<http://varrette.gforge.uni.lu/>
-Please report bugs to L<mailto:Sebastien.Varrette@uni.lu>.
+Sebastien Varrette -- L<http://varrette.gforge.uni.lu/>
+
+Please report bugs to L<Sebastien.Varrette@uni.lu>.
 
 =head1 COPYRIGHT
  
