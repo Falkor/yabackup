@@ -37,7 +37,7 @@ AC_PROG_SSH
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
-AC_CHECK_PERL_MODULES(Storage,, AC_MSG_ERROR(Can't find the Perl modules Storage))
+AC_PROG_PERL_MODULES(Storage,, AC_MSG_ERROR(Can't find the Perl modules Storage))
 
 
 

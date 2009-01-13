@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 ############################################################################################
 # File   : bootstrap 
@@ -49,7 +49,7 @@ CSCOPE_MODE=""  # Initialise the cscope process
 # Commands
 #AUTOHEADER="autoheader"
 ACLOCAL="aclocal -I config/m4"
-AUTOCONF="autoconf"
+AUTOCONF="autoconf -I."
 AUTOMAKE="automake --add-missing --copy"
 AUTORECONF="autoreconf --install --force"
 RM="rm -v -f"
