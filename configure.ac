@@ -65,9 +65,11 @@ AC_CHECK_PERL_MODULES(Storage,, AC_MSG_ERROR(Can't find the Perl modules Storage
 AC_CONFIG_SRCDIR([bin/backup])
 AC_CONFIG_FILES([
 	Makefile
+	bin/Makefile
+])
 #	doc/Makefile
 #	doc/man/Makefile
 #	doc/html/Makefile
-])
+#])
 
 AC_OUTPUT

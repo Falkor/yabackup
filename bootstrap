@@ -47,7 +47,7 @@ DO_ALL_MODE=""  # In addition to rebuilding the autotools, run configure && make
 CSCOPE_MODE=""  # Initialise the cscope process
 
 # Commands
-AUTOHEADER="autoheader"
+#AUTOHEADER="autoheader"
 ACLOCAL="aclocal -I config/m4"
 AUTOCONF="autoconf"
 AUTOMAKE="automake --add-missing --copy"
@@ -270,7 +270,7 @@ while [ $# -ge 1 ]; do
 	-a | --do-all)  DO_ALL_MODE="1";;
 	-n | --dry-run)
 	    DRY_RUN=echo
-	    AUTOHEADER="echo ${AUTOHEADER}"
+#	    AUTOHEADER="echo ${AUTOHEADER}"
 	    ACLOCAL="echo ${ACLOCAL}"
 	    AUTOCONF="echo ${AUTOCONF}"
 	    AUTOMAKE="echo ${AUTOMAKE}"
@@ -286,6 +286,7 @@ done
 
 debug "Verbose mode activated"
 check_bin `get_cmd_from ${AUTOHEADER}` `get_cmd_from ${ACLOCAL}` `get_cmd_from ${AUTOCONF}` `get_cmd_from ${AUTOMAKE}` `get_cmd_from ${AUTORECONF}`
+#check_bin `get_cmd_from ${ACLOCAL}` `get_cmd_from ${AUTOCONF}` `get_cmd_from ${AUTOMAKE}` `get_cmd_from ${AUTORECONF}`
 
 [ -n "${CSCOPE_MODE}" ] && init_cscope && exit 0
 ${AUTORECONF}
