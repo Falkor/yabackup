@@ -10,17 +10,6 @@ unlimited permission to copy, distribute and modify it.
 Basic Installation
 ==================
 
-If the configure script is not present in the current directory, you 
-should run : 
-	./bootstrap
-
-to invoke the autotools process (see option -h for some help).
-
-/!\ WARNING: bootstrap and backup  require autoconf version >= 2.6 and 
-	     automake version > 1.9.6 
-
-
-
 These are generic installation instructions.
 
    The `configure' shell script attempts to guess correct values for
