@@ -514,7 +514,8 @@ sub run_sync_cmd {
 	    }
 	    verbose("   using special settings : \n");
 	    verbose("   " . Dumper $SETTINGS{'Directory'}->{$dir});
-	    $dst_basedir = "$BACKUP_CMD_INFO{'target'}/$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
+	    my $sep  = ($BACKUP_CMD_INFO{'proto'} eq 'ssh') ? ':' : '/';
+	    $dst_basedir = "$BACKUP_CMD_INFO{'target'}$sep$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
 	    if ((! $RETRIEVE_MODE) && 
 		($SETTINGS{'Directory'}->{$dir}->{'src_in_subfolder'})) 
 	      {

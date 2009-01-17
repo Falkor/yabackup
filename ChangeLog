@@ -1,3 +1,6 @@
+2009-01-17  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
+	* FIX BUG id 8 : "Forgot ':' for ssh backup and Directory specialization"
+
 2009-01-05  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
 
 	* backup: initial version.
