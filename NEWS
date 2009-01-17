@@ -1,7 +1,7 @@
 
 2008-?? (to be announced) 
 	* FIX bug id 8:  "Forgot ':' for ssh backup and Directory specialization"
-
+	* Exit when no directory to backup/restore is found
 
 2008-01-13  Version 0.1 Released! 	
 	Initial version on a new repository iBackup (in reference to the future Mac GUI version ;) )

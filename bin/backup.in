@@ -476,6 +476,7 @@ sub configure_sync_cmd {
     info("setup local directories to " . ($RETRIEVE_MODE ? "restore" : "backup") . "\n", "   -");
     setup_directories_to_sync();
     verbose("\tfound:  @{$BACKUP_CMD_INFO{'dirs'}}\n");
+    PRINT_ERROR_THEN_EXIT("No directory to " . ($RETRIEVE_MODE ? "restore" : "backup")) unless (@{$BACKUP_CMD_INFO{'dirs'}});
     # Check command availability both locally and on the target
     check_rsync_availability unless ($QUIET);
     # add options
