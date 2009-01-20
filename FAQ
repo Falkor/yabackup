@@ -1,0 +1,35 @@
+===================================================================
+ File   : FAQ
+ Author : Sebastien VARRETTE <Sebastien.Varrette@uni.lu>
+ Creation date : 20 Jan 2009
+===================================================================
+
+Q: When I put an entry in my crontab to use the backup script on an SSH target, 
+   I get a 'permission denied' whereas launching it in a terminal works 
+   perfectly.
+
+A: The problem is that inside the crontab environement, the environment variable 
+   SSH_AUTH_SOCK is not set (and it is not the case when you launch the script 
+   in a terminal).
+   The solution is to use the directive 'ssh_auth_sock' in your configuration file 
+   (see backup(3)) which leads to the problem of setting a correct path to the 
+   ssh-agent as it is partially dynamic (typically /tmp/ssh-XXXXXXXXXX/agent.<ppid>
+   which change at each daemon startup). 
+   To use always the same path (ans therefore put is in the configuration file), the 
+   general idea is to specialize the '-a' option of the ssh-agent daemon.
+   Otherwise:
+   - On Mac OS X tiger (10.4), I suggest you to use SSHKeyChain (see 
+     http://www.sshkeychain.org/) that rely on a static path for the socket (typically 
+     /tmp/502/SSHKeychain.socket) 
+   - On Mac OS X Leopard (10.5), you can get the dynamic path by issuing the command: 
+     /usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'
+     You may add it in your configuration file: 
+
+     	ssh_auth_sock = `/usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'`
+
+
+
+
+===================================================================
+ 
+ 

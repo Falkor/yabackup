@@ -11,7 +11,9 @@
 	#log_file      = /tmp/backup.log              # location of the log file
 	patternfile_exclude  = $HOME/.rsync_exclude  # the file containing file patterns that should NOT be synchronized
 			       			     # be synchronized
-	#ssh_auth_sock = /tmp/502/SSHKeychain.socket  # ssh-agent configuration 
+	#ssh_auth_sock = /tmp/502/SSHKeychain.socket  # ssh-agent configuration (here from SSHKaychain)
+	#ssh_auth_sock = `/usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'` # ssh-agent socket on Leopard
+
 
 	# Default backup configuration 
 	src_rootdir   = $HOME                        # Root directory on the (local) source

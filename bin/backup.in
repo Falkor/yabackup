@@ -425,8 +425,8 @@ sub update_settings_from {
     my %subsection = %{ dclone($_[0])};   # deep copy 
     while (my ($key, $val) = each(%subsection)) {
 	if ($key eq 'ssh_auth_sock') { 
-	    $ENV{SSH_AUTH_SOCK} = $subsection{'ssh_auth_sock'};
-	    debug "Setting the environment variable SSH_AUTH_SOCK to $subsection{'ssh_auth_sock'}\n";
+	    $ENV{SSH_AUTH_SOCK} = interpret_cmd($subsection{'ssh_auth_sock'});
+	    debug "Setting the environment variable SSH_AUTH_SOCK to $ENV{SSH_AUTH_SOCK}\n";
 	    next;
 	} 
 	if (($key eq 'Directory') && defined($SETTINGS{$key})) {
@@ -585,8 +585,10 @@ sub interpret_cmd {
     foreach my $cmd (@commands) {
 	my $cmd_exec = `$cmd` || die "Unable to execute $cmd : $!\n";
 	chomp($cmd_exec);
+	$cmd =~ s/\$/\\\$/g;  # Serialize command
+	$cmd =~ s/\|/\\\|/g;  # idem
 	$string =~ s/`$cmd`/$cmd_exec/;
-    }
+   }
     return $string;
 }
 
