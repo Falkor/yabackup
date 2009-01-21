@@ -336,6 +336,8 @@ sub getIPs {
 ##
 sub getIPFromInterface {
     my %IPs = getIPs();
+    debug("Analysing IPs on the local system. Found:\n");
+    debug(Dumper \%IPs);
     my @interfaces;
     if (@_) {
 	@interfaces = ($_[0]);
@@ -345,7 +347,7 @@ sub getIPFromInterface {
 	@interfaces = ('en0',  'en1')  if ($os[0] =~ "FreeBSD|OpenBSD|Darwin");
     }
     foreach my $i (@interfaces) {
-	return $IPs{$i}->{IP} if $IPs{$i};
+	return $IPs{$i}->{IP} if ($IPs{$i} && $IPs{$i}->{IP});
     }
     PRINT_ERROR_THEN_EXIT("IP not found for interface(s) @interfaces");
     return;
@@ -359,9 +361,11 @@ sub getIPFromInterface {
 sub check_subnet {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
     my $subnet = $_[0];
-    my $IP = ($_[1] ? getIPFromInterface($_[1]) : getIPFromInterface());
+    my $IP = "";
+    $IP = ($_[1] ? getIPFromInterface($_[1]) : getIPFromInterface());
     verbose("=> check subnet $subnet (current IP address found : $IP)...");
     unless ($IP =~ "$subnet") {
+	verbose("\n");
 	warning "The IP adress $IP does not belong to the subnet $subnet => no backup to be done\n";
 	exit 2;
     }
