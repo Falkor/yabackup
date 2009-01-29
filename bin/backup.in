@@ -918,7 +918,7 @@ It starts with C<< <blockname> >> and ends with C<< </blockname> >>
 Two sections are mandatory: 'global' (which define global settings for the backup) and 
 'default' (which refer to the default backup configuration). 
 Each additionnal section is considered as a separate backup configuration and can be 
-refered using the command-line option C<-s> (see L<DESCRIPTION>).
+refered using the command-line option C<-s> (see L<"DESCRIPTION">).
 
 When defining directory lists, you may use the following patterns symbols: 
 the wildcard C<*>, the symbol C<^> to specify the begining
@@ -948,9 +948,13 @@ directory DIR. You may overwrite the following options
 
 =over 4
 
-=item * B<dst_rootdir = ROOTDIR> : see C<dst_rootdir>
+=item * B<dst_rootdir = ROOTDIR> 
 
-=item * B<src_in_subfolder = SUBDIR> : this sub section is used to separate on the target 
+see C<dst_rootdir>
+
+=item * B<src_in_subfolder = SUBDIR> 
+
+this sub section is used to separate on the target 
 the files and subfolders in DIR into a subdirectory named 'SUBDIR'. 
 For instance, let assume one want to synchronize the B<$HOME/.ssh> folder from 
 multiples computers B<comp1>, B<comp2> etc. on the server B<target_server>, each computer 
@@ -966,6 +970,13 @@ On the other hand, assuming we have set the B<src_in_subfolder> directive as fol
 Then the B<$dst_rootdir/$HOME/.ssh> folder on the target server B<target_server> will 
 contain subfolders B<comp1>, B<comp2> etc., each containing the files and subdirs of
 B<$HOME/.ssh/> from the source computer. 
+In other work, you will be in the following configuration: 
+
+        On'comp1':                     On 'comp2':                  on 'target_server':
+    $HOME/.ssh/id_dsa             $HOME/.ssh/id_dsa             $dst_rootdir/$HOME/.ssh/comp1/id_dsa  
+    $HOME/.ssh/id_dsa.pub         $HOME/.ssh/id_dsa.pub         $dst_rootdir/$HOME/.ssh/comp1/id_dsa.pub
+                                                                $dst_rootdir/$HOME/.ssh/comp2/id_dsa  
+                                                                $dst_rootdir/$HOME/.ssh/comp2/id_dsa.pub 
 
 This directive is ignored in retrieve mode (see option C<-r>)
 
@@ -1011,9 +1022,13 @@ SUBNET. The successive network interface checked for an IP compared with SUBNET 
 
 =over 4
 
-=item * (eth0, eth1) on  Linux system (obtained by the I<uname> command)
+=item * (eth0, eth1) 
 
-=item * (en0, en1) on FreeBSD, OpenBSD and Darwin systems (which include Mac OS X)
+on  Linux system (obtained by the I<uname> command)
+
+=item * (en0, en1) 
+
+on FreeBSD, OpenBSD and Darwin systems (which include Mac OS X)
 
 =back
 
@@ -1023,7 +1038,7 @@ Root directory on the (local) source  (C</> by default)
 
 =item B<ssh_auth_sock = /path/to/ssh-agent.socket>
 
-Set the environment variable B<$SSH_AUTH_SOCK> for this synchronization to the socket 
+Set the environment variable C<$SSH_AUTH_SOCK> for this synchronization to the socket 
 of the socket file of the ssh-agent instance. 
 This is mandatory if you set a passphrase to you SSH key and want the I<backup> script  
 to automatically authenticate on a remote server wher you setup an ssh public key 
@@ -1056,17 +1071,20 @@ Current supported protocols include:
 =item * C<drive> : an external drive 
 
 Example:  
+
       drive:///Volumes/MyDrive         (under Mac OS X)
       drive:///mnt/mydrive             (under Linux) 
 
 =item * C<file>  : a local folder
 
 Example: 
+
       file:///path/to/local/folder
 
 =item * C<ssh>   : SSH with public key authentication 
 
 Example: 
+
       ssh://mylogin@server1
       ssh://mylogin@server1.example.org
       ssh://mylogin@server2.example.org:8022
@@ -1078,14 +1096,17 @@ To setup public key authentication, please refer to L<http://sial.org/howto/open
 
 =back
 
+=head1 BUGS
+
+Please report bugs using the L<https://gforge.uni.lu/tracker/?atid=249&group_id=44> 
+of the C<ibackup> project. 
+
 =head1 AUTHOR
 
 Sebastien Varrette -- L<http://varrette.gforge.uni.lu/>
 
-Please report bugs to L<Sebastien.Varrette@uni.lu>.
-
 =head1 COPYRIGHT
- 
+
 This  is a free software. There is NO warranty; not even for
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 

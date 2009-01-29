@@ -1,0 +1,114 @@
+#navbar {
+    position: fixed;
+    top: 1em;
+    left: 1em;
+    width: 10em;
+    background-color: #c5eae4;
+    color: black;
+    text-align: right;
+    padding-top: 3em;
+    padding-left: 0em;
+    padding-right: 1em;
+    padding-bottom: 3em;
+}
+
+#navbar p {
+    padding: 0em;
+    border: 0em;
+    margin: 0.1em;
+}
+
+#header {
+    position: relative;
+    background: transparent;
+    left: 12em;
+}
+
+#header h1 {
+    font-family: sans-serif;
+    font-size: 3em;
+    margin-top: 0.15em;
+    margin-left: 15px;
+}
+
+#right {
+    font-size: normal;
+    position: relative;
+    left: 12em;
+    right: 2em;
+    min-width: 15em;
+    max-width: 50em;
+    min-height: 15em; /* Make sure it doesn't overlap nav bar */
+}
+
+#footer { 
+    font-size: x-small; 
+    padding: 5px; 
+    border-top: 1px solid #a0a0a0; 
+    margin-top: 5px; 
+    text-align: center;
+}
+
+/* The rest of the css is adapted from a post on perl forum http://www.perlmonks.org/bare/?node_id=262866 */
+
+BODY {
+    background: white;
+    color: black;
+    font-family: arial,sans-serif;
+    margin: 0;
+    padding: 1ex;
+}
+
+TABLE {
+    border-collapse: collapse;
+    border-spacing: 0;
+    border-width: 0;
+    color: inherit;
+}
+
+TD {
+    margin: 0;
+    padding: 0;
+}
+
+DIV {  border-width: 0; }
+DT { margin-top: 1em; }
+
+TH {
+    background: #bbbbbb;
+    color: inherit;
+    padding: 0.4ex 1ex;
+    text-align: left;
+}
+
+TH A:link, TH A:visited {
+    background: transparent;
+    color: black;
+}
+
+PRE     {
+    background: #dddddd;
+    border: 1px solid black;
+    color: black;
+    padding-top: 1em;
+    padding-bottom: 1em;
+    white-space: pre;
+}
+
+H1      {
+    background: transparent;
+    color: #006699;
+    font-size: large;
+}
+
+H2      {
+    background: transparent;
+    color: #006699;
+    font-size: medium;
+}
+
+LI {
+    line-height: 1.2em;
+    /* list-style-type: none; */
+}
+ 

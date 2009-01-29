@@ -1,0 +1,17 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; template.wml                                                       ;;;
+;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
+;;; WML info: see http://thewml.org/docs/                              ;;;
+;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;;                                                                    ;;; 
+;;; Specific balise defined in include/definitions.tag                 ;;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#use wml::include::main
+#use wml::std::info
+
+<htitle "iBackup">
+<page-header "<h1>$(DEFAULT_TITLE)</h1>">
+
+<!-- Your text-->
+

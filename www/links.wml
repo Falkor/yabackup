@@ -1,0 +1,23 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; links.wml                                                       ;;;
+;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
+;;; WML info: see http://thewml.org/docs/                              ;;;
+;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;;                                                                    ;;; 
+;;; Specific balise defined in include/definitions.tag                 ;;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#use wml::include::main
+#use wml::std::info
+
+<htitle "iBackup">
+<page-header "<h1>Links</h1>">
+
+
+<ul>
+  <li><rsync>, the paradigm utility using the rsync algorithm</li>
+  <li><duplicity>, the utility for encrypted bandwidth-efficient backup 
+      using the rsync algorithm</li>
+  <li><a href="http://www.bombich.com/ccc">Carbon Copy Cloner</a></li>
+</ul>
+

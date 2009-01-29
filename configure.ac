@@ -35,14 +35,24 @@ AC_PATH_PROGS(POD2MAN, pod2man, pod2man)
 # ----------------------------------------------------------------
 # --with && --enable OPTIONS
 # ----------------------------------------------------------------
-AC_MSG_CHECKING(for html doc generation)
+AC_MSG_CHECKING([for website generation using pod2html and Website Meta Langage] )
 AC_ARG_ENABLE(
-    htmldoc, 
-    [AS_HELP_STRING([--enable--htmldoc],[enable the generation of html doc using pod2html [default=no]])],
-    [AC_MSG_RESULT([on])
-     AC_PATH_PROGS(POD2HTML, pod2html, pod2html)],
-    [AC_MSG_RESULT([off])]
+    www, 
+    [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
+    [case "${enableval}" in
+    	  yes) AC_MSG_RESULT([on])
+	       AC_PATH_PROGS(POD2HTML, pod2html, pod2html)
+	       AC_PATH_PROGS(WMK, wmk, wmk)
+	       generate_website=true ;;
+  	  no)  AC_MSG_RESULT([off])
+	       generate_website=false ;;
+  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-www) ;;
+     esac],
+     [AC_MSG_RESULT([off])
+      generate_website=false]
 )
+AM_CONDITIONAL(generate_WEBSITE, test x$generate_website = xtrue)
+
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
@@ -61,35 +71,16 @@ AC_CHECK_CPAN_MODULES(
 )
 
 # ----------------------------------------------------------------
-# Checks for header files. 
 # ----------------------------------------------------------------
-
-# ----------------------------------------------------------------
-# Checks for typedefs, structures, and compiler characteristics.
-# ----------------------------------------------------------------
-
-# ----------------------------------------------------------------
-# Checks for library functions.
-# ----------------------------------------------------------------
-
-# ----------------------------------------------------------------
-# --with && --enable OPTIONS
-# ----------------------------------------------------------------
-
-
-# ----------------------------------------------------------------
-# ----------------------------------------------------------------
-
 
 AC_CONFIG_SRCDIR([bin/backup.in])
 AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
 	bin/backup
+	www/.wmlrc
+	www/include/wmlrc.default
+	www/Makefile
 ])
-#	doc/Makefile
-#	doc/man/Makefile
-#	doc/html/Makefile
-#])
 
 AC_OUTPUT

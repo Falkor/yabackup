@@ -1,0 +1,26 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; docs.wml                                                       ;;;
+;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
+;;; WML info: see http://thewml.org/docs/                              ;;;
+;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;;                                                                    ;;; 
+;;; Specific balise defined in include/definitions.tag                 ;;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#use wml::include::main
+#use wml::std::info
+
+<htitle "iBackup">
+<page-header "<h1>Documentation</h1>">
+
+<h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
+
+<ul>
+  <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
+  <li><a href="$(ROOTREL)/FAQ">NEWS</a> from the current release</li>
+  <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>  
+  <li><a href="$(ROOTREL)/backup.3.html" target="_blank"><code>backup</code> man page</a></li>  
+</ul>
+
+<!-- Your text-->
+

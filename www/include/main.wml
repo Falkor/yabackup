@@ -1,0 +1,75 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; main.wml                                                      ;;;
+;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>       ;;;
+;;; For more info, see http://thewml.org/docs/
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#use wml::std::page
+#use wml::std::tags
+#use wml::std::info
+#use wml::des::space
+#use wml::des::navbar
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+;;;   <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+{: [[s|<html>|<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">|]]
+<page color="none" xmlns="http://www.w3.org/1999/xhtml">
+:}
+
+<head>
+	<title>Backup - {#PAGE_TITLE#}</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+	<meta name="author"    content="Sebastien Varrette"/>
+	<link rel="stylesheet" type="text/css" href="$(ROOTREL)/include/style.css" media="screen" />
+</head>
+
+#include <$(ROOTREL)/include/menu.tag>
+#include <$(ROOTREL)/include/definitions.tag>
+
+<div id="header">
+  <a name="top"></a>
+  {#PAGE_HEADER#}
+</div>
+
+<div id="right">
+  <dump BODY>
+</div>
+
+<div id="navbar">
+  <dump MENU>
+</div>
+
+<div id="footer">
+  <maj> | 
+    Design inspired by the <duplicity> web site
+    <br/><br/>
+    <a href="http://validator.w3.org/">
+      <img src="http://www.w3.org/Icons/valid-xhtml10"
+           alt="Valid XHTML 1.0 Strict" height="31" width="88" />
+    </a>
+    <a href="http://www.gnu.org/licenses/gpl.txt">
+      <img src="http://www.gnu.org/graphics/gplv3-88x31.png"
+	   alt="Released under GNU GPL Licence"/>
+    </a>
+    <a href="http://jigsaw.w3.org/css-validator/">
+      <img style="border:0;width:88px;height:31px"
+           src="http://jigsaw.w3.org/css-validator/images/vcss"
+           alt="Valid CSS!" />
+    </a>
+</div>
+
+..PAGE_HEADER!>><h1>{#PAGE_TITLE#}</h1><<..
+
+<define-tag page-header>
+	{#PAGE_HEADER#:%0:##}
+</define-tag>
+
+..PAGE_TITLE!>>Error: Undefined Title !!<<..
+
+<define-tag htitle>
+	{#PAGE_TITLE#:%0:##}
+</define-tag>
+
+{#BODY#:

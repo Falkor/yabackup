@@ -21,20 +21,19 @@ EXTRA_DIST = AUTHORS \
     README     \
     config/m4   
 
-SUBDIRS = bin
+if generate_WEBSITE
+WEBSITEDIR=www
+endif
+
+SUBDIRS = bin $(WEBSITEDIR)
 
 # Generate man page
 backup.3 : bin/backup.in 
-	$(POD2MAN) --name=BACKUP --section=3 \
-	 --center="Backup Script Manual" $^ > $@
-
-# for my own purpose
-backup.html : 
-	[ -n "$(POD2HTML)" ] && $(POD2HTML) --title=BACKUP bin/backup.in > $@ 
-	[ -n "$(POD2HTML)" ] && $(RM) pod2htmd.tmp pod2htmi.tmp
+	$(POD2MAN) --name=BACKUP --section=3 --center="Backup Script Manual" $^ > $@
 
 .PHONY: doc
-doc: backup.3 backup.html
+doc: backup.3
+#doc: backup.3 backup.html
 
 
 
