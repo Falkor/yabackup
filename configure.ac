@@ -7,9 +7,7 @@
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.1],[sebastien.varrette@uni.lu])
-
-#AC_SUBST(VERSION)
+AC_INIT([backup],[0.2],[sebastien.varrette@uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
