@@ -1,6 +1,8 @@
 
 2008-?? (to be announced) 
+	* FIX BUG id 9 : Target path processing ('.' ignore in target_url directive)
 	* FIX bug id 8:  "Forgot ':' for ssh backup and Directory specialization"
+	* Add leading '/' on target drive if missing
 	* Exit when no directory to backup/restore is found
 
 2008-01-13  Version 0.1 Released! 	

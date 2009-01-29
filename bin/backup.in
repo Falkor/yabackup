@@ -46,7 +46,7 @@ use Data::Dumper;
 use Pod::Usage;
 
 # Generic variables
-my $VERSION = '@VERSION@';            # Script version
+my $VERSION = '@VERSION@';    # Script version
 my $VERBOSE = 0;              # option variable for verbose mode with default value (false)
 my $DEBUG   = 0;              # option variable for debug mode with default value (false)
 my $QUIET   = 0;              # By default, display all informations
@@ -60,7 +60,7 @@ my $SYNC_MODE       = "--update"; # By default, update directories, don't delete
 my $RETRIEVE_MODE   = 0;          # By default, push data on the backup target and don't retrieve anything
 
 my $config_file;                  # Configuration file.
-my @backup_sections;                     # backup sections to be used in the configuration file 
+my @backup_sections;              # backup sections to be used in the configuration file 
 
 my %SETTINGS = (
 		'use_duplicity'         => 'no', 
@@ -89,7 +89,7 @@ my %BACKUP_CMD_INFO = (
 
 my %DEFAULT_SETTINGS        = %SETTINGS;
 my %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
-lock_hash(%DEFAULT_SETTINGS);         # for extra safety
+lock_hash(%DEFAULT_SETTINGS);        # for extra safety
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
 
 # Process command line
@@ -243,6 +243,7 @@ sub print_current_cmd_info {
 sub PRINT_ERROR_THEN_EXIT {
     my $msg = $_[0] ? $_[0] : 'Bad format';
     error "$msg\n";
+    append_to_log("[ERROR] $msg");
     exit(1);
 }
 
@@ -584,16 +585,16 @@ sub setup_backup_cmd_info_src {
 ##
 sub interpret_cmd {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
-    my $string = $_[0]; 
+    my $string = my $ref = $_[0]; 
     my @commands = $string =~ /`([^`]+)`/g; # retrieve commands to interpret
     foreach my $cmd (@commands) {
-	my $cmd_exec = `$cmd` || die "Unable to execute $cmd : $!\n";
+	my $cmd_exec = `$cmd` || PRINT_ERROR_THEN_EXIT("Execute of $cmd failed or return and empty string: $!\n");
 	chomp($cmd_exec);
 	$cmd =~ s/\$/\\\$/g;  # Serialize command
 	$cmd =~ s/\|/\\\|/g;  # idem
-	$string =~ s/`$cmd`/$cmd_exec/;
-   }
-    return $string;
+	$ref =~ s/`$cmd`/$cmd_exec/;
+    }
+    return $ref;
 }
 
 ####
@@ -602,7 +603,7 @@ sub interpret_cmd {
 sub parse_target_url {
     PRINT_ERROR_THEN_EXIT("Undefined target url") if ! defined($SETTINGS{'target_url'});
     $SETTINGS{'target_url'} = interpret_cmd("$SETTINGS{'target_url'}");
-    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\w\/]+)((\@([\w\.]+))(:(\d+))?)?)/;
+    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)((\@([\w\.]+))(:(\d+))?)?)/;
     my ($proto, $target, $user, $server, $port) = ($1, $2, $3, $6, $8);
     #my ($proto, $target) = split('://', $SETTINGS{'target_url'});
     debug("Protocol: $proto\n")  if ($proto);
@@ -637,6 +638,11 @@ sub parse_target_url {
 sub setup_target_drive {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
     $BACKUP_CMD_INFO{'dst'} = interpret_cmd($_[0]);
+    # Ensure the target drive starts with a '/'
+    if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
+	warning("The target drive path ($BACKUP_CMD_INFO{'dst'}) does not starts with a '/' => '/' character added\n");
+	$BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
+    }
     PRINT_ERROR_THEN_EXIT("The target $BACKUP_CMD_INFO{'dst'} cannot be found") unless ( -d "$BACKUP_CMD_INFO{'dst'}");
 }
 

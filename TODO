@@ -1,2 +1,3 @@
 - Expand wildcard not only relative to $src_rootdir but also $dst_rootdir in retrieve mode
-
+- Add support for files to include/exclude relative to $src_rootdir (currently, only directories are checked)
+- Add duplicity support ;)
