@@ -27,6 +27,7 @@ AC_PROG_INSTALL
 AC_PROG_SSH
 AC_PATH_PROGS(PERL, perl perl5, false)
 AC_PATH_PROGS(POD2MAN, pod2man, pod2man)
+AC_PATH_PROGS(RSYNC, rsync, rsync)
 
 # ----------------------------------------------------------------
 # Macros that should be defined to compile:

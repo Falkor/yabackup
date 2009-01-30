@@ -19,13 +19,17 @@ EXTRA_DIST = AUTHORS \
     README     \
     TODO       \
     README     \
-    config/m4   
+    config/m4  \
+    www 
 
 if generate_WEBSITE
 WEBSITEDIR=www
 endif
 
 SUBDIRS = bin $(WEBSITEDIR)
+
+dist-hook:
+	rm -rf `find $(distdir) -name .svn`
 
 # Generate man page
 backup.3 : bin/backup.in 

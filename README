@@ -1,6 +1,9 @@
-	backup - Backup, a script utility to backup your system
 
-  Copyright (C) 2009 Sebastien Varrette
+	backup - Backup, a script utility to backup your system
+	
+  Homepage: http://ibackup.gforge.uni.lu
+
+  Copyright (c) 2009 Sebastien Varrette
 
   backup is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -16,8 +19,14 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+
 Comments are welcome. Please submit bugs using the bug tracker system 
 associated with the 'ibackup' project: 
 	https://gforge.uni.lu/tracker/?group_id=44
 
-	- Sebastien Varrette <Sebastien.Varrette@uni.lu>
+Finally, if the 'configure' script is missing, just run the 'bootstrap' script. 
+It supposes the availability on your system of the following software: 
+- autoconf v2.6 or later
+- automake v1.9.6 or later
+
+	Sebastien Varrette <Sebastien.Varrette@uni.lu>
