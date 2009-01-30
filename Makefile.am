@@ -16,6 +16,7 @@ EXTRA_DIST = AUTHORS \
     DISCLAIMER \
     INSTALL    \
     NEWS       \
+    FAQ        \
     README     \
     TODO       \
     README     \

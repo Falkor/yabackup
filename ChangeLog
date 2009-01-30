@@ -1,11 +1,17 @@
+2009-01-30  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
+	* Create website for the ibackup project and add it into the release 
+	* Complete autotools configuration with the --enable-www configure option 
+	* release v0.2
+	
 2009-01-29  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
 	* FIX BUG id 9 : Target path processing ('.' ignore in target_url directive)
+	* Feature: Add leading '/' on target drive if missing
 
 2009-01-17  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
 	* FIX BUG id 8 : "Forgot ':' for ssh backup and Directory specialization"
-	* Exit when no directory to backup/restore is found
+	* Feature: Exit when no directory to backup/restore is found
 	
 2009-01-05  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
 
-	* backup: initial version.
+	* backup: initial version (0.1).
 

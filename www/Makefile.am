@@ -6,9 +6,11 @@
 ## This is the Makefile.am file for web site. 
 ## ----------------------------------------------------------------
 
+if generate_WEBSITE
+
 BACKUP_SCRIPT_SRC="../bin/backup.in"
 CSS_STYLESHEET="./include/style.css"
-DOC_FROMPOD=backup.3.html
+DOC_FROMPOD="backup.3.html"
 # sources
 SRC          = $(wildcard *.wml)
 TARGET       = $(SRC:.wml=.html) $(DOC_FROMPOD) ChangeLog FAQ NEWS 
@@ -46,7 +48,10 @@ NEWS: ../NEWS
 
 rsync: ${TARGET}
 	@echo "=> running $(RSYNC_CMD)"
-#	@eval $(RSYNC_CMD)
+	@eval $(RSYNC_CMD)
 
-
+else 
+all: 
+	@echo "Please configure with --enable-www to be able to compile the backup web site."
+endif
 
