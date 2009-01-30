@@ -13,35 +13,44 @@
 <htitle "iBackup">
 <page-header "<h1>Documentation</h1>">
 
-<!-- ------------------------------------------- -->
+<!-- ========================================== -->
 <h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
 
 <ul>
   <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
   <li><a href="$(ROOTREL)/NEWS">NEWS</a> from the current release</li>
   <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>  
-  <li><a href="$(ROOTREL)/backup.3.html" target="_blank"><code>backup</code> man page</a></li>  
+  <li><a href="$(ROOTREL)/backup.3.html" rel="external"><code>backup</code> man page</a></li>  
 </ul>
 
-<!-- ------------ -->
+<!-- ============ -->
 <h2>Installation</h2>
 
 Once you retrieved the latest release (version $(CURRENT_RELEASE) - see section <menu_download>), 
 uncompress the archive and run the classical <code>configure</code>, <code>make</code>, 
 <code>make install</code> steps:
-<blockquote>
+<blockquote><p>
   <code>$ tar xvzf backup-$(CURRENT_RELEASE).tar.gz</code><br/>
   <code>$ cd backup-$(CURRENT_RELEASE)</code><br/>
   <code>$ ./configure</code><br/>
   <code>$ make</code><br/>
   <code>$ make install</code><br/>
-</blockquote>
+</p></blockquote>
 
 I advice you to use <stow>, a wonderful tool to activate/desactivate different versions for the 
 same program compiled by autotools (you'll then typically run the '<code>configure</code>' script
-with the option <code>--prefix=/usr/local/stow/backup-$(CURRENT_RELEASE)</code>).
+with the option <code>--prefix=/usr/local/stow/backup-$(CURRENT_RELEASE)</code>).<br/><br/>
 
-<!-- ------------ -->
+Once installed and configured, you will probably want to add an entry in your <crontab> 
+(using '<code>crontab -e</code>') such that 
+the backup is performed every hour typically without your interaction. 
+For instance, here is my personnal entry:<pre>
+   $ crontab -l
+   \# crontab entry for backup
+   1 * * * *  	/usr/local/bin/backup -s gandalf --quiet</pre>
+
+
+<!-- ============ -->
 <h2>Requirements</h2>
 
 <backup> was developped under Mac OS X and shall run on any GNU/Linux or BSD-like system. 
@@ -73,20 +82,21 @@ questions (use the default answer) and once you got the prompt, just run the com
 '<code>install My::Module</code>' to install the module <code>My::Module</code>. <br/>
 For mode info, take a look at <a href="http://search.cpan.org/~jhi/perl-5.8.0/lib/CPAN.pm">this page</a>. 
 
-<!-- ----------------------- -->
+<!-- ======================= -->
 <h2>Reference documentation</h2>
 
 <:
    open(HTMLMANPAGE, "./backup.3.html") || die("Missing file: $!");
    my $line; 
-   my $go_print = false;
+   my $go_print;
    while($line = <HTMLMANPAGE>) {
        if ($line =~ /^<body>/) {
           $go_print = true;
           next;
        }
-       $go_print = false if ($line =~ /^<\/body>/);
-       print $line if ($go_print);
+       $go_print = '' if ($line =~ /^<\/body>/);
+       print "$line" if $go_print;
+      
    }
    close(HTMLMANPAGE);
 :>

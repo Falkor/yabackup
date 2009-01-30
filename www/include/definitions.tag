@@ -68,7 +68,9 @@
 <define-tag stow whitespace=delete>
   <a href="http://www.gnu.org/software/stow/">stow</a>
 </define-tag>
-
+<define-tag crontab whitespace=delete>
+  <a href="http://www.linuxweblog.com/crotab-tutorial">crontab</a>
+</define-tag>
  
 ;;; -- classical links --- ;;;
 <define-tag link  whitespace=delete>

@@ -8,9 +8,9 @@
 
 if generate_WEBSITE
 
-BACKUP_SCRIPT_SRC="../bin/backup.in"
-CSS_STYLESHEET="./include/style.css"
-DOC_FROMPOD="backup.3.html"
+BACKUP_SCRIPT_SRC= ../bin/backup.in
+CSS_STYLESHEET   = ./include/style.css
+DOC_FROMPOD      = backup.3.html
 # sources
 SRC          = $(wildcard *.wml)
 TARGET       = $(SRC:.wml=.html) $(DOC_FROMPOD) ChangeLog FAQ NEWS 
@@ -46,7 +46,7 @@ FAQ: ../FAQ
 NEWS: ../NEWS
 	rsync -avzu $< $@
 
-rsync: ${TARGET}
+rsync: all
 	@echo "=> running $(RSYNC_CMD)"
 	@eval $(RSYNC_CMD)
 

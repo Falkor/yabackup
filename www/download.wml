@@ -13,7 +13,7 @@
 <htitle "iBackup">
 <page-header "<h1>Download</h1>">
 
-<!-- ------------------------------------------- -->
+<!-- =========================================== -->
 <h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
 
 <ul>
@@ -25,9 +25,9 @@ There are several way to get <backup>:
 <ul>
   <li>You can download the latest stable tarball version:<br/>
     <blockquote>
-      <a href="https://gforge.uni.lu/frs/download.php/16/backup-0.2.tar.gz">
+      <p><a href="https://gforge.uni.lu/frs/download.php/16/backup-0.2.tar.gz">
 	backup-0.2.tar.gz
-      </a>
+      </a></p>
     </blockquote>
   </li>
   <li>You can download the latest version of the sources using anonymous svn access:<pre>
@@ -38,6 +38,3 @@ There are several way to get <backup>:
 </ul>
 
 Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=44">file area of the Gforge</a>.
-
-<!-- Your text-->
-

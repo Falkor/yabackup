@@ -13,7 +13,7 @@
 <htitle "iBackup">
 <page-header "<h1>Backup</h1>">
 
-<!-- ----------- -->
+<!-- =========== -->
 <h2>What is it?</h2>
 
 <backup> is a highly flexible script written in <perl> used for the 
@@ -25,7 +25,7 @@ external drive or a remote machine with SSH access.<br/><br/>
 (meaning only the files that differs are transfered) and (in a future release) 
 <duplicity> together with a configuration file.
 
-<!-- ------------------- -->
+<!-- =================== -->
 <h2>And more precisely?</h2>
 
 Assume you want to backup all directories in your homedir: 
@@ -59,15 +59,15 @@ This configuration is done through the following configuration file:
 </pre>
 
 To backup using the default configuration, just run: 
-<blockquote><code>backup</code></blockquote>
+<blockquote><p>backup</p></blockquote>
 
 To backup using the '<code>toto</code>' section of the configuration file, 
 just run:
-<blockquote><code>backup --section=toto</code></blockquote>
+<blockquote><p>backup --section=toto</p></blockquote>
 If you need to restore data from the backup '<code>toto</code>', run :
-<blockquote><code>backup --section=toto -r</code></blockquote>
+<blockquote><p>backup --section=toto -r</p></blockquote>
 
-<!-- -------------------------- -->
+<!-- ========================== -->
 <h2>Current development status</h2>
 
 <backup> is still in Alpha (last version: $(CURRENT_RELEASE)) and not all functionnality 
@@ -79,15 +79,12 @@ and symbolic links. <br/><br/>
 As for protocols connecting to a backup target, <backup> supports local sockets 
 (for local file/directories access) and <code>ssh</code>.
 
-<!-- -------------------------- -->
+<!-- ======= -->
 <h2>Licence</h2>
 
 <backup> is released under <a href="http://www.gnu.org/licenses/gpl.html">GNU GPL Licence</a> v3 (free software).
 
-<!-- -------------------------- -->
+<!-- ====== -->
 <h2>Author</h2>
 
 <backup> is written by <me>.
-
-<!-- Your text-->
-
