@@ -10,9 +10,8 @@ BACKUP_SCRIPT_SRC="../bin/backup.in"
 CSS_STYLESHEET="./include/style.css"
 DOC_FROMPOD=backup.3.html
 # sources
-SRC         = $(wildcard *.wml)
-#SRC          = index.wml features.wml docs.wml
-TARGET       = $(SRC:.wml=.html) $(DOC_FROMPOD)
+SRC          = $(wildcard *.wml)
+TARGET       = $(SRC:.wml=.html) $(DOC_FROMPOD) ChangeLog FAQ NEWS 
 MAKEFILE_DEP = .Makefile.dep
 SCRIPT_DEPENDANCES = .dependances.sh
 
@@ -28,7 +27,7 @@ RSYNC_CMD="rsync --rsh=ssh $(RSYNC_EXCLUDE_CMD) -avz --progress $(RSYNC_MODE) . 
 
 CLEANFILES = $(TARGET) *~
 
-all: $(SRC) $(DOC_FROMPOD) ChangeLog FAQ
+all: $(SRC) $(DOC_FROMPOD) ChangeLog FAQ NEWS
 	$(WMK) $(SRC)
 
 $(DOC_FROMPOD): 
@@ -40,6 +39,9 @@ ChangeLog: ../ChangeLog
 	rsync -avzu $< $@
 
 FAQ: ../FAQ
+	rsync -avzu $< $@
+
+NEWS: ../NEWS
 	rsync -avzu $< $@
 
 rsync: ${TARGET}

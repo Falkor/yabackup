@@ -13,14 +13,80 @@
 <htitle "iBackup">
 <page-header "<h1>Documentation</h1>">
 
+<!-- ------------------------------------------- -->
 <h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
 
 <ul>
   <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
-  <li><a href="$(ROOTREL)/FAQ">NEWS</a> from the current release</li>
+  <li><a href="$(ROOTREL)/NEWS">NEWS</a> from the current release</li>
   <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>  
   <li><a href="$(ROOTREL)/backup.3.html" target="_blank"><code>backup</code> man page</a></li>  
 </ul>
 
-<!-- Your text-->
+<!-- ------------ -->
+<h2>Installation</h2>
 
+Once you retrieved the latest release (version $(CURRENT_RELEASE) - see section <menu_download>), 
+uncompress the archive and run the classical <code>configure</code>, <code>make</code>, 
+<code>make install</code> steps:
+<blockquote>
+  <code>$ tar xvzf backup-$(CURRENT_RELEASE).tar.gz</code><br/>
+  <code>$ cd backup-$(CURRENT_RELEASE)</code><br/>
+  <code>$ ./configure</code><br/>
+  <code>$ make</code><br/>
+  <code>$ make install</code><br/>
+</blockquote>
+
+I advice you to use <stow>, a wonderful tool to activate/desactivate different versions for the 
+same program compiled by autotools (you'll then typically run the '<code>configure</code>' script
+with the option <code>--prefix=/usr/local/stow/backup-$(CURRENT_RELEASE)</code>).
+
+<!-- ------------ -->
+<h2>Requirements</h2>
+
+<backup> was developped under Mac OS X and shall run on any GNU/Linux or BSD-like system. 
+It also requires: 
+<ul>
+  <li><rsync> v2.6.9 or later</li>
+  <li><perl> v5 or later</li>
+  <li>A few perl <cpan> modules, more precisely:
+      <ul>
+	<li><code>Switch </code></li>  
+	<li><code>Storable </code></li>  
+	<li><code>Hash::Util </code></li>  
+	<li><code>Time::localtime </code></li>  
+	<li><code>Getopt::Long </code></li>  
+	<li><code>POSIX </code></li>  
+	<li><code>Getopt::Long </code></li>  
+	<li><code>Config::General </code></li>  
+	<li><code>Term::ANSIColor </code></li>  
+	<li><code>Data::Dumper </code></li>  
+	<li><code>Pod::Usage</code></li>  
+      </ul>
+  </li>
+</ul>
+Actually, all those elements are checked by the '<code>configure</code>' script yet don't worry 
+if some (or all) the <cpan> modules mentioned above are missing, they are pretty easy to install 
+using the <code>cpan</code> command (to be launched as root). 
+At the first launch, you'll have to answer a few 
+questions (use the default answer) and once you got the prompt, just run the command 
+'<code>install My::Module</code>' to install the module <code>My::Module</code>. <br/>
+For mode info, take a look at <a href="http://search.cpan.org/~jhi/perl-5.8.0/lib/CPAN.pm">this page</a>. 
+
+<!-- ----------------------- -->
+<h2>Reference documentation</h2>
+
+<:
+   open(HTMLMANPAGE, "./backup.3.html") || die("Missing file: $!");
+   my $line; 
+   my $go_print = false;
+   while($line = <HTMLMANPAGE>) {
+       if ($line =~ /^<body>/) {
+          $go_print = true;
+          next;
+       }
+       $go_print = false if ($line =~ /^<\/body>/);
+       print $line if ($go_print);
+   }
+   close(HTMLMANPAGE);
+:>

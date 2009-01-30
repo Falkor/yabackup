@@ -56,11 +56,17 @@
 <define-tag perl whitespace=delete>
     <a href="http://www.perl.org/">Perl</a>
 </define-tag>
+<define-tag cpan whitespace=delete>
+    <a href="http://www.cpan.org/">CPAN</a>
+</define-tag>
 <define-tag backup whitespace=delete>
     <code>backup</code>
 </define-tag>
 <define-tag rsync whitespace=delete>
   <a href="http://samba.anu.edu.au/rsync/">rsync</a>
+</define-tag>
+<define-tag stow whitespace=delete>
+  <a href="http://www.gnu.org/software/stow/">stow</a>
 </define-tag>
 
  

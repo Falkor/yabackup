@@ -20,8 +20,8 @@
   <navbar:button id=home      txt="Home"           url="$(ROOTREL)/index.html">
   <navbar:button id=features  txt="Features"       url="$(ROOTREL)/features.html">
   <navbar:button id=docs      txt="Documentations" url="$(ROOTREL)/docs.html">
-;;;  <navbar:button id=download  txt="Download"       url="$(ROOTREL)/download.html">
-  <navbar:button id=download  txt="Download"       url="https://gforge.uni.lu/frs/?group_id=44">
+  <navbar:button id=download  txt="Download"    url="$(ROOTREL)/download.html">
+;;;  <navbar:button id=download  txt="Download"       url="https://gforge.uni.lu/frs/?group_id=44">
   <navbar:button id=bugs      txt="Submit bugs"    url="https://gforge.uni.lu/tracker/?atid=249&group_id=44&func=browse">
   <navbar:button id=gforge    txt="Gforge"         url="https://gforge.uni.lu/projects/ibackup/">
   <navbar:button id=links     txt="Links"          url="$(ROOTREL)/links.html">

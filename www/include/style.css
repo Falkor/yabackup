@@ -37,7 +37,7 @@
     left: 12em;
     right: 2em;
     min-width: 15em;
-    max-width: 50em;
+    max-width: 52em;
     min-height: 15em; /* Make sure it doesn't overlap nav bar */
 }
 

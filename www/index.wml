@@ -82,7 +82,7 @@ As for protocols connecting to a backup target, <backup> supports local sockets
 <!-- -------------------------- -->
 <h2>Licence</h2>
 
-<backup> is released under <a href="http://www.gnu.org/licenses/gpl.html">GNU GPL Licence</a> (free software).
+<backup> is released under <a href="http://www.gnu.org/licenses/gpl.html">GNU GPL Licence</a> v 3 (free software).
 
 <!-- -------------------------- -->
 <h2>Author</h2>
