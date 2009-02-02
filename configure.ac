@@ -13,10 +13,6 @@ AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall])	
 
-# Make automake clean emacs ~ files for "make clean"
-CLEANFILES="*~ bin/backup backup.3 backup.html"
-AC_SUBST(CLEANFILES)
-
 PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
 AC_SUBST(PACKAGE_SUMMARY)
 

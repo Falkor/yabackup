@@ -836,7 +836,7 @@ to complete and/or overwrite the global settings.
 To run the backup configured by default, just run:
  
     ./backup -f /path/to/config_file
-  
+
 To run the backup configured by the 'toto' section, just run:
 
     ./backup -f /path/to/config_file -s=toto
@@ -972,11 +972,11 @@ contain subfolders B<comp1>, B<comp2> etc., each containing the files and subdir
 B<$HOME/.ssh/> from the source computer. 
 In other work, you will be in the following configuration: 
 
-        On'comp1':                     On 'comp2':                  on 'target_server':
-    $HOME/.ssh/id_dsa             $HOME/.ssh/id_dsa             $dst_rootdir/$HOME/.ssh/comp1/id_dsa  
-    $HOME/.ssh/id_dsa.pub         $HOME/.ssh/id_dsa.pub         $dst_rootdir/$HOME/.ssh/comp1/id_dsa.pub
-                                                                $dst_rootdir/$HOME/.ssh/comp2/id_dsa  
-                                                                $dst_rootdir/$HOME/.ssh/comp2/id_dsa.pub 
+        On'comp1':             On 'comp2':                 on 'target_server':
+    $HOME/.ssh/id_dsa       $HOME/.ssh/id_dsa        $dst_rootdir/$HOME/.ssh/comp1/id_dsa  
+    $HOME/.ssh/id_dsa.pub   $HOME/.ssh/id_dsa.pub    $dst_rootdir/$HOME/.ssh/comp1/id_dsa.pub
+                                                     $dst_rootdir/$HOME/.ssh/comp2/id_dsa  
+                                                     $dst_rootdir/$HOME/.ssh/comp2/id_dsa.pub 
 
 This directive is ignored in retrieve mode (see option C<-r>)
 

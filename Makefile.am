@@ -27,6 +27,8 @@ if generate_WEBSITE
 WEBSITEDIR=www
 endif
 
+CLEANFILES="*~ bin/backup backup.3 backup.html"
+
 SUBDIRS = bin $(WEBSITEDIR)
 
 dist-hook:
