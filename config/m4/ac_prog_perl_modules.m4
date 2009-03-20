@@ -70,7 +70,6 @@ fi])dnl
 AC_DEFUN([AC_CHECK_CPAN_MODULES],[dnl
 ac_perl_modules="$1"
 for ac_perl_module in $ac_perl_modules; do
-   AC_PROG_PERL_MODULES($ac_perl_module,,          
-   			AC_MSG_ERROR(Can't find the Perl modules $ac_perl_module, please install it through cpan -- see http://search.cpan.org/))
+   AC_PROG_PERL_MODULES([$ac_perl_module],[],AC_MSG_ERROR([Cannot find the perl modules $ac_perl_module. please install it through cpan -- see http://search.cpan.org/.\n One option is to run "sudo cpan" followed by "install $ac_perl_module"]))
 done
 ])dnl

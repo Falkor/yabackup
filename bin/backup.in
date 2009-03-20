@@ -97,7 +97,7 @@ my $getoptRes = GetOptions(# Specific options
 			   'section=s'       => \@backup_sections,              # sections to consider
 			   'config-file|f=s' => \$config_file,                  # Configuration file
 			   'dry-run|n'       => \$SIMULATION_MODE,              # Simulation mode
-			   'exact_sync|e'    => sub { $SYNC_MODE="--delete"; },  # Exact synchro
+			   'exact_sync|e'    => sub { $SYNC_MODE="--delete" },  # Exact synchro
 			   'push|p'          => sub { $RETRIEVE_MODE = 0},      # push data on the backup target
 			   'restore|retrieve|r' => sub { $RETRIEVE_MODE = 1},   # restore data from the backup
 			   # Generic (classical) options
@@ -114,11 +114,11 @@ if ($QUIET && $RETRIEVE_MODE) {
     $QUIET = 0;
     info("Quiet mode desactivated when retrieving data\n");
 }
-if ( $SYNC_MODE eq "--delete") { 
-    warning("This option force an exact duplication and can lead to deletion of files.\n") unless $QUIET;
-    really_continue() unless $QUIET;
+if (($SYNC_MODE eq "--delete") && (! $QUIET)) { 
+    warning("This option force an exact duplication and can lead to deletion of files.\n");
+    really_continue();
 }
-		   }, 
+
 # Process configuration file
 unless ($config_file) {
     my @conffile_list = ('/etc/backup.conf', "$ENV{HOME}/.backup.conf");
@@ -817,7 +817,7 @@ for more details). Here is a illustrative examples:
 
     #### Mandatory default backup definition ####
     <default>
-         target_url = drive:///Volume/Backup  # backup on an external drive 'Backup'
+         target_url = drive:///Volumes/Backup  # backup on an external drive 'Backup'
     </default>
 
     # Definition of the backup on the server 'toto'

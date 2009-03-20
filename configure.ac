@@ -44,7 +44,6 @@ AC_ARG_ENABLE(
     [case "${enableval}" in
     	  yes) AC_MSG_RESULT([on])
 	       PROG_POD2HTML
-	       PROG_POD2XHTML
 	       PROG_WMK
 	       PROG_WML
 	       generate_website=true ;;
@@ -72,7 +71,6 @@ AC_CHECK_CPAN_MODULES(
     Term::ANSIColor 
     Data::Dumper 
     Pod::Usage
-    Pod::Xhtml
 )
 
 # ----------------------------------------------------------------
