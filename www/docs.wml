@@ -10,8 +10,8 @@
 #use wml::include::main
 #use wml::std::info
 
-<htitle "iBackup">
-<page-header "<h1>Documentation</h1>">
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) - Documentation</h1>">
 
 <!-- ========================================== -->
 <h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
@@ -28,7 +28,7 @@
 
 Once you retrieved the latest release (version $(CURRENT_RELEASE) - see section <menu_download>), 
 uncompress the archive and run the classical <code>configure</code>, <code>make</code>, 
-<code>make install</code> steps:
+<code>make install</code> steps (please take a look at <code>./configure --help</code> for configuration options):
 <blockquote><p>
   <code>$ tar xvzf backup-$(CURRENT_RELEASE).tar.gz</code><br/>
   <code>$ cd backup-$(CURRENT_RELEASE)</code><br/>
@@ -53,11 +53,11 @@ For instance, here is my personnal entry:<pre>
 <!-- ============ -->
 <h2>Requirements</h2>
 
-<backup> was developped under Mac OS X and shall run on any GNU/Linux or BSD-like system. 
+<project> was developped under Mac OS X and shall run on any GNU/Linux or BSD-like system. 
 It also requires: 
 <ul>
   <li><rsync> v2.6.9 or later</li>
-  <li><perl> v5 or later</li>
+  <li><refperl> v5 or later</li>
   <li>A few perl <cpan> modules, more precisely:
       <ul>
 	<li><code>Switch </code></li>  
@@ -76,7 +76,7 @@ It also requires:
 </ul>
 Actually, all those elements are checked by the '<code>configure</code>' script yet don't worry 
 if some (or all) the <cpan> modules mentioned above are missing, they are pretty easy to install 
-using the <code>cpan</code> command (to be launched as root). 
+using the <code>cpan</code> command (<strong>to be launched as root</strong>). 
 At the first launch, you'll have to answer a few 
 questions (use the default answer) and once you got the prompt, just run the command 
 '<code>install My::Module</code>' to install the module <code>My::Module</code>. <br/>
@@ -85,8 +85,9 @@ For mode info, take a look at <a href="http://search.cpan.org/~jhi/perl-5.8.0/li
 <!-- ======================= -->
 <h2>Reference documentation</h2>
 
+<div id="pod2html">
 <:
-   open(HTMLMANPAGE, "./backup.3.html") || die("Missing file: $!");
+   open(HTMLMANPAGE, "./backup.3.html") || die("Missing backup.3.html file: $!");
    my $line; 
    my $go_print;
    while($line = <HTMLMANPAGE>) {
@@ -100,3 +101,4 @@ For mode info, take a look at <a href="http://search.cpan.org/~jhi/perl-5.8.0/li
    }
    close(HTMLMANPAGE);
 :>
+</div>

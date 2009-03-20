@@ -1,0 +1,28 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; bugs.wml                                                       ;;;
+;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
+;;; WML info: see http://thewml.org/docs/                              ;;;
+;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;;                                                                    ;;; 
+;;; Specific balise defined in include/definitions.tag                 ;;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#use wml::include::main
+#use wml::std::info
+
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) - Submit Bugs</h1>">
+
+<project> comes as a free software. There is NO warranty, not even for
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.<br/>
+Anyway, we do hope that you find this software useful.<br/><br/>
+Therefore, if you have comments, questions, or suggestions regarding <project>,  kindly consider the 
+folowing options to help us improving this software:
+<ol>
+  <li>Use the <a href="https://gforge.uni.lu/tracker/?group_id=$(PROJECT_GFORGEID)">$(PROJECT_NAME) Tracker System</a><br/>
+    <small><em>(preferred but requires an account on <gforge_unilu>)</em></small><br/>
+  </li>
+  <li><a href="mailto:Sebastien.Varrette 'at' uni.lu?subject=[$(PROJECT_NAME)] Suggestion from user">Send me a mail</a></li>
+</ol> 
+
+Thanks for your support!

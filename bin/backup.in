@@ -97,11 +97,7 @@ my $getoptRes = GetOptions(# Specific options
 			   'section=s'       => \@backup_sections,              # sections to consider
 			   'config-file|f=s' => \$config_file,                  # Configuration file
 			   'dry-run|n'       => \$SIMULATION_MODE,              # Simulation mode
-			   'exact_sync|e'    => sub { 
-			       warning("This option force an exact duplication and can lead to deletion of files.\n");
-			       really_continue() unless $QUIET;
-			       $SYNC_MODE="--delete"; 
-			   }, 
+			   'exact_sync|e'    => sub { $SYNC_MODE="--delete"; },  # Exact synchro
 			   'push|p'          => sub { $RETRIEVE_MODE = 0},      # push data on the backup target
 			   'restore|retrieve|r' => sub { $RETRIEVE_MODE = 1},   # restore data from the backup
 			   # Generic (classical) options
@@ -118,7 +114,11 @@ if ($QUIET && $RETRIEVE_MODE) {
     $QUIET = 0;
     info("Quiet mode desactivated when retrieving data\n");
 }
-
+if ( $SYNC_MODE eq "--delete") { 
+    warning("This option force an exact duplication and can lead to deletion of files.\n") unless $QUIET;
+    really_continue() unless $QUIET;
+}
+		   }, 
 # Process configuration file
 unless ($config_file) {
     my @conffile_list = ('/etc/backup.conf', "$ENV{HOME}/.backup.conf");
@@ -1098,8 +1098,7 @@ To setup public key authentication, please refer to L<http://sial.org/howto/open
 
 =head1 BUGS
 
-Please report bugs using the L<https://gforge.uni.lu/tracker/?atid=249&group_id=44> 
-of the C<ibackup> project. 
+Please report bugs using informations provided at the page L<http://ibackup.gforge.uni.lu/bugs.html>
 
 =head1 AUTHOR
 

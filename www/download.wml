@@ -10,8 +10,8 @@
 #use wml::include::main
 #use wml::std::info
 
-<htitle "iBackup">
-<page-header "<h1>Download</h1>">
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) - Download</h1>">
 
 <!-- =========================================== -->
 <h2>Lastest stable realease: $(CURRENT_RELEASE)</h2>
@@ -26,15 +26,15 @@ There are several way to get <backup>:
   <li>You can download the latest stable tarball version:<br/>
     <blockquote>
       <p><a href="https://gforge.uni.lu/frs/download.php/16/backup-0.2.tar.gz">
-	backup-0.2.tar.gz
+	backup-$(CURRENT_RELEASE).tar.gz
       </a></p>
     </blockquote>
   </li>
   <li>You can download the latest version of the sources using anonymous svn access:<pre>
-    $ svn checkout svn://svn.gforge.uni.lu/svn/ibackup/trunk
-    $ mv trunk ibackup</pre>
+    $ svn checkout svn://svn.gforge.uni.lu/svn/$(PROJECT_UNIXNAME)/trunk
+    $ mv trunk $(PROJECT_UNIXNAME)</pre>
     Keep in mind that it may happens for the sources to be totally brocken so use svn access with 
     caution.</li>
 </ul>
 
-Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=44">file area of the Gforge</a>.
+Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=$(PROJECT_GFORGEID)">file area of the Gforge</a>.

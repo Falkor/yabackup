@@ -11,7 +11,11 @@ AC_INIT([backup],[0.2],[sebastien.varrette@uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE([-Wall])	
+AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
+
+# Make automake clean emacs ~ files for "make clean"
+CLEANFILES="*~"
+AC_SUBST(CLEANFILES)
 
 PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
 AC_SUBST(PACKAGE_SUMMARY)
@@ -21,9 +25,10 @@ AC_SUBST(PACKAGE_SUMMARY)
 # ----------------------------------------------------------------
 AC_PROG_INSTALL
 AC_PROG_SSH
-AC_PATH_PROGS(PERL, perl perl5, false)
-AC_PATH_PROGS(POD2MAN, pod2man, pod2man)
-AC_PATH_PROGS(RSYNC, rsync, rsync)
+# following macro defined in acinclude.m4
+PROG_PERL
+PROG_POD2MAN
+PROG_RSYNC
 
 # ----------------------------------------------------------------
 # Macros that should be defined to compile:
@@ -38,8 +43,10 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
     [case "${enableval}" in
     	  yes) AC_MSG_RESULT([on])
-	       AC_PATH_PROGS(POD2HTML, pod2html, pod2html)
-	       AC_PATH_PROGS(WMK, wmk, wmk)
+	       PROG_POD2HTML
+	       PROG_POD2XHTML
+	       PROG_WMK
+	       PROG_WML
 	       generate_website=true ;;
   	  no)  AC_MSG_RESULT([off])
 	       generate_website=false ;;
@@ -65,6 +72,7 @@ AC_CHECK_CPAN_MODULES(
     Term::ANSIColor 
     Data::Dumper 
     Pod::Usage
+    Pod::Xhtml
 )
 
 # ----------------------------------------------------------------
@@ -75,7 +83,6 @@ AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
 	bin/backup
-	www/.wmlrc
 	www/include/wmlrc.default
 	www/Makefile
 ])

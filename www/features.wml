@@ -10,25 +10,25 @@
 #use wml::include::main
 #use wml::std::info
 
-<htitle "iBackup Features">
-<page-header "<h1>Features</h1>">
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) - Features</h1>">
 
-<backup> implements a traditional backup scheme, where the target contains 
+<project> implements a traditional backup scheme, where the target contains 
 all information (full backup) of the source (typically your local homedir) and 
 in the future only the changed information is added meaning that except for the 
 first invocation o fthe script, the operation is pretty fast.<br/> 
-More precisely, <backup> claims to have the following functionalities: 
+More precisely, <project> claims to have the following functionalities: 
 <ul>
-  <li><strong>Easy to use:</strong> although <backup> is a command-line utility, 
+  <li><strong>Easy to use:</strong> although <project> is a command-line utility, 
       the semantics of the configuration file is relatively simple. 
   </li>
-  <li><strong>Bandwidth and space efficient:</strong> <backup> uses the rsync 
+  <li><strong>Bandwidth and space efficient:</strong> <project> uses the rsync 
       algorithm so only the changed parts of files are sent to the target when 
       doing an incremental backup. 
       For instance, if a long log file increases by just a few lines of text, 
       a small diff will be sent.
   </li> 
 </ul>  
-Currently <backup> supports local file storage and ssh connections.
+Currently <project> supports local file storage and ssh connections.
 
 

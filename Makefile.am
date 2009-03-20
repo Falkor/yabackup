@@ -13,13 +13,13 @@ man_MANS = backup.3
 EXTRA_DIST = AUTHORS \
     COPYING    \
     ChangeLog  \
+    bootstrap  \
     DISCLAIMER \
     INSTALL    \
     NEWS       \
     FAQ        \
     README     \
     TODO       \
-    README     \
     config/m4  \
     www 
 

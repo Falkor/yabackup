@@ -10,18 +10,18 @@
 #use wml::include::main
 #use wml::std::info
 
-<htitle "iBackup">
-<page-header "<h1>Backup</h1>">
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) Homepage</h1>">
 
 <!-- =========== -->
 <h2>What is it?</h2>
 
-<backup> is a highly flexible script written in <perl> used for the 
+<project> is a highly flexible script written in <refperl> used for the 
 <strong>fast backup</strong> 
 of directories on your local system on various targets such as an 
 external drive or a remote machine with SSH access.<br/><br/>
 
-<backup> is designed to be run by command-line and rely on <perl>, <rsync> 
+<project> is designed to be run by command-line and rely on <refperl>, <rsync> 
 (meaning only the files that differs are transfered) and (in a future release) 
 <duplicity> together with a configuration file.
 
@@ -70,21 +70,21 @@ If you need to restore data from the backup '<code>toto</code>', run :
 <!-- ========================== -->
 <h2>Current development status</h2>
 
-<backup> is still in Alpha (last version: $(CURRENT_RELEASE)) and not all functionnality 
+<project> is still in Alpha (last version: $(CURRENT_RELEASE)) and not all functionnality 
 are supported (most importantly <duplicity>).
 Anyway it is sufficient if you plan to backup your data on a external drive or a 
 remote server with SSH access. 
-Currently <backup> supports deleted files, full unix permissions, directories, 
+Currently <project> supports deleted files, full unix permissions, directories, 
 and symbolic links. <br/><br/>
-As for protocols connecting to a backup target, <backup> supports local sockets 
+As for protocols connecting to a backup target, <project> supports local sockets 
 (for local file/directories access) and <code>ssh</code>.
 
 <!-- ======= -->
 <h2>Licence</h2>
 
-<backup> is released under <a href="http://www.gnu.org/licenses/gpl.html">GNU GPL Licence</a> v3 (free software).
+<project> is released under <a href="http://www.gnu.org/licenses/gpl.html">GNU GPL Licence</a> v3 (free software).
 
 <!-- ====== -->
 <h2>Author</h2>
 
-<backup> is written by <me>.
+<project> is written by <svarrette_home>.

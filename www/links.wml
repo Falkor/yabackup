@@ -10,8 +10,8 @@
 #use wml::include::main
 #use wml::std::info
 
-<htitle "iBackup">
-<page-header "<h1>Links</h1>">
+<htitle "$(DEFAULT_TITLE)">
+<page-header "<h1>$(PROJECT_NAME) - Relative Links</h1>">
 
 
 <ul>
