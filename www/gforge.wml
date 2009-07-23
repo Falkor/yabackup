@@ -25,5 +25,5 @@ Here are the revelant links relative to <project>:<br/><br/>
   <li><a href="https://gforge.uni.lu/news/?group_id=$(PROJECT_GFORGEID)">$(PROJECT_NAME) News Manager</a></li>
 </ul>
 <br/>
-<em>Note:</em> most interface require you to have an account on <gforge_unilu> to be able to interact with them.
+<em>Note:</em> all interface require you to have an account on <gforge_unilu> to be able to interact with them.
 

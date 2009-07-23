@@ -36,10 +36,11 @@ clean-local:
 
 $(DOC_FROMPOD): $(BACKUP_SCRIPT_SRC)
 	@echo => generating $@
-	$(PERL) -MPod::Simple::HTML -e Pod::Simple::HTML::go $< $@
-#	$(POD2HTML) --title="Backup Documentation" \
-#		    --css=$(CSS_STYLESHEET) $(BACKUP_SCRIPT_SRC) > $@
-#	$(RM) pod2htmd.tmp pod2htmi.tmp
+#	$(PERL) -MPod::Simple::HTML -e Pod::Simple::HTML::go $< $@
+
+	$(POD2HTML) --title="Backup Documentation" \
+		    --css=$(CSS_STYLESHEET) $(BACKUP_SCRIPT_SRC) > $@
+	$(RM) pod2htmd.tmp pod2htmi.tmp
 #	$(POD2XHTML) --css=$(CSS_STYLESHEET) --infile $(BACKUP_SCRIPT_SRC) \
 #		    --outfile backup.3.x.html -noindex
 
