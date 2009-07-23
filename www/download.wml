@@ -25,7 +25,7 @@ There are several way to get <backup>:
 <ul>
   <li>You can download the latest stable tarball version:<br/>
     <blockquote>
-      <p><a href="https://gforge.uni.lu/frs/download.php/16/backup-0.2.tar.gz">
+      <p><a href="$(ROOTREL)/download/backup-$(CURRENT_RELEASE).tar.gz">
 	backup-$(CURRENT_RELEASE).tar.gz
       </a></p>
     </blockquote>
@@ -37,4 +37,5 @@ There are several way to get <backup>:
     caution.</li>
 </ul>
 
-Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=$(PROJECT_GFORGEID)">file area of the Gforge</a>.
+Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=$(PROJECT_GFORGEID)">file area of the Gforge</a> 
+(required authorization) or in the <a href="$(ROOTREL)/download/">download</a> directory. 
