@@ -3,12 +3,14 @@
 ##############################################################################
 # File   : backup
 # Author : Sebastien VARRETTE <Sebastien.Varrette@uni.lu>
-# 05 Jan 2009
+# Author : Guillaume-Jean HERBIET <Guillaume.Herbiet@uni.lu>
+# 23 Jul 2009
 #
 # Description : A script for handling backups of your system 
 #               See the man page for more information.
 #
-# Copyright (c) 2009 Sebastien Varrette  (http://varrette.gforge.uni.lu/)
+# Copyright (c) 2009 Sebastien Varrette     (http://varrette.gforge.uni.lu/)
+#                    Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu/)
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -26,6 +28,8 @@
 #
 # Sebastien Varrette                               \n
 # <Sebastien.Varrette@uni.lu>                      \n
+# Guillaume-Jean Herbiet                           \n
+# <Guillaume.Herbiet@uni.lu>                       \n
 # University of Luxembourg                         \n
 # 6, rue Richard Coudenhove-Kalergi                \n
 # L-1359 Luxembourg                                \n
@@ -37,6 +41,7 @@ use warnings;
 use Switch;
 use Storable qw(dclone);      # for recursive copy of nested hash 
 use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
+use List::Util qw[min max];   # To find min/max values
 use Time::localtime;          # To access local time
 use POSIX qw(strftime);       # To format time 
 use Getopt::Long;             # For command line management (long version)
@@ -57,7 +62,11 @@ chomp($command);
 # Specific variables
 my $SIMULATION_MODE = 0;          # By default, don't simulate
 my $SYNC_MODE       = "--update"; # By default, update directories, don't delete obsolete files
+my $MAC_FORK        = 0;          # option variable for Mac OS resource forks with default value (false)
+my $NOTIFICATION    = 0;          # By defautlt, don't use system user notification feature
 my $RETRIEVE_MODE   = 0;          # By default, push data on the backup target and don't retrieve anything
+my $PRE_SCRIPT;                   # Complete path to pre-backup script
+my $POST_SCRIPT;                  # Complete path to post-backup script
 
 my $config_file;                  # Configuration file.
 my @backup_sections;              # backup sections to be used in the configuration file 
@@ -97,16 +106,20 @@ my $getoptRes = GetOptions(# Specific options
 			   'section=s'       => \@backup_sections,              # sections to consider
 			   'config-file|f=s' => \$config_file,                  # Configuration file
 			   'dry-run|n'       => \$SIMULATION_MODE,              # Simulation mode
+			   'mac-fork|m'      => \$MAC_FORK,                     # Mac resource fork
+			   'notification'    => \$NOTIFICATION,                 # User notification features
 			   'exact_sync|e'    => sub { $SYNC_MODE="--delete" },  # Exact synchro
 			   'push|p'          => sub { $RETRIEVE_MODE = 0},      # push data on the backup target
 			   'restore|retrieve|r' => sub { $RETRIEVE_MODE = 1},   # restore data from the backup
+			   'pre-script=s'      => \$PRE_SCRIPT,
+			   'post-script=s'     => \$POST_SCRIPT,
 			   # Generic (classical) options
-			   'verbose|v' => \$VERBOSE,                            # Verbose mode
-			   'quiet|q'   => \$QUIET,                              # Quiet mode
-			   'debug'     => sub { $DEBUG = 1; $VERBOSE = 1; },    # Debug mode
-			   'help|h'    => sub { pod2usage(-exitval => 1,
+			   'verbose|v'  => \$VERBOSE,                           # Verbose mode
+			   'quiet|q'    => \$QUIET,                             # Quiet mode
+			   'debug'      => sub { $DEBUG = 1; $VERBOSE = 1; },   # Debug mode
+			   'help|h'     => sub { pod2usage(-exitval => 1,
 							  -verbose => 2); },    # Show help
-			   'version'   => sub { VERSION_MESSAGE(); exit(0); }   # Show version
+			   'version'    => sub { VERSION_MESSAGE(); exit(0); }  # Show version
 			  );
 
 PRINT_ERROR_THEN_EXIT("check the format of the command-line") unless ($getoptRes);
@@ -150,6 +163,11 @@ ensure_section_exists('global', @backup_sections);
 # proceed with each section 
 foreach my $sec (@backup_sections) {
     info('Proceeding backup configured in section ' . color('bold') . "$sec" . color('reset') . "\n");
+	
+	# run pre-backup script if specified
+	info("Executing pre-backup script.\n") if defined $PRE_SCRIPT;
+	external_script_execute($PRE_SCRIPT, "pre") if defined $PRE_SCRIPT;
+    
     # get the settings for this synchro
     debug("Add global settings\n");
     restore_global_settings();
@@ -163,7 +181,12 @@ foreach my $sec (@backup_sections) {
     
     # run the command
     run_sync_cmd();
+
+    # run post-backup script if specified
+	info("Executing post-backup script.\n") if defined $POST_SCRIPT;
+	external_script_execute($POST_SCRIPT, "post") if defined $POST_SCRIPT;
 }
+
 
 #################################################################################
 ############## ------------------ Sub routines  ------------------ ##############
@@ -216,6 +239,33 @@ sub warning {
 }
 
 ######
+# Send a graphical notification to the user
+# usage: notification(title, text, $priority)
+##
+sub notification {
+	my $title    = shift;
+	my $text     = shift;
+	my $priority = shift;
+	$priority = defined($priority)?$priority:0;
+	
+	# Select notification system based on system
+	my @os = qx(uname);
+	# Mac OS X: use growlnotify
+	if ($os[0] =~ "Darwin") {
+		check_binary('growlnotify');
+		$priority = max(min($priority, 2), -2);
+		system('growlnotify -p '.$priority.' -n '.$command.' -a \'Time Machine\' \''.$title.'\' -m \''.$text.'\'');
+	}
+	elsif ($os[0] =~ "Linux") {
+		check_binary('notify-send');
+		$priority = max(min($priority, 1), -1) +1;
+		my @levels = ("low", "normal", "critical"); 
+		system('notify-send -u '.$levels[$priority].' -i gtk-dialog-info \''.$title.'\' \''.$text.'\'');
+		PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] Notification is only supported under Mac OS X so far.');
+	}
+}
+
+######
 # Ask the user is he/she wish to continue. 
 ##
 sub really_continue {
@@ -244,6 +294,7 @@ sub PRINT_ERROR_THEN_EXIT {
     my $msg = $_[0] ? $_[0] : 'Bad format';
     error "$msg\n";
     append_to_log("[ERROR] $msg");
+    notification("Backup aborted due to error", $msg, 1) if ($NOTIFICATION);
     exit(1);
 }
 
@@ -270,6 +321,16 @@ sub ssh_remote_execute {
     my ($host, $port, @command) = @_;
     my $cmd = "ssh -p $port $host @command 1>/dev/null";
     return execute($cmd);
+}
+
+#####
+# execute an external script beofre (pre) or after (post) the backup
+# usage: external_script_execute("/path/to/script", "pre|post")
+###
+sub external_script_execute {
+	my ($command, $pre_post) = @_;
+	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] Execution of '.$pre_post.'-backup script failed.')
+		if (execute($command));
 }
 
 ####
@@ -506,8 +567,10 @@ sub run_sync_cmd {
 	# create basedir on target
 	create_dir_on_target("$BACKUP_CMD_INFO{'dst'}/$BACKUP_CMD_INFO{'src'}") unless $RETRIEVE_MODE;
     }
+    notification("Starting backup", "iBackup is starting backup of ".$BACKUP_CMD_INFO{'src'}." on ".$BACKUP_CMD_INFO{'target'}) if $NOTIFICATION;
     
-    foreach my $dir (@{$BACKUP_CMD_INFO{'dirs'}}) {
+	my $failure = 0;
+	foreach my $dir (@{$BACKUP_CMD_INFO{'dirs'}}) {
 	info("proceeding directory " . color('bold') . "$dir" . color('reset') . "\n", "   ---->");
 	my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
 	my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}/$BACKUP_CMD_INFO{'src'}";
@@ -542,9 +605,14 @@ sub run_sync_cmd {
 
 	my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
 	append_to_log("$cmd");
-	execute($cmd);
+	$failure += execute($cmd);
     }
-
+	notification("Backup failed!", "Backup to $BACKUP_CMD_INFO{'target'} failed!", 1) if ($failure && $NOTIFICATION);
+	notification("Backup succeeded", "Backup to $BACKUP_CMD_INFO{'target'} succeeded.", 0) if (!$failure && $NOTIFICATION);
+	
+	if ($BACKUP_CMD_INFO{'proto'} eq 'sparsebundle') {
+		system('hdiutil detach /Volumes/Backup_Sparsebundle');
+	}
 }
 
 ####
@@ -561,7 +629,8 @@ sub treat_cmd_options {
     }
     # Add classical options
     $BACKUP_CMD_INFO{'opt'} .= " -avz";
-    # TODO: add -E if supported 
+    # TODO: add -E if supported
+    $BACKUP_CMD_INFO{'opt'} .= " -E" if $MAC_FORK;
 #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $VERBOSE;
     $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $QUIET;
     $BACKUP_CMD_INFO{'opt'} .= " $SYNC_MODE";    
@@ -627,6 +696,12 @@ sub parse_target_url {
 		       verbose("\tConnection to be established for the remote user $user by ssh on port $port\n"); 
 		       setup_target_ssh($user, $server, $port);
 		     }
+	case 'sparsebundle'{
+		my @os = qx(uname);
+		PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($os[0] =~ "Darwin");
+		verbose("\tsetup target on the sparsebundle image $target\n");
+		setup_target_sparsebundle($target);
+	}
 	  else { PRINT_ERROR_THEN_EXIT("The protocol $proto is not supported"); }
     }
 }
@@ -663,6 +738,21 @@ sub setup_target_ssh {
     }
  #   ssh_remote_execute($BACKUP_CMD_INFO{'target'}, $port, "hostname") || 
   #    die "unable to connect by ssh to $BACKUP_CMD_INFO{'target'} (port $port): $!\n";
+}
+
+###
+# setup the command for a backup on a sparsebundle image
+# usage: setup_target_sparsebundle(path)
+##
+sub setup_target_sparsebundle {
+	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
+	
+	# test if the sparsebundle is really there
+	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] specified sparsebundle does not exist') unless (-e $_[0]);
+	# mount it
+	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] unable to mount sparsebundle '.$_[0])
+		if (system('hdiutil attach '.$_[0].' -mountpoint /Volumes/Backup_Sparsebundle'));
+	$BACKUP_CMD_INFO{'dst'} = '/Volumes/Backup_Sparsebundle';
 }
 
 ####
@@ -717,7 +807,7 @@ sub create_dir_on_target {
 	info("creating directory $dir\n", "    ");
 	my $exit_status;
 	switch ($BACKUP_CMD_INFO{'proto'}) {
-	    case /drive|file/ { execute("mkdir -p $dir"); 
+	    case /drive|file|sparsebundle/ { execute("mkdir -p $dir"); 
 				$exit_status = $?;
 			      }
 	    case 'ssh'        { my $target = "$BACKUP_CMD_INFO{'target'}:";
@@ -867,7 +957,13 @@ not perform any backend actions.
 
 Exact synchronization mode. 
 Causes I<backup> to delete files on the target if absent in the source directory. 
-This ensure an exact replica but you may loose files so use this option with caution. 
+This ensure an exact replica but you may loose files so use this option with caution.
+
+=item B<--mac-fork  -m>
+
+Use Mac OS resource fork for backup.
+Causes I<backup> to use the Mac OS resource forks when calling the rsync function.
+This will preserve Mac OS extended attributes 
 
 =item B<--help  -h>
 
@@ -883,10 +979,25 @@ Quiet mode. Minimize the number of printed messages and don't ask questions.
 Very useful for invoking this script in a crontab yet use with caution has all 
 operations will be performed without your interaction.
 
+=item B<--notification>
+
+Activates user notification of backup status.
+This feature requires growlnotify (under Mac OS X) or notify-send (under Linux)
+to be installed and in your applications path.
+
 =item B<--restore  --retrieve  -r>
 
 Retrieve mode: restore data from the backup. Use with caution as this will probably 
 overwrite files on your local machine!
+
+=item B<--pre-script>
+
+Execute the script whose complete path is specified with this argument BEFORE the backup operation.
+If the execution of this script fails, the backup will not continue.
+
+=item B<--post-script>
+
+Execute the script whose complete path is specified with this argument AFTER the backup operation.
 
 =item B<--section=SECTION[, SECTION2 ...]>
 
@@ -1090,9 +1201,19 @@ Example:
       ssh://mylogin@server2.example.org:8022
 
 Even if public key authentication is not required, it is strongly recommended and 
-mandatory if I<backup> should be launched in a crontab for instance. 
+mandatory if I<backup> it to be launched in a crontab for instance. 
 
 To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
+
+=item * C<sparsebundle>  : a sparsebundle image (supported only under Mac OS X)
+
+Example: 
+
+      sparsebundle:///path/to/sparsebundle/image.sparsebundle
+
+Even if this is not required, it is strongly recommended for encrypted sparsebundle
+passwords to be stored in the user keychain. This is mandatory if I<backup>
+is to be launched in a crontab for instance.
 
 =back
 
