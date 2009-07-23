@@ -58,6 +58,7 @@
       <h2>Latest news:</h2>
       <p><strong>Jan 30, 2009</strong>:<br/> version $(CURRENT_RELEASE) released!</p>
     </div>
+    <unilu_logo>
   </div>
 
   <div id="contentwide">
@@ -82,7 +83,6 @@
                src="http://jigsaw.w3.org/css-validator/images/vcss"
                alt="Valid CSS!" />
 	</a><br/>
-	<unilu_logo>
 </div>
 </div> <!-- wrap -->
 
