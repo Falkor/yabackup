@@ -748,9 +748,9 @@ sub setup_target_sparsebundle {
 	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
 	
 	# test if the sparsebundle is really there
-	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] specified sparsebundle does not exist') unless (-e $_[0]);
+	PRINT_ERROR_THEN_EXIT("The sparsebundle ".$_[0]." cannot be found") unless (-e $_[0]);
 	# mount it
-	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] unable to mount sparsebundle '.$_[0])
+	PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle '.$_[0])
 		if (system('hdiutil attach '.$_[0].' -mountpoint /Volumes/Backup_Sparsebundle'));
 	$BACKUP_CMD_INFO{'dst'} = '/Volumes/Backup_Sparsebundle';
 }

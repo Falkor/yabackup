@@ -1,6 +1,8 @@
 - Expand wildcard not only relative to $src_rootdir but also $dst_rootdir in retrieve mode
 - Add support for files to include/exclude relative to $src_rootdir (currently, only directories are checked)
-- Notification via Growl/other under Linux
-- manage sparsebundle
+X Notification via Growl/other under Linux
+X manage sparsebundle
 - Add synchronization for specific elements like iCal, Address Book etc. 
 - Add duplicity support ;)
+- Use subnet restriction to other protocols than ssh (avoid unecessary faulty attempts)
+- Add an example of .rsync_exclude file
