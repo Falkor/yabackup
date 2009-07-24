@@ -42,7 +42,6 @@ use Switch;
 use Storable qw(dclone);      # for recursive copy of nested hash 
 use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
 use List::Util qw[min max];   # To find min/max values
-use Time::localtime;          # To access local time
 use POSIX qw(strftime);       # To format time 
 use Getopt::Long;             # For command line management (long version)
 use Config::General;          # For configuration file parsing
@@ -62,6 +61,7 @@ chomp($command);
 # Specific variables
 my $SIMULATION_MODE = 0;          # By default, don't simulate
 my $SYNC_MODE       = "--update"; # By default, update directories, don't delete obsolete files
+my $HISTORICAL      = 0;          # By default do not keep an history of older backups
 my $MAC_FORK        = 0;          # option variable for Mac OS resource forks with default value (false)
 my $NOTIFICATION    = 0;          # By defautlt, don't use system user notification feature
 my $RETRIEVE_MODE   = 0;          # By default, push data on the backup target and don't retrieve anything
@@ -109,6 +109,10 @@ my $getoptRes = GetOptions(# Specific options
 			   'mac-fork|m'      => \$MAC_FORK,                     # Mac resource fork
 			   'notification'    => \$NOTIFICATION,                 # User notification features
 			   'exact_sync|e'    => sub { $SYNC_MODE="--delete" },  # Exact synchro
+			   'history'         => sub {                           # Keep history of backups
+				      $HISTORICAL = 1;
+				      $SYNC_MODE="--delete"
+				},
 			   'push|p'          => sub { $RETRIEVE_MODE = 0},      # push data on the backup target
 			   'restore|retrieve|r' => sub { $RETRIEVE_MODE = 1},   # restore data from the backup
 			   'pre-script=s'      => \$PRE_SCRIPT,
@@ -363,14 +367,15 @@ sub append_to_log {
 	$output = *STDERR;
 	print $output '[' . color('yellow') . "LOG" . color('reset') . ']';
     }
-    my $tm = localtime;
-    printf($output "[%04d-%02d-%02d %02dh%02d:%02d] @_\n",
-	   $tm->year + 1900,
-	   $tm->mon + 1,
-	   $tm->mday,
-	   $tm->hour, 
-	   $tm->min,
-	   $tm->sec);
+	print $output strftime('%Y-%m-%d %Hh%M:%Ss', localtime)." @_\n";
+    # my $tm = localtime;
+    # printf($output "[%04d-%02d-%02d %02dh%02d:%02d] @_\n",
+    # 	   $tm->year + 1900,
+    # 	   $tm->mon + 1,
+    # 	   $tm->mday,
+    # 	   $tm->hour, 
+    # 	   $tm->min,
+    # 	   $tm->sec);
     close($output) if defined($SETTINGS{'log_file'});
 }
 
@@ -556,7 +561,19 @@ sub configure_sync_cmd {
 sub run_sync_cmd {
     # First check subnet
     check_subnet($SETTINGS{'restrict_on_subnet'}) if ($SETTINGS{'restrict_on_subnet'});
-    if ($RETRIEVE_MODE) {
+	
+	# So far no support for ssh + backup history
+	PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with ssh target.")
+		if ($BACKUP_CMD_INFO{'proto'} eq 'ssh' && $HISTORICAL);
+	
+	# So far no support for retrieve + backup history
+	PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with retrieve operation.")
+		if ($RETRIEVE_MODE && $HISTORICAL);
+	
+	# Set timestamp if historical backup
+	my $datestamp = $HISTORICAL ? strftime('%Y-%m-%d_%Hh%Mm%Ss', localtime) : "";
+	
+	if ($RETRIEVE_MODE) {
 	warning('You are about to '. color('red') . color('bold') . 'retrieve ' .color('reset') . color('reset') . 
 	        "the directories '@{$BACKUP_CMD_INFO{'dirs'}}' from $BACKUP_CMD_INFO{'target'}\n");
 	warning("This will " . color('red') . color('bold') . 'overwrite files on your local system.' .color('reset').color('reset') . "\n");
@@ -565,15 +582,16 @@ sub run_sync_cmd {
 	warning("Your are about to backup the directories '@{$BACKUP_CMD_INFO{'dirs'}}' on $BACKUP_CMD_INFO{'target'}.\n") unless $QUIET;
 	really_continue() unless $QUIET;
 	# create basedir on target
-	create_dir_on_target("$BACKUP_CMD_INFO{'dst'}/$BACKUP_CMD_INFO{'src'}") unless $RETRIEVE_MODE;
+	create_dir_on_target("$BACKUP_CMD_INFO{'dst'}/$datestamp$BACKUP_CMD_INFO{'src'}") unless $RETRIEVE_MODE;
     }
-    notification("Starting backup", "iBackup is starting backup of ".$BACKUP_CMD_INFO{'src'}." on ".$BACKUP_CMD_INFO{'target'}) if $NOTIFICATION;
+	notification("Starting backup", "iBackup is starting backup of ".$BACKUP_CMD_INFO{'src'}." on ".$BACKUP_CMD_INFO{'target'}) if $NOTIFICATION;
     
 	my $failure = 0;
 	foreach my $dir (@{$BACKUP_CMD_INFO{'dirs'}}) {
 	info("proceeding directory " . color('bold') . "$dir" . color('reset') . "\n", "   ---->");
 	my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
-	my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}/$BACKUP_CMD_INFO{'src'}";
+	my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}/$datestamp$BACKUP_CMD_INFO{'src'}";
+	my $dst_linkdir = readlink($BACKUP_CMD_INFO{'dst'}.'/latest').$BACKUP_CMD_INFO{'src'} if ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest');
 	my ($src_dir, $dst_dir) = ($dir, $dir);
 	# Manage special treatment of the directory
 	if (exists($SETTINGS{'Directory'}->{$dir})) {
@@ -585,11 +603,13 @@ sub run_sync_cmd {
 	    verbose("   " . Dumper $SETTINGS{'Directory'}->{$dir});
 	    my $sep  = ($BACKUP_CMD_INFO{'proto'} eq 'ssh') ? ':' : '/';
 	    $dst_basedir = "$BACKUP_CMD_INFO{'target'}$sep$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
-	    if ((! $RETRIEVE_MODE) && 
+	    #$dst_linkdir = "$BACKUP_CMD_INFO{'target'}$sep$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
+		if ((! $RETRIEVE_MODE) && 
 		($SETTINGS{'Directory'}->{$dir}->{'src_in_subfolder'})) 
 	      {
 		  verbose("=> setup src differentiation for the directory $dir on the target $BACKUP_CMD_INFO{'target'}\n");
-		  $dst_basedir .= "/$dir"; 
+		  $dst_basedir .= "/$dir";
+		  $dst_linkdir .= "/$dir" if ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest'); 
 		  # create directory on target 
 		  create_dir_on_target("$dst_basedir");
 		  $dst_dir = $SETTINGS{'Directory'}->{$dir}->{'src_in_subfolder'};
@@ -603,15 +623,23 @@ sub run_sync_cmd {
 	# Inverse src_basedir and dst_basedir if $RETRIEVE_MODE
 	($src_basedir, $dst_basedir) = ($dst_basedir, $src_basedir) if ($RETRIEVE_MODE);
 
-	my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
+	# Add historical backup options if required
+	my $hist_opt = ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest')   ?
+	  " --link-dest ".$dst_linkdir."/".$dst_dir : "";
+
+	my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'}$hist_opt $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
 	append_to_log("$cmd");
 	$failure += execute($cmd);
     }
+	
+	execute('unlink '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest');
+	execute('ln -s '.$BACKUP_CMD_INFO{'dst'}.'/'.$datestamp.' '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL);
+	
 	notification("Backup failed!", "Backup to $BACKUP_CMD_INFO{'target'} failed!", 1) if ($failure && $NOTIFICATION);
 	notification("Backup succeeded", "Backup to $BACKUP_CMD_INFO{'target'} succeeded.", 0) if (!$failure && $NOTIFICATION);
 	
 	if ($BACKUP_CMD_INFO{'proto'} eq 'sparsebundle') {
-		system('hdiutil detach /Volumes/Backup_Sparsebundle');
+		execute('hdiutil detach /Volumes/Backup_Sparsebundle');
 	}
 }
 
@@ -629,11 +657,10 @@ sub treat_cmd_options {
     }
     # Add classical options
     $BACKUP_CMD_INFO{'opt'} .= " -avz";
-    # TODO: add -E if supported
     $BACKUP_CMD_INFO{'opt'} .= " -E" if $MAC_FORK;
 #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $VERBOSE;
     $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $QUIET;
-    $BACKUP_CMD_INFO{'opt'} .= " $SYNC_MODE";    
+    $BACKUP_CMD_INFO{'opt'} .= " $SYNC_MODE";  
 }
 
 
@@ -751,7 +778,7 @@ sub setup_target_sparsebundle {
 	PRINT_ERROR_THEN_EXIT("The sparsebundle ".$_[0]." cannot be found") unless (-e $_[0]);
 	# mount it
 	PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle '.$_[0])
-		if (system('hdiutil attach '.$_[0].' -mountpoint /Volumes/Backup_Sparsebundle'));
+		if (execute('hdiutil attach '.$_[0].' -mountpoint /Volumes/Backup_Sparsebundle'));
 	$BACKUP_CMD_INFO{'dst'} = '/Volumes/Backup_Sparsebundle';
 }
 
@@ -958,6 +985,17 @@ not perform any backend actions.
 Exact synchronization mode. 
 Causes I<backup> to delete files on the target if absent in the source directory. 
 This ensure an exact replica but you may loose files so use this option with caution.
+
+=item B<--history>
+
+(Experimental) Keeps an history of backups. Each backup creates a timestamped
+directory in the specified target where files are backuped. To limit disk usage,
+unchanged files are hard linked with existing version on target. Up-to-date
+snapshot is always available under the "latest" directory.
+(Not yet supported)   Backup with history over SSH
+(Not yet implemented) Behavior on target disk full
+(Not yet implemented) History consolidation
+(Not yet implemented) Retrieve mode from latest snapshot
 
 =item B<--mac-fork  -m>
 
