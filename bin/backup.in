@@ -639,7 +639,7 @@ sub run_sync_cmd {
 	notification("Backup succeeded", "Backup to $BACKUP_CMD_INFO{'target'} succeeded.", 0) if (!$failure && $NOTIFICATION);
 	
 	if ($BACKUP_CMD_INFO{'proto'} eq 'sparsebundle') {
-		execute('hdiutil detach /Volumes/Backup_Sparsebundle');
+		execute('hdiutil detach '.$BACKUP_CMD_INFO{'dst'});
 	}
 }
 
@@ -774,12 +774,29 @@ sub setup_target_ssh {
 sub setup_target_sparsebundle {
 	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
 	
+	# List the files in /Volumes/
+	my @Volumes_pre = </Volumes/*>;
+	debug("Directories in Volumes before mounting: @Volumes_pre\n");
+	
 	# test if the sparsebundle is really there
 	PRINT_ERROR_THEN_EXIT("The sparsebundle ".$_[0]." cannot be found") unless (-e $_[0]);
 	# mount it
 	PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle '.$_[0])
-		if (execute('hdiutil attach '.$_[0].' -mountpoint /Volumes/Backup_Sparsebundle'));
-	$BACKUP_CMD_INFO{'dst'} = '/Volumes/Backup_Sparsebundle';
+		if (execute('hdiutil attach '.$_[0]));
+
+	# List the files in /Volumes/ after mounting
+	my @Volumes_post = </Volumes/*>;
+	debug("Directories in Volumes after mounting: @Volumes_post\n");
+
+	if (scalar(array_diff(\@Volumes_post, \@Volumes_pre)) == 1) {
+		($BACKUP_CMD_INFO{'dst'}) = array_diff(\@Volumes_post, \@Volumes_pre);
+	}
+	elsif ($SIMULATION_MODE) {
+		$BACKUP_CMD_INFO{'dst'} = "/Volumes/Backup_Drive"
+	}
+	else {
+		PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle, more than one device was added.'.$_[0])
+	}
 }
 
 ####
