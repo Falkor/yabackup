@@ -925,7 +925,7 @@ EOF
 =head1 NAME
 
 I<backup>, a highly flexible script utility to backup directories from your local 
-system on various targets (external drive, remote server with SSH access etc.)
+system on various targets (external drive, sparsebundle, remote server with SSH access etc.)
 
 I<backup> relies for that on B<rsync> (see L<http://samba.anu.edu.au/rsync/>) and 
 (in a future release) B<duplicity> (see L<http://duplicity.nongnu.org/>) together with a 

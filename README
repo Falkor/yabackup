@@ -24,6 +24,7 @@ Comments are welcome.
 Please report bugs using informations provided at the page 
 		http://ibackup.gforge.uni.lu/bugs.html
 
+Support: ibackup-support@lists.gforge.uni.lu
 
 Finally, if the 'configure' script is missing, just run the 'bootstrap' script. 
 It supposes the availability on your system of the following software: 

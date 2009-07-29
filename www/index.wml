@@ -20,7 +20,7 @@
 <project> is a highly flexible script written in <refperl> used for the 
 <strong>fast backup</strong> 
 of directories on your local system on various targets such as an 
-external drive or a remote machine with SSH access.<br/><br/>
+external drive, an [encrypted] sparsebundle or a remote machine with SSH access.<br/><br/>
 
 <project> is designed to be run by command-line and rely on <refperl>, <rsync> 
 (meaning only the files that differs are transfered) and (in a future release) 
