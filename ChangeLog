@@ -1,3 +1,20 @@
+2009-07-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r37] AUTHORS, ChangeLog, INSTALL[DEL], Makefile.am, README,
+	  acinclude.m4, bin/backup.in, bootstrap, configure.ac,
+	  www/Makefile.am, www/bugs.wml, www/docs.wml, www/download.wml,
+	  www/features.wml, www/gforge.wml, www/include/Makefile,
+	  www/include/definitions.tag, www/include/index.wml[DEL],
+	  www/include/main.wml, www/include/menu.tag,
+	  www/include/style.css, www/include/template.wml,
+	  www/include/wmlrc.default[DEL], www/index.wml, www/links.wml: -
+	  Add Guillaume as co-author in teh documentation
+	  - Update the bootstrap script
+	  - Add --enable-svn2cl to rely on svn2cl.sh to generate
+	  automatically the ChangeLog
+	  - Add propset for the svn keyword Id on relevant files
+	  - Version 0.3 released
+
 2009-07-24  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
 
 	* [r36] bin/backup.in: Fixed bug with sparsebundle target: default
