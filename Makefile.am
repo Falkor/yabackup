@@ -2,6 +2,7 @@
 ##                                                -*- Automake -*-
 ## (c) 2009 -- see the copyright file
 ## Author: Sebastien Varrette <Sebastien.Varrette@uni.lu> 
+## $Id$
 ##
 ## This is the Makefile.am file for backup
 ## ----------------------------------------------------------------
@@ -27,12 +28,35 @@ if generate_WEBSITE
 WEBSITEDIR=www
 endif
 
-CLEANFILES="*~ bin/backup backup.3 backup.html"
+CLEANFILES=*~ bin/backup backup.3 backup.html
 
 SUBDIRS = bin $(WEBSITEDIR)
 
+if use_SVN2CL
+CLEANFILES += .authors.xml
+.authors.xml: 
+	@echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>"              >  $@
+	@echo "<authors>"						>> $@
+	@echo "   <author uid=\"svarrette\">"				>> $@
+	@echo "	Sebastien Varrette &lt;Sebastien.Varrette@uni.lu&gt;"	>> $@
+	@echo "    </author>"						>> $@
+	@echo "    <author uid=\"gherbiet\">"				>> $@
+	@echo "	Guillaume-Jean Herbiet &lt;Guillaume.Herbiet@uni.lu&gt;">> $@
+	@echo "    </author>"						>> $@
+	@echo "</authors>"						>> $@
+
+ChangeLog: .authors.xml
+	svn2cl.sh -a -i --group-by-day --separate-daylogs --authors=.authors.xml
+	$(RM) .authors.xml 
+else
+ChangeLog:
+	@echo "Please configure with --enable-svn2cl to be able to automatically"
+	@echo "generate teh ChangeLog from from the svn repository logs"
+endif
+
 dist-hook:
 	rm -rf `find $(distdir) -name .svn`
+	rm -rf $(distdir)/www/download/*
 
 # Generate man page
 backup.3 : bin/backup.in 

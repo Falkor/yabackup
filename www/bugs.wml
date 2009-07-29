@@ -3,6 +3,7 @@
 ;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
 ;;; WML info: see http://thewml.org/docs/                              ;;;
 ;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;; $Id$
 ;;;                                                                    ;;; 
 ;;; Specific balise defined in include/definitions.tag                 ;;; 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

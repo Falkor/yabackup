@@ -2,12 +2,13 @@
 #                                                -*- Autoconf -*-
 # Copyright (c) 2009 -- see the copyright file
 # Author: Sebastien Varrette <Sebastien.Varrette@uni.lu> 
+# $Id$
 #
 # This is the configure.ac file for backup.
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.2],[sebastien.varrette@uni.lu])
+AC_INIT([backup],[0.3],[sebastien.varrette@uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
@@ -55,6 +56,26 @@ AC_ARG_ENABLE(
       generate_website=false]
 )
 AM_CONDITIONAL(generate_WEBSITE, test x$generate_website = xtrue)
+
+
+AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
+AC_ARG_ENABLE(
+    svn2cl, 
+    [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
+    [case "${enableval}" in
+    	  yes) AC_MSG_RESULT([on])
+	       PROG_SVN2CL
+	       use_svn2cl=true ;;
+  	  no)  AC_MSG_RESULT([off])
+	       use_svn2cl=false ;;
+  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
+     esac],
+     [AC_MSG_RESULT([off])
+      use_svn2cl=false]
+)
+AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
+
+
 
 # ----------------------------------------------------------------
 # Checks for libraries.

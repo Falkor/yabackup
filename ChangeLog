@@ -1,17 +1,173 @@
-2009-01-30  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
-	* Create website for the ibackup project and add it into the release 
-	* Complete autotools configuration with the --enable-www configure option 
-	* release v0.2
-	
-2009-01-29  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
-	* FIX BUG id 9 : Target path processing ('.' ignore in target_url directive)
-	* Feature: Add leading '/' on target drive if missing
+2009-07-24  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
 
-2009-01-17  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
-	* FIX BUG id 8 : "Forgot ':' for ssh backup and Directory specialization"
-	* Feature: Exit when no directory to backup/restore is found
-	
-2009-01-05  Sebastien Varrette  <Sebastien.Varrette@uni.lu>
+	* [r36] bin/backup.in: Fixed bug with sparsebundle target: default
+	  mountpoint "Backup_Sparsebundle" was used which caused creation
+	  of simlink "latest" that was broken when mounting the
+	  sparsebundle manually if the sparsebundle name differed from
+	  "Backup_Sparsebundle".
 
-	* backup: initial version (0.1).
+	* [r35] bin/backup.in: Experimental implementation of backup
+	  history :
+	  - Each backup creates a timestamped directory in the specified
+	  target where files are backuped. To limit disk usage, unchanged
+	  files are hard linked with existing version on target.
+	  - Up-to-date snapshot is always available under the "latest"
+	  directory.
+	  - (Not yet supported) Backup with history over SSH, causes a
+	  backup failure
+	  - (Not yet implemented) Behavior on target disk full
+	  - (Not yet implemented) History consolidation
+	  - (Not yet implemented) Retrieve mode from latest snapshot,
+	  causes a retrieve failure
+
+	* [r34] TODO, bin/backup.in: - Modified sparsebundle protocol error
+	  messages to be more consistant with other protocols
+	  - Updated TODO to reflect recent modifications
+
+2009-07-23  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
+
+	* [r33] INSTALL, bin/backup.in: - Added support for rsync with Mac
+	  OS resource forks (extended attributes), see -m option
+	  - Added support for pre/post backup scripts, see --pre-backup and
+	  --post-backup options
+	  - Added support for sparsebundle images through the
+	  sparsebundle:/// protocol
+	  - Added user notification (Growl under Mac OS X, notify-send
+	  under Linux), see the --notification option
+	  
+	  POD documentation is updated accordingly.
+
+2009-07-23  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r32] www/.dependances.sh:
+
+	* [r31] www/download.wml: remove anonymous svn access
+
+	* [r30] www/download.wml, www/include/andreas01.css,
+	  www/include/main.wml: Update web site
+
+	* [r29] www/Makefile.am, www/gforge.wml: update html documentation
+	  generation
+
+	* [r28] NEWS: NEWS files is now a symbolic link to Changelog
+
+	* [r27] COPYING, NEWS[DEL], TODO, www/download, www/download.wml,
+	  www/download/backup-0.1.tar.gz, www/download/backup-0.2.tar.gz,
+	  www/links.wml: - Add new download section in the website
+	  - update COPYING file with GPL3
+
+2009-03-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r26] bin/backup.in, config/m4/ac_prog_perl_modules.m4,
+	  configure.ac: Correct issue on --quiet
+
+	* [r25] Makefile.am, acinclude.m4, bin/backup.in, configure.ac,
+	  www/.wmlrc.in[DEL], www/Makefile.am, www/bugs.wml, www/docs.wml,
+	  www/download.wml, www/features.wml, www/gforge.wml,
+	  www/include/definitions.tag, www/include/main.wml,
+	  www/include/menu.tag, www/include/wmlrc.default,
+	  www/include/wmlrc.default.in, www/index.wml, www/links.wml: -
+	  Correct --quiet bug
+	  - modify CSS for the website (not finished)
+
+2009-02-02  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r24] www/links.wml: Add SyncToy (Micro$oft) and BackupPC links
+
+	* [r23] Makefile.am, bin/backup.in, configure.ac,
+	  www/include/style.css: Minor change for pod output
+
+2009-01-30  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r22] www/include/style.css: - Correct CSS for the W3C validator
+	  (http://jigsaw.w3.org/css-validator/)
+
+	* [r21] www/Makefile.am, www/docs.wml, www/download.wml,
+	  www/include/definitions.tag, www/include/menu.tag,
+	  www/include/style.css, www/index.wml, www/links.wml: - Correct
+	  html format to make the pages validated by the W3C validator
+	  - the generated doc.html failed because of the part extracted
+	  from pod2html (<dt> balise is not closed)
+	  
+
+	* [r19] ChangeLog, Makefile.am, NEWS, www/Makefile.am,
+	  www/download.wml, www/index.wml: - Update website
+	  - Launch release 0.2
+
+	* [r18] Makefile.am, README, configure.ac: Add --enable-www option
+	  to handle web site generation
+
+	* [r17] www/Makefile.am, www/docs.wml, www/download.wml,
+	  www/features.wml, www/include/definitions.tag,
+	  www/include/menu.tag, www/include/style.css, www/index.wml:
+	  Nearly finished the web site
+
+2009-01-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r16] INSTALL, Makefile.am, bin/backup.in, configure.ac, www,
+	  www/.wmkrc, www/.wmlrc.in, www/Makefile.am, www/docs.wml,
+	  www/features.wml, www/images, www/include, www/include/Makefile,
+	  www/include/definitions.tag, www/include/index.wml,
+	  www/include/main.wml, www/include/menu.tag,
+	  www/include/style.css, www/include/template.wml,
+	  www/include/wmlrc.default, www/include/wmlrc.default.in,
+	  www/index.wml, www/links.wml: Add web site in the repository
+
+	* [r15] INSTALL, configure.ac: update install
+
+	* [r14] ChangeLog, NEWS, TODO, bin/backup.in: - FIX BUG id 9 :
+	  Target path processing ('.' ignore in target_url directive)
+	  - Add leading '/' on target drive if missing
+
+2009-01-21  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r13] bin/backup.in: - Fix Bug on IP adress lookup
+
+2009-01-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r12] ChangeLog, FAQ, bin/backup.in, etc/backup.conf.example: -
+	  Add FAQ for ssh-agent configuration
+	  - correct interpret_cmd (to support pipe on awk)
+
+2009-01-17  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r11] NEWS, bin/backup.in: Now Exit when no directory to
+	  backup/restore is found
+
+	* [r10] NEWS, README: update info
+
+	* [r9] ChangeLog, bin/backup.in: FIX bug 8 "Forgot ':' for ssh
+	  backup and Directory specialization"
+	  
+
+2009-01-15  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r8] INSTALL: Add tags directory
+
+2009-01-13  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r7] INSTALL: Add note about bootstrap in the INSTALL file
+
+	* [r6] DISCLAIMER, INSTALL, Makefile.am, bin/Makefile.am,
+	  bin/backup.in, bootstrap, configure.ac: - With Autotools
+	  configured
+
+	* [r5] bin/backup[DEL], bin/backup.in[CPY],
+	  config/m4/ac_prog_perl_modules.m4, configure.ac[CPY],
+	  configure.in[DEL]: - Add AC_CHECK_CPAN_MODULES to configure.ac
+
+	* [r4] bootstrap, configure.in:
+
+	* [r3] configure.ac[DEL], configure.in[CPY]: Make configure.ac
+	  compatible with aclocal 1.4 on leopard (that expect configure.in
+	  instead)
+
+	* [r2] bootstrap, configure.ac:
+
+	* [r1] ., AUTHORS, COPYING, ChangeLog, DISCLAIMER, Makefile.am,
+	  NEWS, README, TODO, bin, bin/Makefile.am, bin/backup, bootstrap,
+	  config, config/m4, config/m4/ac_prog_perl_modules.m4,
+	  config/m4/ac_prog_ssh.m4, configure.ac, etc,
+	  etc/backup.conf.example: - Add Autotool version
+	  - First release
 

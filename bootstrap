@@ -1,27 +1,27 @@
 #! /bin/bash
 
 ############################################################################################
-# File   : bootstrap 
-# Author : Sebastien Varrette <Sebastien.Varrette@imag.fr>
-#          (Web page : http://www-id.imag.fr/~svarrett/perso.html)
-# Creation date : 21 Dec 2007
+# File   : bootstrap
+# Author : Sebastien VARRETTE <Sebastien.Varrette@uni.lu>
+#          (Web page : http://varrette.gforge.uni.lu)
+# Creation date : 21 Jul 2009
+# Time-stamp: <2009-07-21 16:13:47 svarrette>
 #
-# Description : see the print_help function or launch 'bootstrap --help'
+# $Id: bootstrap 1 2009-07-21 14:18:56Z svarrette $
+#
+# Description : see the print_help function or launch 'bootstrap.sh --help'
 #  
 # This program is free software; you can redistribute it and/or modify it under the terms 
 # of the GNU General Public License as published by the Free Software Foundation; either 
 # version 2 of the License, or (at your option) any later version.
-#
 # This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
 # without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 # See the GNU General Public License for more details.
-#
 # You should have received a copy of the GNU General Public License along with this 
 # program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, 
 # Fifth Floor, Boston, MA  02110-1301, USA.
 # 
-# Sebastien Varrette  <Sebastien.Varrette@imag.fr> 
-#                     <Sebastien.Varrette@uni.lu> 
+# Sebastien Varrette <Sebastien.Varrette@uni.lu> 
 # University of Luxembourg 
 # 6, rue Richard Coudenhove-Kalergi
 # L-1359 Luxembourg, LUXEMBOURG
@@ -31,6 +31,8 @@
 VERSION=0.2
 COMMAND=`basename $0`
 VERBOSE=""
+DEBUG=""
+SIMULATION=""
 
 ### displayed colors
 COLOR_GREEN="\033[0;32m"
@@ -41,6 +43,7 @@ COLOR_CYAN="\033[0;36m"
 COLOR_BOLD="\033[1m"
 COLOR_BACK="\033[0m"
 
+### Local variables
 # Execution Mode 
 CLEAN_MODE=""   # clean all generated files 
 DO_ALL_MODE=""  # In addition to rebuilding the autotools, run configure && make
@@ -52,10 +55,8 @@ ACLOCAL="aclocal -I config/m4"
 AUTOCONF="autoconf -I."
 AUTOMAKE="automake --add-missing --copy"
 AUTORECONF="autoreconf --install --force"
-RM="rm -v -f"
 
 # files
-CSCOPE_FILES=cscope.files
 BACKUP_FILES=`find . -name *~`
 OBJ_FILES=`find . -name *.o`
 MAKEFILES_IN=`find . -name Makefile.in`
@@ -64,9 +65,7 @@ AUTOM4TE_CACHE_DIR=autom4te.cache
 AUTOHEADER_FILES="config.h config.h.in"
 ACLOCAL_FILES="aclocal.m4"
 AUTOCONF_FILES="configure"
-AUTOMAKE_FILES="stamp-h1 config/config.sub config/ltmain.sh config/missing config/mkinstalldirs config/install-sh config/config.guess config/config.sub config/missing config/depcomp ${MAKEFILES_IN}"
-
-
+AUTOMAKE_FILES="INSTALL stamp-h1 config/config.sub config/ltmain.sh config/missing config/mkinstalldirs config/install-sh config/config.guess config/config.sub config/missing config/depcomp ${MAKEFILES_IN}"
 
 #######################
 ### print functions ###
@@ -78,7 +77,7 @@ AUTOMAKE_FILES="stamp-h1 config/config.sub config/ltmain.sh config/missing confi
 print_version() {
     cat <<EOF
 This is $COMMAND version "$VERSION".
-Copyright (c) 2007 Sebastien Varrette  (http://www-id.imag.fr/~svarrett/)
+Copyright (c) 2009 Sebastien VARRETTE  (http://varrette.gforge.uni.lu)
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 EOF
@@ -90,50 +89,44 @@ EOF
 print_help() {
 cat <<EOF
 NAME
-	$COMMAND -- calls autotools to build configure script and Makefile.in
+	$COMMAND -- initiate an autotools project to generate the configure script. 
 
 SYNOPSIS
-	$COMMAND [-h|-V]
-	$COMMAND [-v] [--clean|-a] [--dry-run]
+	$COMMAND [-V | -h]	
+	$COMMAND [-v] [--clean|-a] [-n]	
 
 DESCRIPTION
 	$COMMAND 
 
 OPTIONS
+        -a | --do-all
+                Also complete the installation by running ./configure && make
+        -c --clean
+                Clean the current directory with generated files
+	--debug
+		Debug mode. Causes $COMMAND to print debugging messages.
 	-h --help
 		Display a help screen and quit.
-
+	-n --dry-run
+		Simulation mode. 
 	-v --verbose
-		Verbose mode. Causes $COMMAND to print debugging messages.
-
+		Verbose mode. 
 	-V --version
 		Display the version number then quit. 
 
-        
-        -a | --do-all
-                Also complete the installation by running ./configure && make
-
-        -n --dry-run
-              This  tells  $COMMAND to not do anything, instead it will
-              just report the actions it would have taken.
-
-        -c --clean
-                Clean the current directory with generated files
-
-
 AUTHOR
-	Sebastien Varrette <Sebastien.Varrette@imag.fr>
-	Web page: http://www-id.imag.fr/~svarrett/ 
+	Sebastien VARRETTE <Sebastien.Varrette@uni.lu>
+	Web page: http://varrette.gforge.uni.lu 
 
 REPORTING BUGS 
-	Please report bugs to <Sebastien.Varrette@imag.fr>
+	Please report bugs to <Sebastien.Varrette@uni.lu>
 
 COPYRIGHT
 	This is free software; see the source for copying conditions.  There is NO
 	warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
        
 SEE ALSO	
-	Other scripts are available on my web site http://www-id.imag.fr/~svarrett/
+	Other scripts are available on my web site http://varrette.gforge.uni.lu
 EOF
 }
 
@@ -149,12 +142,20 @@ info() {
     [ -n "$text" ] && text="${title:==>} $text"    
     echo -e $text
 }
-
+debug()   { [ -n "$DEBUG"   ] && info "$1" "[${COLOR_YELLOW}DEBUG${COLOR_BACK}]"; }
+verbose() { [ -n "$VERBOSE" ] && info "$1"; }
+error()   { info "$1" "[${COLOR_RED}ERROR${COLOR_BACK}]"; }
+warning() { info "$1" "[${COLOR_VIOLET}WARNING${COLOR_BACK}]"; }
+print_error_and_exit() {
+    local text=$1
+    [ -z "$1" ] && text=" Bad format"
+    error  "$text. '$COMMAND -h' for help."
+    exit 1
+}
 #####
 # print the strings [ OK ] or [ FAILED ] or [ FAILED ]\n$1
 ##
 print_ok()     { echo -e "[   ${COLOR_GREEN}OK${COLOR_BACK}   ]"; }
-print_ok_on_verbose()     { [ -n "${VERBOSE}" ] &&  print_ok; } 
 print_failed() { echo -e "[ ${COLOR_RED}FAILED${COLOR_BACK} ]"; }
 print_failed_and_exit() { 
     print_failed
@@ -162,34 +163,29 @@ print_failed_and_exit() {
     exit 1
 }
 
-#####
-# Print debug information if verbose mode enabled
-# usage: debug text
-##
-debug() {     [ -n "$VERBOSE" ] && info "$1" "[${COLOR_YELLOW}DEBUG${COLOR_BACK}]"; }
-
-#####
-# Print error message
-# usage: error text
-##
-error() {     info "$1" "[${COLOR_RED}ERROR${COLOR_BACK}]"; }
-print_error_and_exit() {
-    local text=$1
-    [ -z "$1" ] && text=" Bad format"
-    error  "$text. '$COMMAND -h' for help."
-    exit 1
-}
-
 #########################
 ### toolbox functions ###
 #########################
+
+#####
+# execute a local command 
+# usage: execute command
+###
+execute() {
+    [ $# -eq 0 ] && print_error_and_exit "[$FUNCNAME] missing command argument"
+    debug "[$FUNCNAME] $*"
+    [ -n "${SIMULATION}" ] && echo "(simulation) $*" || eval $*
+    local exit_status=$?
+    debug "[$FUNCNAME] exit status: $exit_status"
+    return $exit_status
+}
 
 ####
 # ask to continue. exit 1 if the answer is no
 # usage: really_continue text
 ##
 really_continue() {
-    echo -e -n "$1 Are you sure you want to continue? [Y|n] "
+    echo -e -n "[${COLOR_VIOLET}WARNING${COLOR_BACK}] $1 Are you sure you want to continue? [Y|n] "
     read ans
     case $ans in 
 	n*|N*) exit 1;;
@@ -203,18 +199,16 @@ really_continue() {
 check_bin() {
     [ $# -eq 0 ] && print_error_and_exit "[$FUNCNAME] missing argument"
     for appl in $*; do
-	[ -n "${VERBOSE}" ] && echo -n -e "=> checking availability of the command '$appl' on your system \t"
+	[ -n "$VERBOSE" ] && echo -n -e "=> checking availability of the command '$appl' on your system \t"
 	local tmp=`which $appl`
-	[ -z "$tmp" ] && print_failed_and_exit "Please install $appl or check \$PATH." || print_ok_on_verbose
+	[ -z "$tmp" ] && print_failed_and_exit "Please install $appl or check \$PATH."
+	[ -n "$tmp" ] && [ -n "$VERBOSE" ] && print_ok
     done
 }
 
-####
-# Get base command (without the arguments) 
-# usage: get_cmd_from string
-##
-get_cmd_from() { echo $* | cut -d " " -f 1; } 
-
+##########################
+### Specific functions ###
+##########################
 ####
 # clean the generated files
 ##
@@ -222,36 +216,26 @@ clean() {
     # check if a Makefile is present or not 
     if  [ -f "Makefile" ]; then
 	info "found a Makefile in the current directory"
-	info "running 'make distclean'"
-	make clean
-	make distclean
+	info "running 'make clean && make distclean'"
+	execute "make clean"
+	execute "make distclean"
     fi
 
     # remove autom4te.cache directopry if it exists
     if [ -d "${AUTOM4TE_CACHE_DIR}" -a -n "${AUTOM4TE_CACHE_DIR}/" ]; then
 	info "removing ${AUTOM4TE_CACHE_DIR}/ directory"
-	${RM} -r ${AUTOM4TE_CACHE_DIR}
+	execute "rm -r ${AUTOM4TE_CACHE_DIR}"
     fi
 
-    info "remove object files"     && ${RM} ${OBJ_FILES}
-    info "remove backup files"     && ${RM} ${BACKUP_FILES}
-    info "remove autoheader files" && ${RM} ${AUTOHEADER_FILES}
-    info "remove aclocal files"    && ${RM} ${ACLOCAL_FILES}
-    info "remove autoconf files"   && ${RM} ${AUTOCONF_FILES}
-    info "remove automake files"   && ${RM} ${AUTOMAKE_FILES}
+    info "remove object files"     && execute "rm -f ${OBJ_FILES}"
+    info "remove backup files"     && execute "rm -f ${BACKUP_FILES}"
+    info "remove autoheader files" && execute "rm -f ${AUTOHEADER_FILES}"
+    info "remove aclocal files"    && execute "rm -f ${ACLOCAL_FILES}"
+    info "remove autoconf files"   && execute "rm -f ${AUTOCONF_FILES}"
+    info "remove automake files"   && execute "rm -f ${AUTOMAKE_FILES}"
 }
 
-####
-# cscope
-###
-init_cscope() {
-    check_bin "cscope"
-    # generate cscope file
-    find . -name "*.cpp" -or -name "*.h" > ${CSCOPE_FILES}
-    # run cscope
-    cscope -b -q
 
-}
 
 
 ################################################################################
@@ -266,33 +250,28 @@ while [ $# -ge 1 ]; do
     case $1 in
 	-h | --help)    print_help;        exit 0;;
 	-V | --version) print_version;     exit 0;;
+	--debug)        DEBUG="--debug"; 
+	                VERBOSE="--verbose";; 	   
+ 	-n | --dry-run) SIMULATION="--dry-run";;
 	-v | --verbose) VERBOSE="--verbose";; 	    
+# ---------------------------------------
 	-c | --clean)   CLEAN_MODE="1";;
 	-a | --do-all)  DO_ALL_MODE="1";;
-	-n | --dry-run)
-	    DRY_RUN=echo
-#	    AUTOHEADER="echo ${AUTOHEADER}"
-	    ACLOCAL="echo ${ACLOCAL}"
-	    AUTOCONF="echo ${AUTOCONF}"
-	    AUTOMAKE="echo ${AUTOMAKE}"
-	    AUTORECONF="echo ${AUTORECONF}"
-	    RM="echo ${RM}"
-	    ;;
-	--cscope) CSCOPE_MODE="1";;
+	-c | --clean)   CLEAN_MODE="1";;
     esac
     shift
 done
 
-[ -n "${CLEAN_MODE}" ] && clean && exit 0
-
-debug "Verbose mode activated"
-check_bin `get_cmd_from ${AUTOHEADER}` `get_cmd_from ${ACLOCAL}` `get_cmd_from ${AUTOCONF}` `get_cmd_from ${AUTOMAKE}` `get_cmd_from ${AUTORECONF}`
-#check_bin `get_cmd_from ${ACLOCAL}` `get_cmd_from ${AUTOCONF}` `get_cmd_from ${AUTOMAKE}` `get_cmd_from ${AUTORECONF}`
-
-[ -n "${CSCOPE_MODE}" ] && init_cscope && exit 0
-${AUTORECONF}
+if [ -n "${CLEAN_MODE}" ]; then 
+    clean
+    exit 0
+fi
+check_bin autoheader aclocal autoconf automake autoreconf
+info "running autoreconf to generate the configure script and initiate autotools"
+execute "${AUTORECONF}"
 if [ -n "${DO_ALL_MODE}" ]; then
     debug "do_all mode"
-    ${DRY_RUN} ./configure
-    ${DRY_RUN} make
+    execute "./configure && make"
 fi
+
+

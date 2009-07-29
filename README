@@ -20,9 +20,11 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-Comments are welcome. Please submit bugs using the bug tracker system 
-associated with the 'ibackup' project: 
+Comments are welcome. Please submit bugs: 
+- using the bug tracker system associated with the 'ibackup' project: 
 	https://gforge.uni.lu/tracker/?group_id=44
+  (require authorization)
+- send me a mail
 
 Finally, if the 'configure' script is missing, just run the 'bootstrap' script. 
 It supposes the availability on your system of the following software: 

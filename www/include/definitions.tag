@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; definitions.tag                                               ;;;
 ;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>       ;;;
+;;; $Id$
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #use wml::std::tags
@@ -235,6 +236,12 @@
 </define-tag>
 <define-tag svarrette_home whitespace=delete>
    <a href="http://varrette.gforge.uni.lu">Sebastien Varrette</a>
+</define-tag>
+<define-tag gherbiet whitespace=delete>
+   <a href="mailto:Guillaume.Herbiet 'at' uni.lu">Guillaume-Jean Herbiet</a>
+</define-tag>
+<define-tag gherbiet_home whitespace=delete>
+   <a href="http://herbiet.gforge.uni.lu">Guillaume-Jean Herbiet</a>
 </define-tag>
 <define-tag gdanoy whitespace=delete>
    <a href="mailto:Gregoire.Danoy 'at' uni.lu">Gregoire Danoy</a>

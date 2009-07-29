@@ -1,7 +1,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; main.wml                                                      ;;;
 ;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>       ;;;
-;;; For more info, see http://thewml.org/docs/
+;;; For more info, see http://thewml.org/docs/                    ;;;
+;;; $Id$
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #use wml::std::page
@@ -56,7 +57,7 @@
     <dump MENU>
     <div class="announce">
       <h2>Latest news:</h2>
-      <p><strong>Jan 30, 2009</strong>:<br/> version $(CURRENT_RELEASE) released!</p>
+      <p><strong>July 29, 2009</strong>:<br/> version $(CURRENT_RELEASE) released!</p>
     </div>
     <unilu_logo>
   </div>

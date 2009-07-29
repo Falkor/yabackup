@@ -3,6 +3,7 @@
 ;;; Author : Sebastien Varrette <Sebastien.Varrette@uni.lu>            ;;;
 ;;; WML info: see http://thewml.org/docs/                              ;;;
 ;;; XHTML reference: http://webpageworkshop.co.uk/main/xhtml_reference ;;;
+;;; $Id$
 ;;;                                                                    ;;; 
 ;;; Specific balise defined in include/definitions.tag                 ;;; 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -28,7 +29,9 @@ More precisely, <project> claims to have the following functionalities:
       For instance, if a long log file increases by just a few lines of text, 
       a small diff will be sent.
   </li> 
+  <li><strong>Support various backup targets</strong>, from local drives or [encrypted] 
+    sparsebundle to remote server with SSH access.
+  </li>
 </ul>  
-Currently <project> supports local file storage and ssh connections.
 
 
