@@ -1279,6 +1279,7 @@ Please report bugs using informations provided at the page L<http://ibackup.gfor
 =head1 AUTHOR
 
 Original author: Sebastien Varrette -- L<http://varrette.gforge.uni.lu/>
+
 Recently, Guillaume-Jean Herbiet (L<http://herbiet.gforge.uni.lu>) joined me to improve 
 the script in many ways (sparsebundle support etc.)
 

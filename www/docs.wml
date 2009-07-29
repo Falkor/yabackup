@@ -19,7 +19,6 @@
 
 <ul>
   <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
-  <li><a href="$(ROOTREL)/NEWS">NEWS</a> from the current release</li>
   <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>  
   <li><a href="$(ROOTREL)/backup.3.html" rel="external"><code>backup</code> man page</a></li>  
 </ul>

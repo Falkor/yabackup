@@ -88,5 +88,5 @@ As for protocols connecting to a backup target, <project> supports local sockets
 <!-- ====== -->
 <h2>Authors</h2>
 
-<project> is written by <svarrette_home>.
+<project> is written by <svarrette_home>.<br/>
 Recently, <gherbiet_home> joined me to improve the script in many ways (sparsebundle support etc.)

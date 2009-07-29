@@ -3,11 +3,11 @@
 	
   Homepage: http://ibackup.gforge.uni.lu
 
-  Copyright (c) 2009 Sebastien Varrette
+  Copyright (c) 2009 Sebastien Varrette, Guillaume-Jean Herbiet
 
   backup is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  the Free Software Foundation; either version 3 of the License, or
   (at your option) any later version.
 
   This program is distributed in the hope that it will be useful,
@@ -20,15 +20,15 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-Comments are welcome. Please submit bugs: 
-- using the bug tracker system associated with the 'ibackup' project: 
-	https://gforge.uni.lu/tracker/?group_id=44
-  (require authorization)
-- send me a mail
+Comments are welcome. 
+Please report bugs using informations provided at the page 
+		http://ibackup.gforge.uni.lu/bugs.html
+
 
 Finally, if the 'configure' script is missing, just run the 'bootstrap' script. 
 It supposes the availability on your system of the following software: 
 - autoconf v2.6 or later
 - automake v1.9.6 or later
 
-	Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	Sebastien Varrette 	<Sebastien.Varrette@uni.lu>
+	Guillaume-Jean Herbiet 	<Guillaume.Herbiet@uni.lu>

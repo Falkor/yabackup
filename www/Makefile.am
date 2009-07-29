@@ -16,7 +16,7 @@ DOC_FROMPOD      = backup.3.html
 #backup.3.x.html
 # sources
 SRC          = $(wildcard *.wml)
-TARGET       = $(SRC:.wml=.html) ChangeLog FAQ NEWS 
+TARGET       = $(SRC:.wml=.html) ChangeLog FAQ  
 MAKEFILE_DEP = .Makefile.dep
 SCRIPT_DEPENDANCES = .dependances.sh
 
@@ -36,7 +36,7 @@ clean-local:
 	$(RM) .wmlrc $(MAKEFILE_DEP) $(DOC_FROMPOD) $(TARGET)
 
 $(DOC_FROMPOD): $(BACKUP_SCRIPT_SRC)
-	@echo => generating $@
+	@echo "=> generating $@"
 	$(POD2HTML) --title="Backup Documentation" \
 		    --css=$(CSS_STYLESHEET) $(BACKUP_SCRIPT_SRC) > $@
 	$(RM) pod2htmd.tmp pod2htmi.tmp
@@ -59,8 +59,8 @@ ChangeLog: ../ChangeLog
 FAQ: ../FAQ
 	rsync -avzu $< $@
 
-NEWS: ../NEWS
-	rsync -avzu $< $@
+#NEWS: ../NEWS
+#	rsync -avzu $< $@
 
 rsync: all
 	@echo "=> running $(RSYNC_CMD)"
