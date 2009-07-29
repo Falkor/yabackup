@@ -70,6 +70,7 @@ my $POST_SCRIPT;                  # Complete path to post-backup script
 
 my $config_file;                  # Configuration file.
 my @backup_sections;              # backup sections to be used in the configuration file 
+my @OS = qx(uname);               # Current OS
 
 my %SETTINGS = (
 		'use_duplicity'         => 'no', 
@@ -127,6 +128,11 @@ my $getoptRes = GetOptions(# Specific options
 			  );
 
 PRINT_ERROR_THEN_EXIT("check the format of the command-line") unless ($getoptRes);
+if ($NOTIFICATION) {
+    check_binary('growlnotify') if ($OS[0] =~ "Darwin"); # Mac OS X: check growlnotify
+    check_binary('notify-send') if ($OS[0] =~ "Linux");  # Linux: check notify-send
+}
+
 if ($QUIET && $RETRIEVE_MODE) {
     $QUIET = 0;
     info("Quiet mode desactivated when retrieving data\n");
@@ -253,15 +259,11 @@ sub notification {
 	$priority = defined($priority)?$priority:0;
 	
 	# Select notification system based on system
-	my @os = qx(uname);
-	# Mac OS X: use growlnotify
-	if ($os[0] =~ "Darwin") {
-		check_binary('growlnotify');
+	if ($OS[0] =~ "Darwin") {   	# Mac OS X: use growlnotify
 		$priority = max(min($priority, 2), -2);
 		system('growlnotify -p '.$priority.' -n '.$command.' -a \'Time Machine\' \''.$title.'\' -m \''.$text.'\'');
 	}
-	elsif ($os[0] =~ "Linux") {
-		check_binary('notify-send');
+	elsif ($OS[0] =~ "Linux") {
 		$priority = max(min($priority, 1), -1) +1;
 		my @levels = ("low", "normal", "critical"); 
 		system('notify-send -u '.$levels[$priority].' -i gtk-dialog-info \''.$title.'\' \''.$text.'\'');
@@ -409,9 +411,8 @@ sub getIPFromInterface {
     if (@_) {
 	@interfaces = ($_[0]);
     } else {
-	my @os = qx(uname);
-	@interfaces = ('eth0', 'eth1') if ($os[0] eq "Linux");
-	@interfaces = ('en0',  'en1')  if ($os[0] =~ "FreeBSD|OpenBSD|Darwin");
+	@interfaces = ('eth0', 'eth1') if ($OS[0] eq "Linux");
+	@interfaces = ('en0',  'en1')  if ($OS[0] =~ "FreeBSD|OpenBSD|Darwin");
     }
     foreach my $i (@interfaces) {
 	return $IPs{$i}->{IP} if ($IPs{$i} && $IPs{$i}->{IP});
@@ -724,8 +725,7 @@ sub parse_target_url {
 		       setup_target_ssh($user, $server, $port);
 		     }
 	case 'sparsebundle'{
-		my @os = qx(uname);
-		PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($os[0] =~ "Darwin");
+		PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
 		verbose("\tsetup target on the sparsebundle image $target\n");
 		setup_target_sparsebundle($target);
 	}
