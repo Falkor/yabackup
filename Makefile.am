@@ -46,7 +46,7 @@ CLEANFILES += .authors.xml
 	@echo "</authors>"						>> $@
 
 ChangeLog: .authors.xml
-	svn2cl.sh -a -i --group-by-day --separate-daylogs --authors=.authors.xml
+	svn2cl.sh -a -i --group-by-day --separate-daylogs --authors=.authors.xml -r HEAD:1
 	$(RM) .authors.xml 
 else
 ChangeLog:

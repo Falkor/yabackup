@@ -1,4 +1,24 @@
+2009-07-31  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r42] Makefile.am, bin/backup.in: Correct PATH issues when using
+	  growlnotify in a crontab
+	  - Fix Bug 11: --notification in crontab raise 'could not find
+	  local GrowlApplicationBridgePathway, falling back to NSDNC'
+
 2009-07-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r41] bin/backup.in, www/bugs.wml: Fix bug '10': --notification
+	  and absence of grownotification should raise a single error
+
+	* [r40] README, bin/backup.in, configure.ac, www/bugs.wml,
+	  www/index.wml: correct mispellings + add mention to the new
+	  mailing list ibackup-support@lists.gforge.uni.lu
+
+	* [r39] README, bin/backup.in, www/Makefile.am, www/docs.wml,
+	  www/download/backup-0.3.tar.gz, www/index.wml: Release v0.3 on
+	  the web site
+
+	* [r38] ChangeLog: update from svn2cl.sh
 
 	* [r37] AUTHORS, ChangeLog, INSTALL[DEL], Makefile.am, README,
 	  acinclude.m4, bin/backup.in, bootstrap, configure.ac,
