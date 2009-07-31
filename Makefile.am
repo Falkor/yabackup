@@ -51,7 +51,7 @@ ChangeLog: .authors.xml
 else
 ChangeLog:
 	@echo "Please configure with --enable-svn2cl to be able to automatically"
-	@echo "generate teh ChangeLog from from the svn repository logs"
+	@echo "generate the ChangeLog from from the svn repository logs"
 endif
 
 dist-hook:
@@ -59,8 +59,8 @@ dist-hook:
 	rm -rf $(distdir)/www/download/*
 
 # Generate man page
-backup.3 : bin/backup.in 
-	$(POD2MAN) --name=BACKUP --section=3 --center="Backup Script Manual" $^ > $@
+backup.3 : bin/backup 
+	$(POD2MAN) --name=BACKUP --section=3 --center="Backup v@VERSION@ Script Manual" $^ > $@
 
 .PHONY: doc
 doc: backup.3

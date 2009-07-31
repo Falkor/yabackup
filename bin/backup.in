@@ -49,6 +49,9 @@ use Term::ANSIColor;          # To send the ANSI color-change sequences to the u
 use Data::Dumper;
 use Pod::Usage;
 
+# PATH
+$ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin";
+
 # Generic variables
 my $VERSION = '@VERSION@';    # Script version
 my $VERBOSE = 0;              # option variable for verbose mode with default value (false)
@@ -261,12 +264,12 @@ sub notification {
 	# Select notification system based on system
 	if ($OS[0] =~ "Darwin") {   	# Mac OS X: use growlnotify
 		$priority = max(min($priority, 2), -2);
-		system('growlnotify -p '.$priority.' -n '.$command.' -a \'Time Machine\' \''.$title.'\' -m \''.$text.'\'');
+		execute('growlnotify -p '.$priority.' -n '.$command.' -a \'Time Machine\' \''.$title.'\' -m \''.$text.'\' > /dev/null 2>&1');
 	}
 	elsif ($OS[0] =~ "Linux") {
 		$priority = max(min($priority, 1), -1) +1;
 		my @levels = ("low", "normal", "critical"); 
-		system('notify-send -u '.$levels[$priority].' -i gtk-dialog-info \''.$title.'\' \''.$text.'\'');
+		execute('notify-send -u '.$levels[$priority].' -i gtk-dialog-info \''.$title.'\' \''.$text.'\'');
 		PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] Notification is only supported under Mac OS X so far.');
 	}
 }
@@ -350,7 +353,7 @@ sub check_binary {
 	verbose("=> check availability of the command '$app' on the local system...");
 	verbose("\n") if (($DEBUG) || ($SIMULATION_MODE));
        	my $exit_status = execute("which $app 1>/dev/null");
-	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . "] unable to find the application $app on your system") if ($exit_status);
+	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . "] unable to find the application $app on your system (using PATH=$ENV{'PATH'})") if ($exit_status);
 	verbose("\tOK\n");
     }
 }
