@@ -19,27 +19,26 @@
 
 <ul>
   <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
-  <li><a href="$(ROOTREL)/NEWS">NEWS</a> from the current release</li>
+  <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>
 </ul>
 
-The latest stable version of of <project> can be downloaded here: 
-;;;There are several way to get <project>: 
-;;; <ul>
-;;;  <li>You can download the latest stable tarball version:<br/>
+There are several way to get <project>: 
+<ul>
+  <li>You can download the latest stable tarball version:<br/>
     <blockquote>
       <p><a href="$(ROOTREL)/download/backup-$(CURRENT_RELEASE).tar.gz">
-	backup-$(CURRENT_RELEASE).tar.gz
+	  backup-$(CURRENT_RELEASE).tar.gz
       </a></p>
     </blockquote>
-;;;  </li>
-  <!-- 
-       <li>You can download the latest version of the sources using anonymous svn access:<pre>
-	   $ svn checkout svn://svn.gforge.uni.lu/svn/$(PROJECT_UNIXNAME)/trunk
-	   $ mv trunk $(PROJECT_UNIXNAME)</pre>
-	 Keep in mind that it may happens for the sources to be totally brocken so use svn access with 
-	 caution.</li>
-    -->
+  </li> 
+  <li>You can download the latest version of the sources using anonymous svn access:<pre>
+      $ svn checkout svn://svn.gforge.uni.lu/svn/$(PROJECT_UNIXNAME)/trunk
+      $ mv trunk $(PROJECT_UNIXNAME)</pre>
+    Keep in mind that it may happens for the sources to be totally brocken so use svn access with 
+    caution.
+  </li>
 </ul>
-
-Old versions are kept in the <a href="https://gforge.uni.lu/frs/?group_id=$(PROJECT_GFORGEID)">file area of the Gforge</a> 
+  
+Old versions are kept in the 
+<a href="https://gforge.uni.lu/frs/?group_id=$(PROJECT_GFORGEID)">file area of the Gforge</a> 
 (required authorization) or in the <a href="$(ROOTREL)/download/">download</a> directory. 

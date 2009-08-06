@@ -42,6 +42,7 @@ use Switch;
 use Storable qw(dclone);      # for recursive copy of nested hash 
 use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
 use List::Util qw[min max];   # To find min/max values
+use Time::localtime;
 use POSIX qw(strftime);       # To format time 
 use Getopt::Long;             # For command line management (long version)
 use Config::General;          # For configuration file parsing
@@ -112,7 +113,7 @@ my $getoptRes = GetOptions(# Specific options
 			   'dry-run|n'       => \$SIMULATION_MODE,              # Simulation mode
 			   'mac-fork|m'      => \$MAC_FORK,                     # Mac resource fork
 			   'notification'    => \$NOTIFICATION,                 # User notification features
-			   'exact_sync|e'    => sub { $SYNC_MODE="--delete" },  # Exact synchro
+			   'exact-sync|e'    => sub { $SYNC_MODE="--delete" },  # Exact synchro
 			   'history'         => sub {                           # Keep history of backups
 				      $HISTORICAL = 1;
 				      $SYNC_MODE="--delete"

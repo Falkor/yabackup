@@ -8,15 +8,11 @@
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.3],[ibackup-support@lists.gforge.uni.lu])
+AC_INIT([backup],[0.3.1],[ibackup-support@lists.gforge.uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
-
-# Make automake clean emacs ~ files for "make clean"
-CLEANFILES="*~"
-AC_SUBST(CLEANFILES)
 
 PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
 AC_SUBST(PACKAGE_SUMMARY)
@@ -83,9 +79,9 @@ AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 AC_CHECK_CPAN_MODULES(
     Switch 
     Storable 
-    Hash::Util 
+    Hash::Util
+    List::Util 
     Time::localtime 
-    Getopt::Long 
     POSIX 
     Getopt::Long 
     Config::General 
