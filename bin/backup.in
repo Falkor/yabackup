@@ -662,7 +662,8 @@ sub treat_cmd_options {
     }
     # Add classical options
     $BACKUP_CMD_INFO{'opt'} .= " -avz";
-    $BACKUP_CMD_INFO{'opt'} .= " -E" if $MAC_FORK;
+    #$BACKUP_CMD_INFO{'opt'} .= " -E" if $MAC_FORK;
+	$BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change" if ($MAC_FORK && !$BACKUP_CMD_INFO{'proto'} eq 'ssh');
 #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $VERBOSE;
     $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $QUIET;
     $BACKUP_CMD_INFO{'opt'} .= " $SYNC_MODE";  
