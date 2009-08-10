@@ -271,7 +271,7 @@ sub notification {
 		$priority = max(min($priority, 1), -1) +1;
 		my @levels = ("low", "normal", "critical"); 
 		execute('notify-send -u '.$levels[$priority].' -i gtk-dialog-info \''.$title.'\' \''.$text.'\'');
-		PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] Notification is only supported under Mac OS X so far.');
+		#PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] Notification is only supported under Mac OS X so far.');
 	}
 }
 
