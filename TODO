@@ -2,7 +2,9 @@
 - Add support for files to include/exclude relative to $src_rootdir (currently, only directories are checked)
 X Notification via Growl/other under Linux
 X manage sparsebundle
-- Add synchronization for specific elements like iCal, Address Book etc. 
+- Add synchronization for specific elements like iCal, Address Book etc. (see http://osxportableapps.sourceforge.net/syncpappx for instance)
 - Add duplicity support ;)
 - Use subnet restriction to other protocols than ssh (avoid unecessary faulty attempts)
 - Add an example of .rsync_exclude file
+- Add GUI support using CocoaDialog (http://cocoadialog.sourceforge.net/, http://search.cpan.org/~polettix/Mac-CocoaDialog-0.0.2/lib/Mac/CocoaDialog.pm) for Mac and Zenity (http://library.gnome.org/users/zenity/stable/, http://search.cpan.org/~kck/UI-Dialog-1.08/lib/UI/Dialog/Backend/Zenity.pod) for Gnome under Linux or using wwxPerl (http://search.cpan.org/~garu/Padre-0.42/lib/Wx/Perl/Dialog/Simple.pm)
+- Rewrite for a more organized code using separated Perl packages for various backup operations
