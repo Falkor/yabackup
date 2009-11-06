@@ -1,4 +1,5 @@
-#!@PERL@ -w
+#!/usr/bin/perl  -w
+#########!@PERL@ -w
 
 ##############################################################################
 # File   : backup
@@ -42,11 +43,14 @@ use Switch;
 use Storable qw(dclone);      # for recursive copy of nested hash 
 use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
 use List::Util qw[min max];   # To find min/max values
-use Time::localtime;
 use POSIX qw(strftime);       # To format time 
 use Getopt::Long;             # For command line management (long version)
 use Config::General;          # For configuration file parsing
-use Term::ANSIColor;          # To send the ANSI color-change sequences to the user's terminal
+use Term::ANSIColor;          # To send the ANSI color-change sequences to the 
+                              #    user's terminal
+# TODO: add a sort of #ifdef __DARWIN__ here for Data::Plist not required on other systems
+use Mac::PropertyList qw(parse_plist);       # To parse plist files obtained under Mac OS X 
+
 use Data::Dumper;
 use Pod::Usage;
 
@@ -76,6 +80,7 @@ my $config_file;                  # Configuration file.
 my @backup_sections;              # backup sections to be used in the configuration file 
 my @OS = qx(uname);               # Current OS
 
+# configuration file sections
 my %SETTINGS = (
 		'use_duplicity'         => 'no', 
 		'log_file'              => undef,
@@ -90,6 +95,7 @@ my %SETTINGS = (
 		'target_url'            => undef,
 	       );
 
+# Element of the backup command (populated while parsing the configuration file) 
 my %BACKUP_CMD_INFO = (
 		       'basecmd'     => 'rsync',
 		       'opt'         => '',
@@ -100,6 +106,13 @@ my %BACKUP_CMD_INFO = (
 		       'port'        => undef,
 		       'target'      => undef,
 		      );
+
+# Hash of drives mounted by the script (to be unmounted at the end)
+my %MOUNTED_VOLUMES = (
+		       'afp'          => undef,
+		       'drive'        => undef,
+		       'sparsebundle' => undef,
+		       );
 
 my %DEFAULT_SETTINGS        = %SETTINGS;
 my %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
@@ -178,9 +191,9 @@ ensure_section_exists('global', @backup_sections);
 foreach my $sec (@backup_sections) {
     info('Proceeding backup configured in section ' . color('bold') . "$sec" . color('reset') . "\n");
 	
-	# run pre-backup script if specified
-	info("Executing pre-backup script.\n") if defined $PRE_SCRIPT;
-	external_script_execute($PRE_SCRIPT, "pre") if defined $PRE_SCRIPT;
+    # run pre-backup script if specified
+    info("Executing pre-backup script.\n") if defined $PRE_SCRIPT;
+    external_script_execute($PRE_SCRIPT, "pre") if defined $PRE_SCRIPT;
     
     # get the settings for this synchro
     debug("Add global settings\n");
@@ -196,9 +209,12 @@ foreach my $sec (@backup_sections) {
     # run the command
     run_sync_cmd();
 
+    # clean after the syncho (umount sparsebundle/afp volumes etc.)
+    clean_after_sync();
+
     # run post-backup script if specified
-	info("Executing post-backup script.\n") if defined $POST_SCRIPT;
-	external_script_execute($POST_SCRIPT, "post") if defined $POST_SCRIPT;
+    info("Executing post-backup script.\n") if defined $POST_SCRIPT;
+    external_script_execute($POST_SCRIPT, "post") if defined $POST_SCRIPT;
 }
 
 
@@ -281,7 +297,10 @@ sub notification {
 sub really_continue {
     print "Are you sure you want to continue? [yN] ";
     chomp(my $ans = <STDIN>);
-    exit(0) unless ($ans && ($ans =~ /y|yes|1/i));
+    unless ($ans && ($ans =~ /y|yes|1/i)) {
+	clean_after_sync();
+	exit(0);
+    }
 }
 
 ####
@@ -373,15 +392,7 @@ sub append_to_log {
 	$output = *STDERR;
 	print $output '[' . color('yellow') . "LOG" . color('reset') . ']';
     }
-	print $output strftime('%Y-%m-%d %Hh%M:%Ss', localtime)." @_\n";
-    # my $tm = localtime;
-    # printf($output "[%04d-%02d-%02d %02dh%02d:%02d] @_\n",
-    # 	   $tm->year + 1900,
-    # 	   $tm->mon + 1,
-    # 	   $tm->mday,
-    # 	   $tm->hour, 
-    # 	   $tm->min,
-    # 	   $tm->sec);
+    print $output strftime('%Y-%m-%d %Hh%M:%Ss', localtime)." @_\n";
     close($output) if defined($SETTINGS{'log_file'});
 }
 
@@ -566,19 +577,19 @@ sub configure_sync_cmd {
 sub run_sync_cmd {
     # First check subnet
     check_subnet($SETTINGS{'restrict_on_subnet'}) if ($SETTINGS{'restrict_on_subnet'});
-	
-	# So far no support for ssh + backup history
-	PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with ssh target.")
-		if ($BACKUP_CMD_INFO{'proto'} eq 'ssh' && $HISTORICAL);
-	
-	# So far no support for retrieve + backup history
-	PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with retrieve operation.")
-		if ($RETRIEVE_MODE && $HISTORICAL);
-	
-	# Set timestamp if historical backup
-	my $datestamp = $HISTORICAL ? strftime('%Y-%m-%d_%Hh%Mm%Ss', localtime) : "";
-	
-	if ($RETRIEVE_MODE) {
+    
+    # So far no support for ssh + backup history
+    PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with ssh target.")
+      if ($BACKUP_CMD_INFO{'proto'} eq 'ssh' && $HISTORICAL);
+    
+    # So far no support for retrieve + backup history
+    PRINT_ERROR_THEN_EXIT("In this version historical backups are not compatible with retrieve operation.")
+      if ($RETRIEVE_MODE && $HISTORICAL);
+    
+    # Set timestamp if historical backup
+    my $datestamp = $HISTORICAL ? strftime('%Y-%m-%d_%Hh%Mm%Ss', localtime) : "";
+    
+    if ($RETRIEVE_MODE) {
 	warning('You are about to '. color('red') . color('bold') . 'retrieve ' .color('reset') . color('reset') . 
 	        "the directories '@{$BACKUP_CMD_INFO{'dirs'}}' from $BACKUP_CMD_INFO{'target'}\n");
 	warning("This will " . color('red') . color('bold') . 'overwrite files on your local system.' .color('reset').color('reset') . "\n");
@@ -589,10 +600,10 @@ sub run_sync_cmd {
 	# create basedir on target
 	create_dir_on_target("$BACKUP_CMD_INFO{'dst'}/$datestamp$BACKUP_CMD_INFO{'src'}") unless $RETRIEVE_MODE;
     }
-	notification("Starting backup", "iBackup is starting backup of ".$BACKUP_CMD_INFO{'src'}." on ".$BACKUP_CMD_INFO{'target'}) if $NOTIFICATION;
+    notification("Starting backup", "iBackup is starting backup of ".$BACKUP_CMD_INFO{'src'}." on ".$BACKUP_CMD_INFO{'target'}) if $NOTIFICATION;
     
-	my $failure = 0;
-	foreach my $dir (@{$BACKUP_CMD_INFO{'dirs'}}) {
+    my $failure = 0;
+    foreach my $dir (@{$BACKUP_CMD_INFO{'dirs'}}) {
 	info("proceeding directory " . color('bold') . "$dir" . color('reset') . "\n", "   ---->");
 	my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
 	my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}/$datestamp$BACKUP_CMD_INFO{'src'}";
@@ -609,7 +620,7 @@ sub run_sync_cmd {
 	    my $sep  = ($BACKUP_CMD_INFO{'proto'} eq 'ssh') ? ':' : '/';
 	    $dst_basedir = "$BACKUP_CMD_INFO{'target'}$sep$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
 	    #$dst_linkdir = "$BACKUP_CMD_INFO{'target'}$sep$SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'}" if $SETTINGS{'Directory'}->{$dir}->{'dst_rootdir'};
-		if ((! $RETRIEVE_MODE) && 
+	    if ((! $RETRIEVE_MODE) && 
 		($SETTINGS{'Directory'}->{$dir}->{'src_in_subfolder'})) 
 	      {
 		  verbose("=> setup src differentiation for the directory $dir on the target $BACKUP_CMD_INFO{'target'}\n");
@@ -627,26 +638,43 @@ sub run_sync_cmd {
 	}
 	# Inverse src_basedir and dst_basedir if $RETRIEVE_MODE
 	($src_basedir, $dst_basedir) = ($dst_basedir, $src_basedir) if ($RETRIEVE_MODE);
-
+	
 	# Add historical backup options if required
 	my $hist_opt = ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest')   ?
 	  " --link-dest ".$dst_linkdir."/".$dst_dir : "";
-
+	
 	my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'}$hist_opt $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
 	append_to_log("$cmd");
 	$failure += execute($cmd);
     }
-	
-	execute('unlink '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest');
-	execute('ln -s '.$BACKUP_CMD_INFO{'dst'}.'/'.$datestamp.' '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL);
-	
-	notification("Backup failed!", "Backup to $BACKUP_CMD_INFO{'target'} failed!", 1) if ($failure && $NOTIFICATION);
-	notification("Backup succeeded", "Backup to $BACKUP_CMD_INFO{'target'} succeeded.", 0) if (!$failure && $NOTIFICATION);
-	
-	if ($BACKUP_CMD_INFO{'proto'} eq 'sparsebundle') {
-		execute('hdiutil detach '.$BACKUP_CMD_INFO{'dst'});
-	}
+    
+    execute('unlink '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL && -l $BACKUP_CMD_INFO{'dst'}.'/latest');
+    execute('ln -s '.$BACKUP_CMD_INFO{'dst'}.'/'.$datestamp.' '.$BACKUP_CMD_INFO{'dst'}.'/latest') if ($HISTORICAL);
+    
+    notification("Backup failed!", "Backup to $BACKUP_CMD_INFO{'target'} failed!", 1) if ($failure && $NOTIFICATION);
+    notification("Backup succeeded", "Backup to $BACKUP_CMD_INFO{'target'} succeeded.", 0) if (!$failure && $NOTIFICATION);
 }
+
+###
+# Clean the local system after the synchronization i.e. unmount volumes etc. 
+##
+sub clean_after_sync {
+    debug("List of mounted volumes : \n" . Dumper \%MOUNTED_VOLUMES);
+    foreach my $proto (keys %MOUNTED_VOLUMES) {
+	if (defined ($MOUNTED_VOLUMES{$proto})) {
+	    my $umount_cmd = "";
+	    $umount_cmd = "umount "         if ($proto =~ "drive|afp");
+	    $umount_cmd = "hdiutil detach -quiet " if ($proto eq 'sparsebundle');
+	    PRINT_ERROR_THEN_EXIT("No unmount command set!\n") unless ($umount_cmd);
+	    
+	    foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
+		info("Unmounting the volume $vol (mounted via $proto)\n");
+		execute("$umount_cmd $vol");
+	    }
+	}
+    }
+}
+
 
 ####
 # specialize the command options
@@ -716,25 +744,39 @@ sub parse_target_url {
     PRINT_ERROR_THEN_EXIT("Malformed url $SETTINGS{'target_url'}") unless ($proto && $target);
     $BACKUP_CMD_INFO{'proto'} = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
+    
+    # Handle each prototype
     switch ($proto) {
-	case 'drive' { verbose("\tsetup target on the external drive $target\n"); 
-		       setup_target_drive($target);
-		     }
-	case 'file'  { verbose("\tsetup target on the local directory $target\n"); 
-		       setup_target_drive($target);
-		     }
-	case 'ssh'   { PRINT_ERROR_THEN_EXIT("Malformed ssh target") unless ($user && $server);
-		       $port = 22 unless ($port);
-		       verbose("\tsetup target on the remote server $server.\n");
-		       verbose("\tConnection to be established for the remote user $user by ssh on port $port\n"); 
-		       setup_target_ssh($user, $server, $port);
-		     }
-	case 'sparsebundle'{
-		PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
-		verbose("\tsetup target on the sparsebundle image $target\n");
-		setup_target_sparsebundle($target);
-	}
-	  else { PRINT_ERROR_THEN_EXIT("The protocol $proto is not supported"); }
+	# Local drive
+	case 'drive' 
+	  { 
+	   verbose("\tsetup target on the external drive $target\n"); 
+	   setup_target_drive($target);
+	  }
+	# Local directory 
+	case 'file'  
+	  { 
+	   verbose("\tsetup target on the local directory $target\n"); 
+	   setup_target_drive($target);
+	  }
+	# Remote server reacheable by ssh 
+	case 'ssh'   
+	  { 
+	   PRINT_ERROR_THEN_EXIT("Malformed ssh target") unless ($user && $server);
+	   $port = 22 unless ($port);
+	   verbose("\tsetup target on the remote server $server.\n");
+	   verbose("\tConnection to be established for the remote user $user by ssh on port $port\n"); 
+	   setup_target_ssh($user, $server, $port);
+	  }
+	# sparsebundle
+	case 'sparsebundle'
+	  {
+	   PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
+	   verbose("\tsetup target on the sparsebundle image $target\n");
+	   setup_target_sparsebundle($target);
+	  }
+	# ERROR: NOT supported => raise error
+	else { PRINT_ERROR_THEN_EXIT("The protocol $proto is not supported"); }
     }
 }
 
@@ -751,6 +793,7 @@ sub setup_target_drive {
 	$BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
     }
     PRINT_ERROR_THEN_EXIT("The target $BACKUP_CMD_INFO{'dst'} cannot be found") unless ( -d "$BACKUP_CMD_INFO{'dst'}");
+    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
 }
 
 ###
@@ -778,30 +821,36 @@ sub setup_target_ssh {
 ##
 sub setup_target_sparsebundle {
 	PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (@_);
-	
-	# List the files in /Volumes/
-	my @Volumes_pre = </Volumes/*>;
-	debug("Directories in Volumes before mounting: @Volumes_pre\n");
-	
+	my $sparsebundle = $_[0];
+
 	# test if the sparsebundle is really there
-	PRINT_ERROR_THEN_EXIT("The sparsebundle ".$_[0]." cannot be found") unless (-e $_[0]);
-	# mount it
-	PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle '.$_[0])
-		if (execute('hdiutil attach '.$_[0]));
+	PRINT_ERROR_THEN_EXIT("The sparsebundle $sparsebundle cannot be found") unless (-e $sparsebundle);
 
-	# List the files in /Volumes/ after mounting
-	my @Volumes_post = </Volumes/*>;
-	debug("Directories in Volumes after mounting: @Volumes_post\n");
+	# Now mount it
+	my $attach_cmd = "hdiutil attach $sparsebundle -plist";
+	if ($SIMULATION_MODE) {
+	    execute($attach_cmd);
+	    $BACKUP_CMD_INFO{'dst'} = "/Volumes/Backup_Drive";
+	} else {
+	    debug("Running '$attach_cmd'\n");
+	    my $plist_str = `$attach_cmd`;
+	      
+	    # Run the attach command and retrieve the plist infos
+	    my $plist = Mac::PropertyList::parse_plist( "$plist_str" );
+	    # Extract from it the mount point 
+	    my $mount_point = ""; 
+	    foreach my $dict ($plist->{'system-entities'}->value()) {
+		next unless $dict->exists('mount-point');
+		$mount_point = $dict->{'mount-point'}->value();		
+	    }
+	    PRINT_ERROR_THEN_EXIT("The mount point associated to the sparsebundle $sparsebundle cannot be found")
+		unless ($mount_point);
+	    debug("Mount point associated to $sparsebundle : ". color('bold') . $mount_point . color('reset') . "\n");
 
-	if (scalar(array_diff(\@Volumes_post, \@Volumes_pre)) == 1) {
-		($BACKUP_CMD_INFO{'dst'}) = array_diff(\@Volumes_post, \@Volumes_pre);
-	}
-	elsif ($SIMULATION_MODE) {
-		$BACKUP_CMD_INFO{'dst'} = "/Volumes/Backup_Drive"
-	}
-	else {
-		PRINT_ERROR_THEN_EXIT( 'Error while mounting sparsebundle, more than one device was added.'.$_[0])
-	}
+	    PRINT_ERROR_THEN_EXIT("The sparsebundle $sparsebundle cannot be mounted (in $mount_point)\n") unless (-d $mount_point);
+	    $BACKUP_CMD_INFO{'dst'} = "$mount_point";
+	    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+	}	
 }
 
 ####
@@ -1252,6 +1301,19 @@ Example:
 
       file:///path/to/local/folder
 
+=item * C<sparsebundle> :  a Mac OS X Sparse Bundle [encrypted] image
+
+Example: 
+
+      sparsebundle:///path/to/sparsebundle/image.sparsebundle
+
+With the previous line, the sparse bundle image /path/to/file.sparsebundle 
+will be mounted (let's say in /Volumes/ImageName) 
+
+Even if this is not required, it is strongly recommended for encrypted sparsebundle
+passwords to be stored in the user keychain. This is mandatory if I<backup>
+is to be launched in a crontab for instance.
+
 =item * C<ssh>   : SSH with public key authentication 
 
 Example: 
@@ -1264,16 +1326,6 @@ Even if public key authentication is not required, it is strongly recommended an
 mandatory if I<backup> it to be launched in a crontab for instance. 
 
 To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
-
-=item * C<sparsebundle>  : a sparsebundle image (supported only under Mac OS X)
-
-Example: 
-
-      sparsebundle:///path/to/sparsebundle/image.sparsebundle
-
-Even if this is not required, it is strongly recommended for encrypted sparsebundle
-passwords to be stored in the user keychain. This is mandatory if I<backup>
-is to be launched in a crontab for instance.
 
 =back
 

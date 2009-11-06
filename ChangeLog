@@ -1,5 +1,8 @@
 2009-07-31  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
+	* [r43] ChangeLog, Makefile.am: Correct the ChangeLog rule for
+	  Makefile.am to include all revisions
+
 	* [r42] Makefile.am, bin/backup.in: Correct PATH issues when using
 	  growlnotify in a crontab
 	  - Fix Bug 11: --notification in crontab raise 'could not find

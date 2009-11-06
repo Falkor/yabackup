@@ -8,7 +8,7 @@
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.3.1],[ibackup-support@lists.gforge.uni.lu])
+AC_INIT([backup],[0.3.2],[ibackup-support@lists.gforge.uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
@@ -88,6 +88,7 @@ AC_CHECK_CPAN_MODULES(
     Term::ANSIColor 
     Data::Dumper 
     Pod::Usage
+    Mac::PropertyList
 )
 
 # ----------------------------------------------------------------
