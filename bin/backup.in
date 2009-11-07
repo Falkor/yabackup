@@ -559,6 +559,7 @@ sub configure_sync_cmd {
     # setup destination basedir
     info("analysing target url $SETTINGS{'target_url'}\n", "   -");    
     parse_target_url();
+
     # setup directories to backup/restore
     info("setup local directories to " . ($RETRIEVE_MODE ? "restore" : "backup") . "\n", "   -");
     setup_directories_to_sync();
@@ -691,7 +692,7 @@ sub treat_cmd_options {
     # Add classical options
     $BACKUP_CMD_INFO{'opt'} .= " -avz";
     #$BACKUP_CMD_INFO{'opt'} .= " -E" if $MAC_FORK;
-	$BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change" if ($MAC_FORK && !$BACKUP_CMD_INFO{'proto'} eq 'ssh');
+    $BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change" if ($MAC_FORK && !$BACKUP_CMD_INFO{'proto'} eq 'ssh');
 #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $VERBOSE;
     $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $QUIET;
     $BACKUP_CMD_INFO{'opt'} .= " $SYNC_MODE";  
@@ -706,6 +707,15 @@ sub setup_backup_cmd_info_src {
     my $src_rootdir = interpret_cmd($SETTINGS{'src_rootdir'});
     PRINT_ERROR_THEN_EXIT("The directory $src_rootdir cannot be found on this computer") unless ( -d $src_rootdir);
     $BACKUP_CMD_INFO{'src'} = $src_rootdir;
+}
+
+####
+# complement $BACKUP_CMD_INFO{'dst'} (i.e the basedir of the folders to  host the backup) with
+# $SETTINGS{'dst_rootdir'}
+###
+sub complement_backup_cmd_info_dst {
+    my $dst_rootdir = interpret_cmd($SETTINGS{'dst_rootdir'});
+    $BACKUP_CMD_INFO{'dst'} .= "/$dst_rootdir";
 }
 
 ####
@@ -733,14 +743,16 @@ sub interpret_cmd {
 sub parse_target_url {
     PRINT_ERROR_THEN_EXIT("Undefined target url") if ! defined($SETTINGS{'target_url'});
     $SETTINGS{'target_url'} = interpret_cmd("$SETTINGS{'target_url'}");
-    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)((\@([\w\.]+))(:(\d+))?)?)/;
-    my ($proto, $target, $user, $server, $port) = ($1, $2, $3, $6, $8);
-    #my ($proto, $target) = split('://', $SETTINGS{'target_url'});
-    debug("Protocol: $proto\n")  if ($proto);
-    debug("target  : $target\n") if ($target);
-    debug("user    : $user\n")   if ($user);
-    debug("server  : $server\n") if ($server);
-    debug("port    : $port\n")   if ($port);
+    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)(:([\w]+))?((\@([\w-\.]+))(:(\d+))?)?(\/(\w+))?)/;
+    my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $8, $10, $12); 
+    debug("Protocol: $proto\n")   if ($proto);
+    debug("target  : $target\n")  if ($target);
+    debug("user    : $user\n")    if ($user);
+    debug("passwd  : $passwd\n")  if ($passwd);
+    debug("server  : $server\n")  if ($server);
+    debug("port    : $port\n")    if ($port);
+    debug("volname : $volname\n") if ($volname);
+
     PRINT_ERROR_THEN_EXIT("Malformed url $SETTINGS{'target_url'}") unless ($proto && $target);
     $BACKUP_CMD_INFO{'proto'} = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
@@ -775,9 +787,18 @@ sub parse_target_url {
 	   verbose("\tsetup target on the sparsebundle image $target\n");
 	   setup_target_sparsebundle($target);
 	  }
+	case 'afp'
+	  {
+	   PRINT_ERROR_THEN_EXIT("Apple Filing Protocol (AFP) are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
+	   $port = 548 unless ($port);
+	   verbose("\tsetup target on the remote server $server.\n");
+	   verbose("\tConnection to be established for the remote user $user by afp\n"); 
+	   setup_target_afp($user, $passwd, $server, $port, $volname);
+	   }
 	# ERROR: NOT supported => raise error
 	else { PRINT_ERROR_THEN_EXIT("The protocol $proto is not supported"); }
     }
+    complement_backup_cmd_info_dst();
 }
 
 ###
@@ -792,8 +813,10 @@ sub setup_target_drive {
 	warning("The target drive path ($BACKUP_CMD_INFO{'dst'}) does not starts with a '/' => '/' character added\n");
 	$BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
     }
-    PRINT_ERROR_THEN_EXIT("The target $BACKUP_CMD_INFO{'dst'} cannot be found") unless ( -d "$BACKUP_CMD_INFO{'dst'}");
-    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+    PRINT_ERROR_THEN_EXIT("The target $BACKUP_CMD_INFO{'dst'} cannot be found") 
+      unless ( -d "$BACKUP_CMD_INFO{'dst'}");
+    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'}) 
+      unless ($BACKUP_CMD_INFO{'proto'} eq 'file');
 }
 
 ###
@@ -807,13 +830,32 @@ sub setup_target_ssh {
     $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
     if ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync') {
 	$BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
-	$BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:" . interpret_cmd($SETTINGS{'dst_rootdir'});
+	$BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:"; 
     } else {
 	PRINT_ERROR_THEN_EXIT("rsync is the only supported command currently");
     }
  #   ssh_remote_execute($BACKUP_CMD_INFO{'target'}, $port, "hostname") || 
   #    die "unable to connect by ssh to $BACKUP_CMD_INFO{'target'} (port $port): $!\n";
 }
+
+###
+# setup the command for a backup on a remote server reacheable by afp
+# usage: setup_target_afp(user, passwd, server, afp_port, volname)
+##
+sub setup_target_afp($$$$$) {
+    PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (scalar(@_) == 5);
+    my ($user, $passwd, $server, $port, $volname) = @_;
+    PRINT_ERROR_THEN_EXIT("AFP protocol requires a volume name\n") unless defined $volname;
+    unless (defined $passwd) {
+	info("password not precised in the configuration\n");
+	info("TODO: ADD a directive check a deported (encrypted) file\n");
+    }
+    print "@_\n";
+
+    exit(0);
+
+}
+
 
 ###
 # setup the command for a backup on a sparsebundle image
@@ -1308,7 +1350,9 @@ Example:
       sparsebundle:///path/to/sparsebundle/image.sparsebundle
 
 With the previous line, the sparse bundle image /path/to/file.sparsebundle 
-will be mounted (let's say in /Volumes/ImageName) 
+will be mounted (let's say in /Volumes/ImageName). 
+Typically, create an encrypted sparse bundle image (via Disk Utility) and use it as a secure 
+container for your backup.    
 
 Even if this is not required, it is strongly recommended for encrypted sparsebundle
 passwords to be stored in the user keychain. This is mandatory if I<backup>
@@ -1326,6 +1370,16 @@ Even if public key authentication is not required, it is strongly recommended an
 mandatory if I<backup> it to be launched in a crontab for instance. 
 
 To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
+
+=item * C<afp> :  AFP (Apple Filing Protocol) access to a remote server (a NAS typically). 
+This is only available on Mac OS X.
+
+Example: 
+
+      afp://[user[:password]@]host[:port]/volumename/path/to/backupdir
+      afp://[user[:password]@]host[:port]/volumename/path/to/image.sparsebundle
+
+
 
 =back
 
