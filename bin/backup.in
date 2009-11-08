@@ -84,6 +84,7 @@ my @OS = qx(uname);               # Current OS
 my %SETTINGS = (
 		'use_duplicity'         => 'no', 
 		'log_file'              => undef,
+		'pass_file'             => undef,
 		'patternfile_exclude'   => undef,
 		'restrict_on_subnet'    => undef,
 		'src_rootdir'           => '/',
@@ -738,6 +739,27 @@ sub interpret_cmd {
 }
 
 ####
+# Retrieve password entry from file
+# usage: getPasswordFromFile(password_file, entry)
+##
+sub getPasswordFromFile($$) {
+    my $file = shift;
+    my $entry = shift;
+    my $password = "";
+    open(FILE, "$file") || die("Cannot open $file: $!\n");
+    while (<FILE>) {
+	chomp;
+	next unless (/\s*$entry\s+(.*)/);
+	$password = $1;
+	debug("Found entry '$password' in file $file\n");
+	last;
+    }
+    close FILE;
+    return $password;
+}
+
+
+####
 # Parse the target url 
 ##
 sub parse_target_url {
@@ -844,18 +866,49 @@ sub setup_target_ssh {
 ##
 sub setup_target_afp($$$$$) {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (scalar(@_) == 5);
+    check_binary('mount_afp');
     my ($user, $passwd, $server, $port, $volname) = @_;
+    PRINT_ERROR_THEN_EXIT("AFP protocol requires a server name\n") unless defined $server;
     PRINT_ERROR_THEN_EXIT("AFP protocol requires a volume name\n") unless defined $volname;
-    unless (defined $passwd) {
-	info("password not precised in the configuration\n");
-	info("TODO: ADD a directive check a deported (encrypted) file\n");
-    }
-    print "@_\n";
-
+    PRINT_ERROR_THEN_EXIT("For the moment, backup requires a username for AFP connection\n") unless defined $user;
+    my $mount_point = "/Volumes/$volname";
+    if (-d "$mount_point") {
+	warning("$mount_point is already mounted\n");
+    } else {
+	# otherwise perform the mount
+	my $mount_cmd = "mount_afp afp://$user";
+	# complement the mount command with the eventual password
+	if (defined $passwd) {
+	    $mount_cmd .= ":$passwd";
+	} else {
+	    # Retrieve password from the pass_file if existing
+	    $passwd = getPasswordFromFile("$SETTINGS{'pass_file'}", "afp://$user\@$server/$volname") if (defined  $SETTINGS{'pass_file'});
+	    if ($passwd) {
+		info("password successfully retrieved from $SETTINGS{'pass_file'}\n");
+		$mount_cmd .= ":$passwd";
+	    } else {
+		info("No password found, assuming connection with authentication protocole 'NO USER Authent'\n");
+		$mount_cmd .= ";AUTH=No%20User%20Authent";
+	    }
+	}
+	$mount_cmd .= "\@$server:$port/$volname $mount_point";
+	# Create mount dir
+	verbose("creating AFP mount point $mount_point\n");
+	execute("mkdir $mount_point") && PRINT_ERROR_THEN_EXIT("Unable to create directory $mount_point\n");
+	# run mount_afp
+	execute("$mount_cmd");
+	if ($? == 0) {
+	    info("AFP mount of $mount_point successful\n");
+	    $BACKUP_CMD_INFO{'dst'} = "$mount_point";
+	    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+	} else {
+	    error("AFP mount of $mount_point failed\n");
+	    verbose("removing directory $mount_point\n");
+	    execute("rm -rf $mount_point");
+	}
+   }
     exit(0);
-
 }
-
 
 ###
 # setup the command for a backup on a sparsebundle image
@@ -1263,9 +1316,23 @@ You may use the pattern symbols C<*>, C<^> and C<$> for each element of the list
 Space separated list of directories to include from synchronization (relative to B<$src_rootdir>).
 You may use the pattern symbols C<*>, C<^> and C<$> for each element of the list. 
 
-=item B<log_file = FILE>
+pass_file
 
-Set FILE as the log file for I<backup>. If not present, logs are printed on STDERR.
+=item B<pass_file = FILE>
+
+Set FILE as the password file for I<backup>. 
+Each line of the password file corresponds to a password entry with the following format:
+ 
+   target_url   password
+
+Example: 
+
+    afp://user@server/volumename    mypasword     
+
+This option is used for instance in the case of connection via AFP to avoid putting 
+password in the backup configuration files. 
+Anyways, it's never a good idea to put clear password in a separate files so this approach 
+should be avoided. 
 
 =item B<patternfile_exclude = FILE>
 
