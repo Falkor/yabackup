@@ -1,5 +1,4 @@
-#!/usr/bin/perl  -w
-#########!@PERL@ -w
+#!@PERL@ -w
 
 ##############################################################################
 # File   : backup
@@ -8,7 +7,8 @@
 # $Id$
 #
 # Description : @PACKAGE_SUMMARY@
-#               See the man page for more information.
+#               For more information: see backup(3) or 
+#               @PACKAGE_WEBSITE@ 
 #
 # Copyright (c) 2009 Sebastien Varrette     (http://varrette.gforge.uni.lu/)
 #                    Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu/)
@@ -27,13 +27,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
-# Sebastien Varrette                               \n
-# <Sebastien.Varrette@uni.lu>                      \n
-# Guillaume-Jean Herbiet                           \n
-# <Guillaume.Herbiet@uni.lu>                       \n
-# University of Luxembourg                         \n
-# 6, rue Richard Coudenhove-Kalergi                \n
-# L-1359 Luxembourg                                \n
+# Sebastien Varrette     <Sebastien.Varrette@uni.lu>\n
+# Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu> \n
+# University of Luxembourg                          \n
+# 6, rue Richard Coudenhove-Kalergi                 \n
+# L-1359 Luxembourg                                 \n
 ##############################################################################
 use strict;
 use warnings;

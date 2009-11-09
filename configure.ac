@@ -16,6 +16,9 @@ AM_INIT_AUTOMAKE([-Wall -Wno-portability])
 
 PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
 AC_SUBST(PACKAGE_SUMMARY)
+PACKAGE_WEBSITE="http://ibackup.gforge.uni.lu"
+AC_SUBST(PACKAGE_WEBSITE)
+
 
 # ----------------------------------------------------------------
 # Checks for programs.
