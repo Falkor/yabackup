@@ -680,6 +680,7 @@ sub clean_after_sync {
 	    foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
 		info("Unmounting the volume $vol (mounted via $proto)\n");
 		execute("$umount_cmd $vol");
+		warning("Unable to unmount $vol: $!\n") if ($? != 0);
 	    }
 	}
     }
@@ -968,7 +969,9 @@ sub setup_target_sparsebundle {
 		unless ($mount_point);
 	    debug("Mount point associated to $sparsebundle : ". color('bold') . $mount_point . color('reset') . "\n");
 
-	    PRINT_ERROR_THEN_EXIT("The sparsebundle $sparsebundle cannot be mounted (in $mount_point)\n") unless (-d $mount_point);
+	    PRINT_ERROR_THEN_EXIT("The sparsebundle $sparsebundle cannot be mounted (in $mount_point)\n") unless (-d "$mount_point");
+	    $mount_point =~ s/(\s)/\\$1/g;  # Handle space
+	    debug("New mount point: $mount_point\n");
 	    $BACKUP_CMD_INFO{'dst'} = "$mount_point";
 	    push(@{$MOUNTED_VOLUMES{'sparsebundle'}}, $BACKUP_CMD_INFO{'dst'});
 	}	
