@@ -176,7 +176,6 @@ my %CONFIGS = Config::General::ParseConfig(-ConfigFile => $config_file,
 
 PRINT_ERROR_THEN_EXIT("Empty configuration") unless (%CONFIGS);
 
-
 lock_hash(%CONFIGS);
 debug("Creation of the hash table from the configuration file $config_file : \n");
 debug(Dumper \%CONFIGS); 
@@ -203,6 +202,14 @@ foreach my $sec (@backup_sections) {
     update_settings_from($CONFIGS{$sec});
     print_current_settings();
     ensure_defined_settings('src_rootdir', 'dst_rootdir', 'include_dir', 'target_url');
+
+    # TODO: early test on log file creation
+    if (defined $SETTINGS{'log_file'}) {	
+	open(TESTOPEN, ">$SETTINGS{'log_file'}") || PRINT_ERROR_THEN_EXIT("Cannot open log file $SETTINGS{'log_file'} : $!\n");
+	close(TESTOPEN);
+    }
+
+
     
     # configure the command to be executed
     configure_sync_cmd();
@@ -388,12 +395,12 @@ sub append_to_log {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing text argument') unless @_;
     my $output;
     if (defined($SETTINGS{'log_file'})) {
-	open($output, ">>", $SETTINGS{'log_file'});
+	open($output, ">>$SETTINGS{'log_file'}") || die("Cannot open log file : $!\n");
     } else {
 	$output = *STDERR;
 	print $output '[' . color('yellow') . "LOG" . color('reset') . ']';
     }
-    print $output strftime('%Y-%m-%d %Hh%M:%Ss', localtime)." @_\n";
+    print $output strftime('[%Y-%m-%d %Hh%M:%Ss]', localtime)." @_\n";
     close($output) if defined($SETTINGS{'log_file'});
 }
 
@@ -662,7 +669,8 @@ sub run_sync_cmd {
 ##
 sub clean_after_sync {
     debug("List of mounted volumes : \n" . Dumper \%MOUNTED_VOLUMES);
-    foreach my $proto (keys %MOUNTED_VOLUMES) {
+    # (bad) Hack to unmount first sparsebundle then afp ;) 
+    foreach my $proto (reverse sort keys %MOUNTED_VOLUMES) {
 	if (defined ($MOUNTED_VOLUMES{$proto})) {
 	    my $umount_cmd = "";
 	    $umount_cmd = "umount "         if ($proto =~ "drive|afp");
@@ -751,7 +759,7 @@ sub getPasswordFromFile($$) {
 	chomp;
 	next unless (/\s*$entry\s+(.*)/);
 	$password = $1;
-	debug("Found entry '$password' in file $file\n");
+	debug("Found password for the entry '$entry' in file $file\n");
 	last;
     }
     close FILE;
@@ -765,7 +773,7 @@ sub getPasswordFromFile($$) {
 sub parse_target_url {
     PRINT_ERROR_THEN_EXIT("Undefined target url") if ! defined($SETTINGS{'target_url'});
     $SETTINGS{'target_url'} = interpret_cmd("$SETTINGS{'target_url'}");
-    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)(:([\w]+))?((\@([\w-\.]+))(:(\d+))?)?(\/(\w+))?)/;
+    $SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)(:([\w]+))?((\@([-\w\.]+))(:(\d+))?)?(\/([\.\w\/]+))?)/;
     my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $8, $10, $12); 
     debug("Protocol: $proto\n")   if ($proto);
     debug("target  : $target\n")  if ($target);
@@ -867,7 +875,11 @@ sub setup_target_ssh {
 sub setup_target_afp($$$$$) {
     PRINT_ERROR_THEN_EXIT( '[' . (caller(0))[3] . '] missing argument') unless (scalar(@_) == 5);
     check_binary('mount_afp');
-    my ($user, $passwd, $server, $port, $volname) = @_;
+    my ($user, $passwd, $server, $port, $fullvolname) = @_;
+    $fullvolname =~ /(\w+)([\/\w\.]*)/;
+    my ($volname, $complementpath) = ($1 , $2);
+    debug("Volume name : $volname\n");
+    debug("Complement path : $complementpath\n") if ($complementpath);
     PRINT_ERROR_THEN_EXIT("AFP protocol requires a server name\n") unless defined $server;
     PRINT_ERROR_THEN_EXIT("AFP protocol requires a volume name\n") unless defined $volname;
     PRINT_ERROR_THEN_EXIT("For the moment, backup requires a username for AFP connection\n") unless defined $user;
@@ -893,7 +905,7 @@ sub setup_target_afp($$$$$) {
 	}
 	$mount_cmd .= "\@$server:$port/$volname $mount_point";
 	# Create mount dir
-	verbose("creating AFP mount point $mount_point\n");
+	verbose("\tcreating AFP mount point $mount_point\n");
 	execute("mkdir $mount_point") && PRINT_ERROR_THEN_EXIT("Unable to create directory $mount_point\n");
 	# run mount_afp
 	execute("$mount_cmd");
@@ -905,9 +917,23 @@ sub setup_target_afp($$$$$) {
 	    error("AFP mount of $mount_point failed\n");
 	    verbose("removing directory $mount_point\n");
 	    execute("rm -rf $mount_point");
+	    PRINT_ERROR_THEN_EXIT("exiting");
 	}
-   }
-    exit(0);
+    }
+    $BACKUP_CMD_INFO{'dst'} = "$mount_point";
+    # Now handle complement paths
+    if ($complementpath) {
+	info("found complement path $complementpath\n");
+	if ($complementpath =~ /\.sparsebundle\/?\s*$/) {
+	    info("Reference to a sparsebundle image found\n");
+	    setup_target_sparsebundle("$mount_point/$complementpath");
+	} else {
+	    PRINT_ERROR_THEN_EXIT("The directory $mount_point/$complementpath does not exist\n") 
+	      unless (-d "$mount_point/$complementpath");
+	    $BACKUP_CMD_INFO{'dst'} .=  "/$complementpath"; 
+	}
+    }
+    #exit(0);
 }
 
 ###
@@ -925,7 +951,7 @@ sub setup_target_sparsebundle {
 	my $attach_cmd = "hdiutil attach $sparsebundle -plist";
 	if ($SIMULATION_MODE) {
 	    execute($attach_cmd);
-	    $BACKUP_CMD_INFO{'dst'} = "/Volumes/Backup_Drive";
+	    $BACKUP_CMD_INFO{'dst'} = "/Volumes/Simulated_Backup_Drive";
 	} else {
 	    debug("Running '$attach_cmd'\n");
 	    my $plist_str = `$attach_cmd`;
@@ -944,7 +970,7 @@ sub setup_target_sparsebundle {
 
 	    PRINT_ERROR_THEN_EXIT("The sparsebundle $sparsebundle cannot be mounted (in $mount_point)\n") unless (-d $mount_point);
 	    $BACKUP_CMD_INFO{'dst'} = "$mount_point";
-	    push(@{$MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+	    push(@{$MOUNTED_VOLUMES{'sparsebundle'}}, $BACKUP_CMD_INFO{'dst'});
 	}	
 }
 
@@ -1000,7 +1026,7 @@ sub create_dir_on_target {
 	info("creating directory $dir\n", "    ");
 	my $exit_status;
 	switch ($BACKUP_CMD_INFO{'proto'}) {
-	    case /drive|file|sparsebundle/ { execute("mkdir -p $dir"); 
+	    case /drive|file|afp|sparsebundle/ { execute("mkdir -p $dir"); 
 				$exit_status = $?;
 			      }
 	    case 'ssh'        { my $target = "$BACKUP_CMD_INFO{'target'}:";
