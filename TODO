@@ -1,3 +1,6 @@
+- Log file management via Log::Log4perl
+- Change PRINT_ERROR_AND_EXIT to simply raise a signal such that several section can be used sequentially (i.e go to next section if one 
+  of them fail for some reason)
 - Expand wildcard not only relative to $src_rootdir but also $dst_rootdir in retrieve mode
 - Add support for files to include/exclude relative to $src_rootdir (currently, only directories are checked)
 X Notification via Growl/other under Linux

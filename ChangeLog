@@ -1,3 +1,53 @@
+2009-11-09  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r54] bin/backup.in, configure.ac: Correct header
+
+	* [r53] bin/backup.in: Correct bug on sparsebundle volume
+	  containing space characters
+
+	* [r52] etc/backup.conf.example: Rework the content of the
+	  backup.conf example
+
+	* [r51] bin/backup.in: Finalize support of AFP connection,
+	  eventually on a [encrypted] sparsebundle.
+
+2009-11-08  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r50] bin/backup.in: Continue work on AFP handling
+
+2009-11-07  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r49] bin/backup.in: Start handling afp connection
+
+2009-11-06  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r48] ChangeLog, bin/backup.in, configure.ac: Improve
+	  sparsebundle management (automatic detection of mount point) +
+	  add global clean mechanism at the end of the synchro (to umount
+	  all volumes etc.)
+
+2009-08-11  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
+
+	* [r47] TODO: Modified TODO with ideas about GUI support and code
+	  rewrite
+
+2009-08-10  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
+
+	* [r46] bin/backup.in: Commented out outdated error message when
+	  notification() was used under Linux.
+
+	* [r45] bin/backup.in: - Modified rsync options corresponding to
+	  MAC_FORK in treat_cmd_options()
+	  - Prevented activation of MAC_FORK options when target is ssh due
+	  to incompatibilities in treat_cmd_options()
+
+2009-08-06  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r44] bin/backup.in, configure.ac, www/download.wml: - Reactivate
+	  anonymous access to the svn repository on teh web site
+	  - Fix bug for the option unrecognized option --exact-sync (was
+	  --exact_sync in Getopt)
+
 2009-07-31  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
 	* [r43] ChangeLog, Makefile.am: Correct the ChangeLog rule for
@@ -18,8 +68,8 @@
 	  mailing list ibackup-support@lists.gforge.uni.lu
 
 	* [r39] README, bin/backup.in, www/Makefile.am, www/docs.wml,
-	  www/download/backup-0.3.tar.gz, www/index.wml: Release v0.3 on
-	  the web site
+	  www/download/backup-0.3.tar.gz[ADD], www/index.wml: Release v0.3
+	  on the web site
 
 	* [r38] ChangeLog: update from svn2cl.sh
 
@@ -79,21 +129,22 @@
 
 2009-07-23  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
-	* [r32] www/.dependances.sh:
+	* [r32] www/.dependances.sh[ADD]:
 
 	* [r31] www/download.wml: remove anonymous svn access
 
-	* [r30] www/download.wml, www/include/andreas01.css,
+	* [r30] www/download.wml, www/include/andreas01.css[ADD],
 	  www/include/main.wml: Update web site
 
 	* [r29] www/Makefile.am, www/gforge.wml: update html documentation
 	  generation
 
-	* [r28] NEWS: NEWS files is now a symbolic link to Changelog
+	* [r28] NEWS[ADD]: NEWS files is now a symbolic link to Changelog
 
-	* [r27] COPYING, NEWS[DEL], TODO, www/download, www/download.wml,
-	  www/download/backup-0.1.tar.gz, www/download/backup-0.2.tar.gz,
-	  www/links.wml: - Add new download section in the website
+	* [r27] COPYING, NEWS[DEL], TODO, www/download[ADD],
+	  www/download.wml, www/download/backup-0.1.tar.gz[ADD],
+	  www/download/backup-0.2.tar.gz[ADD], www/links.wml: - Add new
+	  download section in the website
 	  - update COPYING file with GPL3
 
 2009-03-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
@@ -101,9 +152,10 @@
 	* [r26] bin/backup.in, config/m4/ac_prog_perl_modules.m4,
 	  configure.ac: Correct issue on --quiet
 
-	* [r25] Makefile.am, acinclude.m4, bin/backup.in, configure.ac,
-	  www/.wmlrc.in[DEL], www/Makefile.am, www/bugs.wml, www/docs.wml,
-	  www/download.wml, www/features.wml, www/gforge.wml,
+	* [r25] Makefile.am, acinclude.m4[ADD], bin/backup.in,
+	  configure.ac, www/.wmlrc.in[DEL], www/Makefile.am,
+	  www/bugs.wml[ADD], www/docs.wml, www/download.wml,
+	  www/features.wml, www/gforge.wml[ADD],
 	  www/include/definitions.tag, www/include/main.wml,
 	  www/include/menu.tag, www/include/wmlrc.default,
 	  www/include/wmlrc.default.in, www/index.wml, www/links.wml: -
@@ -137,21 +189,23 @@
 	* [r18] Makefile.am, README, configure.ac: Add --enable-www option
 	  to handle web site generation
 
-	* [r17] www/Makefile.am, www/docs.wml, www/download.wml,
+	* [r17] www/Makefile.am, www/docs.wml, www/download.wml[ADD],
 	  www/features.wml, www/include/definitions.tag,
 	  www/include/menu.tag, www/include/style.css, www/index.wml:
 	  Nearly finished the web site
 
 2009-01-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
-	* [r16] INSTALL, Makefile.am, bin/backup.in, configure.ac, www,
-	  www/.wmkrc, www/.wmlrc.in, www/Makefile.am, www/docs.wml,
-	  www/features.wml, www/images, www/include, www/include/Makefile,
-	  www/include/definitions.tag, www/include/index.wml,
-	  www/include/main.wml, www/include/menu.tag,
-	  www/include/style.css, www/include/template.wml,
-	  www/include/wmlrc.default, www/include/wmlrc.default.in,
-	  www/index.wml, www/links.wml: Add web site in the repository
+	* [r16] INSTALL, Makefile.am, bin/backup.in, configure.ac,
+	  www[ADD], www/.wmkrc[ADD], www/.wmlrc.in[ADD],
+	  www/Makefile.am[ADD], www/docs.wml[ADD], www/features.wml[ADD],
+	  www/images[ADD], www/include[ADD], www/include/Makefile[ADD],
+	  www/include/definitions.tag[ADD], www/include/index.wml[ADD],
+	  www/include/main.wml[ADD], www/include/menu.tag[ADD],
+	  www/include/style.css[ADD], www/include/template.wml[ADD],
+	  www/include/wmlrc.default[ADD],
+	  www/include/wmlrc.default.in[ADD], www/index.wml[ADD],
+	  www/links.wml[ADD]: Add web site in the repository
 
 	* [r15] INSTALL, configure.ac: update install
 
@@ -165,8 +219,8 @@
 
 2009-01-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
-	* [r12] ChangeLog, FAQ, bin/backup.in, etc/backup.conf.example: -
-	  Add FAQ for ssh-agent configuration
+	* [r12] ChangeLog, FAQ[ADD], bin/backup.in,
+	  etc/backup.conf.example: - Add FAQ for ssh-agent configuration
 	  - correct interpret_cmd (to support pipe on awk)
 
 2009-01-17  Sebastien Varrette <Sebastien.Varrette@uni.lu>
@@ -188,7 +242,7 @@
 
 	* [r7] INSTALL: Add note about bootstrap in the INSTALL file
 
-	* [r6] DISCLAIMER, INSTALL, Makefile.am, bin/Makefile.am,
+	* [r6] DISCLAIMER, INSTALL[ADD], Makefile.am, bin/Makefile.am,
 	  bin/backup.in, bootstrap, configure.ac: - With Autotools
 	  configured
 
@@ -204,10 +258,12 @@
 
 	* [r2] bootstrap, configure.ac:
 
-	* [r1] ., AUTHORS, COPYING, ChangeLog, DISCLAIMER, Makefile.am,
-	  NEWS, README, TODO, bin, bin/Makefile.am, bin/backup, bootstrap,
-	  config, config/m4, config/m4/ac_prog_perl_modules.m4,
-	  config/m4/ac_prog_ssh.m4, configure.ac, etc,
-	  etc/backup.conf.example: - Add Autotool version
+	* [r1] .[ADD], AUTHORS[ADD], COPYING[ADD], ChangeLog[ADD],
+	  DISCLAIMER[ADD], Makefile.am[ADD], NEWS[ADD], README[ADD],
+	  TODO[ADD], bin[ADD], bin/Makefile.am[ADD], bin/backup[ADD],
+	  bootstrap[ADD], config[ADD], config/m4[ADD],
+	  config/m4/ac_prog_perl_modules.m4[ADD],
+	  config/m4/ac_prog_ssh.m4[ADD], configure.ac[ADD], etc[ADD],
+	  etc/backup.conf.example[ADD]: - Add Autotool version
 	  - First release
 

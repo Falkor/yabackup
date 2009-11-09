@@ -84,14 +84,13 @@ AC_CHECK_CPAN_MODULES(
     Storable 
     Hash::Util
     List::Util 
-    Time::localtime 
     POSIX 
     Getopt::Long 
     Config::General 
     Term::ANSIColor 
+    Mac::PropertyList
     Data::Dumper 
     Pod::Usage
-    Mac::PropertyList
 )
 
 # ----------------------------------------------------------------
