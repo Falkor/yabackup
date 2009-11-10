@@ -52,8 +52,8 @@ use Mac::PropertyList qw(parse_plist);       # To parse plist files obtained und
 use Data::Dumper;
 use Pod::Usage;
 
-# PATH
-$ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin";
+# PATH (/sbin required for mount_afp)
+$ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
 
 # Generic variables
 my $VERSION = '@VERSION@';    # Script version
