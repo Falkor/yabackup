@@ -56,7 +56,7 @@
     <dump MENU>
     <div class="announce">
       <h2>Latest news:</h2>
-      <p><strong>July 29, 2009</strong>:<br/> version $(CURRENT_RELEASE) released!</p>
+      <p><strong>Nov 12, 2009</strong>:<br/> version $(CURRENT_RELEASE) released!</p>
     </div>
     <unilu_logo>
   </div>

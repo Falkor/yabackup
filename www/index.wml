@@ -129,5 +129,8 @@ and <code>afp</code>.
 <!-- ====== -->
 <h2>Authors</h2>
 
-<project> is written by <svarrette_home>.<br/>
-Recently, <gherbiet_home> joined me to improve the script in many ways (sparsebundle support, inspiration for AFP support etc.)
+Most of <project> was made by <svarrette_home>.<br/> 
+
+I'm grateful to <gherbiet_home> who joined force recently to improve 
+the script in many ways (sparsebundle support, notification etc.)
+

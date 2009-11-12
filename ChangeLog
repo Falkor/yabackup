@@ -1,5 +1,8 @@
 2009-11-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
+	* [r59] ChangeLog, Makefile.am,
+	  www/download/backup-0.3.2.tar.gz[ADD]: Release version 0.3.2
+
 	* [r58] ChangeLog, Makefile.am, README: Correct ChangeLog issue on
 	  'make dist' (cause by the absence of ChangeLog file in www/)
 

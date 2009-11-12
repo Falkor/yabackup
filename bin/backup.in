@@ -1175,6 +1175,9 @@ To restore data from the backup 'toto', run :
 
     ./backup -f /path/to/config_file -s=toto -r
 
+Note that I<backup> try to use the configuration files C</etc/backup.conf> or C<~/.backup.conf> 
+so that the C<-f> option can be avoided. 
+
 =head1 OPTIONS
 
 The following options are available:
@@ -1527,6 +1530,8 @@ Guillaume-Jean Herbiet (L<http://herbiet.gforge.uni.lu>) joined force recently t
 the script in many ways (sparsebundle support, notification etc.)
 
 =head1 COPYRIGHT
+
+I<backup> is released under GNU GPL Licence v3.
 
 This  is a free software. There is NO warranty; not even for
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

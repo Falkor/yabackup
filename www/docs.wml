@@ -39,16 +39,27 @@ uncompress the archive and run the classical <code>configure</code>, <code>make<
 </p></blockquote>
 
 I advice you to use <stow>, a wonderful tool to activate/desactivate different versions for the 
-same program compiled by autotools (you'll then typically run the '<code>configure</code>' script
-with the option <code>--prefix=/usr/local/stow/backup-$(CURRENT_RELEASE)</code>).<br/><br/>
+same program compiled by autotools. 
+You'll then typically install <project> as follows:
+<blockquote><p>
+    <code>$ ./configure --prefix=/usr/local/stow/backup-$(CURRENT_RELEASE)</code><br/>
+    <code>$ make</code><br/>
+    <code>$ make install</code><br/>
+    <code>$ cd /usr/local/stow</code><br/>
+    <code>$ sudo stow backup-$(CURRENT_RELEASE)</code><br/>
+</p></blockquote>
+
+<em>Note:</em> Use <code>stow -D</code> to disable a given release. <br/><br/>
 
 Once installed and configured, you will probably want to add an entry in your <crontab> 
 (using '<code>crontab -e</code>') such that 
 the backup is performed every hour typically without your interaction. 
-For instance, here is my personnal entry:<pre>
+For instance, here is my personnal crontab related to <project>:<pre>
    $ crontab -l
    \# crontab entry for backup
-   1 * * * *  	/usr/local/bin/backup -s gandalf --quiet --notification</pre>
+   1  * * * *	/usr/local/bin/backup -s gandalf --notification --quiet
+   25 * * * *	/usr/local/bin/backup -m -s tbynas --notification --quiet
+</pre>
 
 
 <!-- ============ -->
