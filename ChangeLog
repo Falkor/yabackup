@@ -1,5 +1,8 @@
 2009-11-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
+	* [r58] ChangeLog, Makefile.am, README: Correct ChangeLog issue on
+	  'make dist' (cause by the absence of ChangeLog file in www/)
+
 	* [r57] bin/backup.in, www/Makefile.am, www/docs.wml,
 	  www/features.wml, www/include/main.wml, www/index.wml: Update
 	  documentation and website to prepare release 0.3.2

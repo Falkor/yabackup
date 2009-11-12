@@ -57,10 +57,11 @@ ChangeLog:
 endif
 
 dist-hook:
-	$(RM) `find $(distdir) -name .svn`
-	$(RM) $(distdir)/www/download/*
-
-
+	$(RM) -r `find $(distdir) -name .svn`
+	$(RM) -r $(distdir)/www/download/*
+	for file in *.html .wmlrc .Makefile.dep Makefile ChangeLog FAQ backup.conf.example; do \
+		$(RM) $(distdir)/www/$$file; \
+	done
 # Generate man page
 backup.3 : bin/backup 
 	$(POD2MAN) --name=BACKUP --section=3 --center="Backup v@VERSION@ Script Manual" $^ > $@
