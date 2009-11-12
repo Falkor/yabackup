@@ -20,7 +20,7 @@
 <project> is a highly flexible script written in <refperl> used for the 
 <strong>fast backup</strong> 
 of directories on your local system on various targets such as an 
-external drive, an [encrypted] sparsebundle or a remote machine with SSH access.<br/><br/>
+external drive, an [encrypted] sparsebundle or a remote machine with SSH or AFP access.<br/><br/>
 
 <project> is designed to be run by command-line and rely on <refperl>, <rsync> 
 (meaning only the files that differs are transfered) and (in a future release) 
@@ -29,16 +29,32 @@ external drive, an [encrypted] sparsebundle or a remote machine with SSH access.
 <!-- =================== -->
 <h2>And more precisely?</h2>
 
-Assume you want to backup all directories in your homedir: 
+As always, a concrete situation with a precise example is the best to apprehend the behaviour of a new tool.<br/>
+
+Assume therefore that you want to backup all directories in your homedir: 
 <ul>
   <li><strong>(default backup)</strong> on an external drive mounted in <code>/Volumes/Backup</code></li>
-  <li>on your desktop machine at work (<code>toto.example.org</code>) where 
-    you have an SSH access (user: <code>mylogin</code>)</li>
+  <li>(for MAC OS X user) on a local 
+    <a href="http://db.tidbits.com/article/9673">[encrypted] sparse bundle image</a>
+    <code>/path/to/image.sparsebundle</code>
+  </li>
+  <li>on your desktop machine (<code>toto.example.org</code>) where 
+    you have an SSH access (username: <code>mylogin</code>) with 
+    <a href="http://sial.org/howto/openssh/publickey-auth/">public-key authentication</a></li>
+  <li>(for MAC OS X user) on your company NAS (Network-attached Storage) <code>nas.company.com</code> 
+    where you own a volume (name: <code>volname</code>) configured for AFP (Apple Filing Protocol) 
+    access (login: <code>mylogin</code>, password: <code>mypassword</code>).<br/>
+  Note that this applies to a backup on Apple Time Capsule.</li>
+  <li>(NEW) on a remote [encrypted] sparse bundle image on your company NAS (using the volume attributed 
+    to you as stated in the previous item) ;)</li>
 </ul>
 
-This configuration is done through the following configuration file: 
+The last three backup should interviene only when you're working. 
+This state is typically identified by your IP subnet (Let's say 10.7.14 for instance).<br/>
+
+This behaviour is represented through the following configuration file of <project>: 
 <pre>#
-\# Configuration file example
+\# Configuration file example for backup(3)
 \#
 \#### Mandatory global settings ####
 &lt;global&gt;
@@ -51,13 +67,36 @@ This configuration is done through the following configuration file:
     target_url = drive:///Volume/Backup  # backup on an external drive 'Backup'
 &lt;/default&gt;
 
-\# Definition of the backup on the machine 'toto'
+\# Definition of the backup on a local [encrypted] sparse bundle 
+&lt;sbimage&gt;
+    target_url  = sparsebundle:///path/to/image.sparsebundle
+    dst_rootdir = myBackup                        # Root directory for the backup 
+&lt;/sbimage&gt;
+
+\# Definition of the backup on the machine 'toto' (via SSH access)
 &lt;toto&gt;
     target_url  = ssh://mylogin@toto.example.org  # backup through ssh
     dst_rootdir = /backup/`whoami`@`hostname`     # Root directory on target server
-    restrict_on_subnet = 10.7                     # backup only when you're working
+    restrict_on_subnet = 10.7.14                  # backup only when you're working
 &lt;/toto&gt;
+
+\# Definition of the backup on the company NAS (via AFP access)
+&lt;nas&gt;
+    # backup through AFP (eventually put the password in a separate file and use the directive 'pass_file')
+    target_url  = afp://mylogin:mypassword@nas.company.com/volname          
+    dst_rootdir = myBackup                        # Root directory for the backup 
+    restrict_on_subnet = 10.7.14                  # backup only when you're working
+&lt;/nas&gt;
+
+\# Definition of the backup on a remote [encrypted] sparse bundle on the company NAS 
+&lt;nassbimage&gt;
+    target_url  = afp://mylogin:mypassword@nas.company.com/volname/path/to/image.sparsebundle          
+    dst_rootdir = myBackup                        # Root directory for the backup 
+    restrict_on_subnet = 10.7.14                  # backup only when you're working
+&lt;/nassbimage&gt;
 </pre>
+
+Pretty natural I hope :)<br/>
 
 To backup using the default configuration, just run: 
 <blockquote><p>backup</p></blockquote>
@@ -74,11 +113,13 @@ If you need to restore data from the backup '<code>toto</code>', run :
 <project> is still in Alpha (last version: $(CURRENT_RELEASE)) and not all functionnality 
 are supported (most importantly <duplicity>).
 Anyway it is sufficient if you plan to backup your data on a external drive or a 
-remote server with SSH access. 
+remote server (via SSH or AFP). That's typically my daily usage of this script. <br/>
+ 
 Currently <project> supports deleted files, full unix permissions, directories, 
 and symbolic links. <br/><br/>
 As for protocols connecting to a backup target, <project> supports local sockets 
-(for local file/directories access) and <code>ssh</code>.
+(for local file/directories access), Mac OS X sparse bundle images, <code>ssh</code> 
+and <code>afp</code>.
 
 <!-- ======= -->
 <h2>Licence</h2>
@@ -89,4 +130,4 @@ As for protocols connecting to a backup target, <project> supports local sockets
 <h2>Authors</h2>
 
 <project> is written by <svarrette_home>.<br/>
-Recently, <gherbiet_home> joined me to improve the script in many ways (sparsebundle support etc.)
+Recently, <gherbiet_home> joined me to improve the script in many ways (sparsebundle support, inspiration for AFP support etc.)

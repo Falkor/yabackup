@@ -1130,16 +1130,33 @@ for more details). Here is a illustrative examples:
          target_url = drive:///Volumes/Backup  # backup on an external drive 'Backup'
     </default>
 
-    # Definition of the backup on the server 'toto'
+    # Definition of the backup on a local [encrypted] sparse bundle (Mac OS X)
+    <sbimage>
+         target_url  = sparsebundle:///path/to/image.sparsebundle
+         dst_rootdir = myBackup         # Specialized root directory for this backup 
+    </sbimage>
+
+    # Definition of the backup on the machine 'toto' (via SSH access)
     <toto>
          target_url  = ssh://mylogin@toto.example.org  # backup through ssh
-         dst_rootdir = /backup/`whoami`@`hostname`     # Root directory on target server
-         restrict_on_subnet = 192.168  # backup only when your machine belongs to this subnet
-	# Special treatment of the "Music" subdirectory
-	<Directory Music>
-		 dst_rootdir = /multimedia  # change the rootdir on target for this folder
-	</Directory>
+         dst_rootdir = /backup/`whoami`@`hostname`     # Specialized root directory on target server
+         restrict_on_subnet = 10.7.14                  # backup only when you're working
     </toto>
+
+    # Definition of the backup on the company NAS (via AFP access)
+    <nas>
+          # backup through AFP (eventually put the password in a separate file and use the directive 'pass_file')
+          target_url  = afp://mylogin:mypassword@nas.company.com/volname          
+          dst_rootdir = myBackup                        # Root directory for the backup 
+          restrict_on_subnet = 10.7.14                  # backup only when you're working
+    </nas>
+
+    # Definition of the backup on a remote [encrypted] sparse bundle on the company NAS 
+    <nassbimage>
+          target_url  = afp://mylogin:mypassword@nas.company.com/volname/path/to/image.sparsebundle          
+          dst_rootdir = myBackup                        # Root directory for the backup 
+          restrict_on_subnet = 10.7.14                  # backup only when you're working
+    </nassbimage>
 
 So appart from the 'global' section, each backup is defined in a named block that helps 
 to complete and/or overwrite the global settings.
@@ -1190,15 +1207,30 @@ snapshot is always available under the "latest" directory.
 (Not yet implemented) History consolidation
 (Not yet implemented) Retrieve mode from latest snapshot
 
+=item B<--help  -h>
+
+Display a help screen and quit.
+
 =item B<--mac-fork  -m>
 
 Use Mac OS resource fork for backup.
 Causes I<backup> to use the Mac OS resource forks when calling the rsync function.
 This will preserve Mac OS extended attributes 
 
-=item B<--help  -h>
+=item B<--notification>
 
-Display a help screen and quit.
+Activates user notification of backup status.
+This feature requires growlnotify (under Mac OS X) or notify-send (under Linux)
+to be installed and in your applications path.
+
+=item B<--post-script>
+
+Execute the script whose complete path is specified with this argument AFTER the backup operation.
+
+=item B<--pre-script>
+
+Execute the script whose complete path is specified with this argument BEFORE the backup operation.
+If the execution of this script fails, the backup will not continue.
 
 =item B<--push -p>
 
@@ -1210,25 +1242,10 @@ Quiet mode. Minimize the number of printed messages and don't ask questions.
 Very useful for invoking this script in a crontab yet use with caution has all 
 operations will be performed without your interaction.
 
-=item B<--notification>
-
-Activates user notification of backup status.
-This feature requires growlnotify (under Mac OS X) or notify-send (under Linux)
-to be installed and in your applications path.
-
 =item B<--restore  --retrieve  -r>
 
 Retrieve mode: restore data from the backup. Use with caution as this will probably 
 overwrite files on your local machine!
-
-=item B<--pre-script>
-
-Execute the script whose complete path is specified with this argument BEFORE the backup operation.
-If the execution of this script fails, the backup will not continue.
-
-=item B<--post-script>
-
-Execute the script whose complete path is specified with this argument AFTER the backup operation.
 
 =item B<--section=SECTION[, SECTION2 ...]>
 
@@ -1356,10 +1373,15 @@ Example:
 
     afp://user@server/volumename    mypasword     
 
-This option is used for instance in the case of connection via AFP to avoid putting 
-password in the backup configuration files. 
-Anyways, it's never a good idea to put clear password in a separate files so this approach 
-should be avoided. 
+For the moment, this option is only relevant for AFP connection as it seemed impossible to 
+rely on other (more secure) mechanisms such as keychain (used for encrypted sparse 
+bundle mounts for instance), or agents (used for SSH -- see the 'auth_auth_sock' directive). 
+I simply thought it's a better alternative than putting the password in I<backup> configuration file.
+
+By the way, it's NEVER a good idea to put clear password in text file. 
+At minimum, ensure correct rights on this file ('chmod 600 /path/to/passwordfile') and don't 
+put a personnal password in it. 
+Prefer a random (unique) one generated by openSSL ('openssl rand 16 -base64' for instance)
 
 =item B<patternfile_exclude = FILE>
 
@@ -1396,9 +1418,9 @@ Root directory on the (local) source  (C</> by default)
 
 Set the environment variable C<$SSH_AUTH_SOCK> for this synchronization to the socket 
 of the socket file of the ssh-agent instance. 
-This is mandatory if you set a passphrase to you SSH key and want the I<backup> script  
-to automatically authenticate on a remote server wher you setup an ssh public key 
-authentication.
+This is mandatory if you set a passphrase to you SSH key (it's always a good idea) and 
+want the I<backup> script to automatically authenticate on a remote server wher you setup 
+an ssh public key authentication.
 
 =item B<target_url = URL>
 
@@ -1418,7 +1440,8 @@ The generic format for a target URL is:
               protocol://path|user[@host[:port]]
 
 I<backup> don't support the exposure of cleartext passwords on purpose for obvious security 
-reasons. 
+reasons. The exception is for AFP connections (see notes on this subject in the 'pass_file' 
+directive and the C<afp> protocol).
 
 Current supported protocols include: 
 
@@ -1452,7 +1475,7 @@ Even if this is not required, it is strongly recommended for encrypted sparsebun
 passwords to be stored in the user keychain. This is mandatory if I<backup>
 is to be launched in a crontab for instance.
 
-=item * C<ssh>   : SSH with public key authentication 
+=item * C<ssh>   : SSH access to a remote server, with public key authentication 
 
 Example: 
 
@@ -1466,16 +1489,31 @@ mandatory if I<backup> it to be launched in a crontab for instance.
 To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
 
 =item * C<afp> :  AFP (Apple Filing Protocol) access to a remote server (a NAS typically). 
-This is only available on Mac OS X.
 
 Example: 
 
       afp://[user[:password]@]host[:port]/volumename/path/to/backupdir
       afp://[user[:password]@]host[:port]/volumename/path/to/image.sparsebundle
 
-
+This is only available on Mac OS X (and may work on other systems if the I<mount_afp> command 
+is available). Whereas you can precise the password directly in the target_url, it is strongly 
+unadvised. Prefer the 'pass_file' directive even if exposing clear password is far from a good 
+solution. See the notes on this subject in the 'pass_file' directive. 
 
 =back
+
+=head1 FILES
+
+C</etc/backup.conf>
+
+C<~/.backup.conf>
+
+The I<backup> configuration file. See L<CONFIGURATION FILE FORMAT>. 
+A documented example of configuration file is proposed in 
+C<etc/backup.conf.example> that is included in the tarball of the 
+distribution. 
+
+For recent info, read the I<backup> home page: L<http://ibackup.gforge.uni.lu/>
 
 =head1 BUGS
 
@@ -1483,10 +1521,10 @@ Please report bugs using informations provided at the page L<http://ibackup.gfor
 
 =head1 AUTHOR
 
-Original author: Sebastien Varrette -- L<http://varrette.gforge.uni.lu/>
+Most of I<backup> was made by Sebastien Varrette (see L<http://varrette.gforge.uni.lu/>). 
 
-Recently, Guillaume-Jean Herbiet (L<http://herbiet.gforge.uni.lu>) joined me to improve 
-the script in many ways (sparsebundle support etc.)
+Guillaume-Jean Herbiet (L<http://herbiet.gforge.uni.lu>) joined force recently to improve 
+the script in many ways (sparsebundle support, notification etc.)
 
 =head1 COPYRIGHT
 

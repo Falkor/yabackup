@@ -21,6 +21,7 @@
   <li><a href="$(ROOTREL)/ChangeLog">ChangeLog</a></li>
   <li><a href="$(ROOTREL)/FAQ">FAQ</a></li>  
   <li><a href="$(ROOTREL)/backup.3.html" rel="external"><code>backup</code> man page</a></li>  
+  <li><a href="$(ROOTREL)/backup.conf.example" rel="external"><code>backup.conf.example</code></a>, a more complete (and commented) configuration file example</li>  
 </ul>
 
 <!-- ============ -->
@@ -47,7 +48,7 @@ the backup is performed every hour typically without your interaction.
 For instance, here is my personnal entry:<pre>
    $ crontab -l
    \# crontab entry for backup
-   1 * * * *  	/usr/local/bin/backup -s gandalf --quiet</pre>
+   1 * * * *  	/usr/local/bin/backup -s gandalf --quiet --notification</pre>
 
 
 <!-- ============ -->
@@ -63,14 +64,15 @@ It also requires:
 	<li><code>Switch </code></li>  
 	<li><code>Storable </code></li>  
 	<li><code>Hash::Util </code></li>  
-	<li><code>Time::localtime </code></li>  
-	<li><code>Getopt::Long </code></li>  
+	<li><code>List::Util </code></li>  
 	<li><code>POSIX </code></li>  
+	<li><code>Getopt::Long </code></li>  
 	<li><code>Getopt::Long </code></li>  
 	<li><code>Config::General </code></li>  
 	<li><code>Term::ANSIColor </code></li>  
+	<li><code>Mac::PropertyList</code></li>
 	<li><code>Data::Dumper </code></li>  
-	<li><code>Pod::Usage</code></li>  
+	<li><code>Pod::Usage</code></li>      
       </ul>
   </li>
 </ul>

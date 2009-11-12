@@ -10,18 +10,19 @@
 if generate_WEBSITE
 
 BACKUP_SCRIPT_SRC= ../bin/backup.in
+BACKUP_CONF_EXAMPLE=../etc/backup.conf.example
 CSS_STYLESHEET   = ./include/style.css
 #CSS_STYLESHEET   = ./include/andreas01.css
 DOC_FROMPOD      = backup.3.html
 #backup.3.x.html
 # sources
 SRC          = $(wildcard *.wml)
-TARGET       = $(SRC:.wml=.html) ChangeLog FAQ  
+TARGET       = $(SRC:.wml=.html) ChangeLog FAQ $(shell basename $(BACKUP_CONF_EXAMPLE))
 MAKEFILE_DEP = .Makefile.dep
 SCRIPT_DEPENDANCES = .dependances.sh
 
 # rsync stuff on the gforge
-USER=svarrette
+USER=`whoami`
 GFORGE_PROJECT=ibackup
 EXCLUDE_FROM_RSYNC=".svn  Makefile* *~ *.tag *.wml .wmkrc .wmlrc $(MAKEFILE_DEP) $(SCRIPT_DEPENDANCES)"  # item that should NOT be rsynced space separated.
 RSYNC_MODE="--delete"             # use --delete to delete remote files not present
@@ -44,6 +45,9 @@ $(DOC_FROMPOD): $(BACKUP_SCRIPT_SRC)
 #	$(PERL) -MPod::Simple::HTML -e Pod::Simple::HTML::go $< $@
 #	$(POD2XHTML) --css=$(CSS_STYLESHEET) --infile $(BACKUP_SCRIPT_SRC) \
 #		    --outfile backup.3.x.html -noindex
+
+$(shell basename $(BACKUP_CONF_EXAMPLE)) : $(BACKUP_CONF_EXAMPLE)
+	rsync -avzu $< $@
 
 .wmlrc : include/wmlrc.default
 	@sed -e "s/~\.\./~\./" $< > $@

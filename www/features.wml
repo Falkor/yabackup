@@ -17,10 +17,10 @@
 <project> implements a traditional backup scheme, where the target contains 
 all information (full backup) of the source (typically your local homedir) and 
 in the future only the changed information is added meaning that except for the 
-first invocation o fthe script, the operation is pretty fast.<br/> 
-More precisely, <project> claims to have the following functionalities: 
+  first invocation o fthe script, the operation is pretty fast.<br/> <br/>
+More precisely, <project> claims to have the following functionalities: <br/><br/>
 <ul>
-  <li><strong>Easy to use:</strong> although <project> is a command-line utility, 
+  <li><strong>Flexible and Easy to use:</strong> although <project> is a command-line utility, 
       the semantics of the configuration file is relatively simple. 
   </li>
   <li><strong>Bandwidth and space efficient:</strong> <project> uses the rsync 
@@ -29,8 +29,14 @@ More precisely, <project> claims to have the following functionalities:
       For instance, if a long log file increases by just a few lines of text, 
       a small diff will be sent.
   </li> 
-  <li><strong>Support various backup targets</strong>, from local drives or [encrypted] 
-    sparsebundle to remote server with SSH access.
+  <li><strong>Support various backup targets</strong>: 
+    <ul>
+      <li>"local" drive (i.e a hard disk connected by USB or Firewire to your system)</li>
+      <li>"local" [encrypted] sparsebundle images</li>
+      <li>remote server with SSH access</li>
+      <li>remote NAS with AFP access</li>
+      <li>remote [encrypted] sparsebundle images on a NAS with AFP access</li>
+    </ul>
   </li>
 </ul>  
 
