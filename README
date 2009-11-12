@@ -26,7 +26,9 @@ Please report bugs using informations provided at the page
 
 Support: ibackup-support@lists.gforge.uni.lu
 
-Finally, if the 'configure' script is missing, just run the 'bootstrap' script. 
+Finally, if the 'configure' script is missing (or modify any configuration 
+file of the autotools - configure.ac or Makefile.am), just run the 
+'bootstrap' script. 
 It supposes the availability on your system of the following software: 
 - autoconf v2.6 or later
 - automake v1.9.6 or later

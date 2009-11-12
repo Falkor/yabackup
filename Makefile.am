@@ -12,8 +12,8 @@ ACLOCAL_AMFLAGS = -I config/m4
 man_MANS = backup.3
 
 EXTRA_DIST = AUTHORS \
-    COPYING    \
     ChangeLog  \
+    COPYING    \
     bootstrap  \
     DISCLAIMER \
     INSTALL    \
@@ -22,7 +22,9 @@ EXTRA_DIST = AUTHORS \
     README     \
     TODO       \
     config/m4  \
-    www 
+    www        \
+    etc
+
 
 if generate_WEBSITE
 WEBSITEDIR=www
@@ -55,8 +57,9 @@ ChangeLog:
 endif
 
 dist-hook:
-	rm -rf `find $(distdir) -name .svn`
-	rm -rf $(distdir)/www/download/*
+	$(RM) `find $(distdir) -name .svn`
+	$(RM) $(distdir)/www/download/*
+
 
 # Generate man page
 backup.3 : bin/backup 

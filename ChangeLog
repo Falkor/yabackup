@@ -1,4 +1,18 @@
+2009-11-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r57] bin/backup.in, www/Makefile.am, www/docs.wml,
+	  www/features.wml, www/include/main.wml, www/index.wml: Update
+	  documentation and website to prepare release 0.3.2
+
+2009-11-10  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r56] bin/backup.in: Correct path bug that happens inside crontab
+	  when searching for mount_afp
+
 2009-11-09  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+
+	* [r55] ChangeLog, TODO, configure.ac: Update ChangeLog and
+	  complement TODO
 
 	* [r54] bin/backup.in, configure.ac: Correct header
 
