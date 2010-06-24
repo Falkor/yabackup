@@ -33,6 +33,54 @@
 # 6, rue Richard Coudenhove-Kalergi                 \n
 # L-1359 Luxembourg                                 \n
 ##############################################################################
+
+##############################################################################
+# PACKAGE LOG
+# Handle all logging/printing features
+##############################################################################
+package log;
+use strict;
+use warnings;
+
+use Log::Handler;             # log manager
+
+sub initialize($$);
+sub debug(@);
+sub info(@);
+
+our $log_handler = Log::Handler->new();
+
+########
+# Initialize the log handler 
+# Usage: initialize(logfile, loglevel)
+##
+sub initialize($$) {
+    
+
+
+}
+
+
+
+
+
+
+
+
+
+##############################################################################
+#     PACKAGE MAIN
+##############################################################################
+package main;
+
+
+
+
+
+
+
+
+
 use strict;
 use warnings;
 
@@ -51,6 +99,8 @@ use Mac::PropertyList qw(parse_plist);       # To parse plist files obtained und
 
 use Data::Dumper;
 use Pod::Usage;
+use Log::Handler;             # log manager
+my $log_handler = Log::Handler->new();
 
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
@@ -59,6 +109,15 @@ $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin
 my $VERSION = '@VERSION@';    # Script version
 my $VERBOSE = 0;              # option variable for verbose mode with default value (false)
 my $DEBUG   = 0;              # option variable for debug mode with default value (false)
+my $DEBUG_LEVEL = 0;          # Debug level; 8 values are possible:
+                              #      7   debug
+                              #      6   info
+                              #      5   notice
+                              #      4   warning, warn
+                              #      3   error, err
+                              #      2   critical, crit
+                              #      1   alert
+                              #      0   emergency, emerg
 my $QUIET   = 0;              # By default, display all informations
 my $numargs = scalar(@ARGV);  # Number of arguments
 my $command = `basename $0`;  # base command

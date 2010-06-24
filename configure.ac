@@ -91,6 +91,7 @@ AC_CHECK_CPAN_MODULES(
     Mac::PropertyList
     Data::Dumper 
     Pod::Usage
+    Log::Handler
 )
 
 # ----------------------------------------------------------------
