@@ -37,24 +37,28 @@
 ##############################################################################
 
 ### Function prototype declaration ###
-sub print::error_nolog(@);
-sub print::error(@);
-sub print::debug(@);
-sub print::info(@);
-sub print::warning(@);
-sub print::warn(@);
-sub print::critical(@);
 sub print::alert(@);
+sub print::critical(@);
+sub print::debug(@);
 sub print::error_nolog_and_exit($@);
 sub print::error_and_exit($@);
+sub print::error_nolog(@);
+sub print::error(@);
+sub print::info(@);
 sub print::notification($$@);
 sub print::really_continue();
+sub print::warning(@);
+sub print::warn(@);
 
 sub format::color_msg($$);
 
 sub log::initialize(@);
 
+sub system::check_binary(@);
+sub system::check_subnet($@);
 sub system::execute(@);
+sub system::getIPs();
+sub system::getIPFromInterface(@);
 sub system::remote_execute_by_ssh($$@);
 
 
@@ -145,14 +149,14 @@ sub notification($$@) {
 }
 
 ######
-# Ask the user is he wishes to continue. 
+# Ask the user is he wishes to continue.
 ##
 sub really_continue() {
     print "Are you sure you want to continue? [yN] ";
     chomp(my $ans = <STDIN>);
     unless ($ans && ($ans =~ /y|yes|1/i)) {
-	#sync::clean_after_sync();
-	exit(0);
+        #sync::clean_after_sync();
+        exit(0);
     }
 }
 
@@ -220,7 +224,6 @@ use Log::Handler;  # Log manager
 our $handler    = Log::Handler->new();
 our $timeformat = '%Y/%m/%d %H:%M:%S';
 our $msg_layout = '%T [%L] %m';
-
 
 ########
 # Initialize the log handler
@@ -296,7 +299,11 @@ sub initialize(@) {
     # ===  Initialize file log (in $logdir) ===
     if (defined($logdir)) {
         # ensure the directory exists
-        print::error_and_exit(1, "The directory $logdir do not exists impossible to log into this directory\n") unless (-d "$logdir");
+        print::error_and_exit(1,
+                              "The directory $logdir do not exist: ",
+                              "impossible to create log files into ",
+                              "this directory\n")
+            unless (-d "$logdir");
 
         # Initialie the log file for common logs
         $handler->add(
@@ -321,6 +328,7 @@ sub initialize(@) {
             );
     }
 
+    # Eventually mail errors/warnings
     if (defined($email)) {
         chomp(my $username = `whoami`);
         chomp(my $hostname = `hostname -f`);
@@ -344,12 +352,46 @@ sub initialize(@) {
 
 ##############################################################################
 # PACKAGE SYSTEM
-# Handle all system calls/behaviour etc.
+# Handle all system calls/behaviour/information etc.
 ##############################################################################
 package system;
 
 use strict;
 use warnings;
+use Data::Dumper;
+
+
+####
+# check the presence of the binaries @_ on the local system using 'which'
+# usage:  check_binary(bin1 [, bin2 ...]);
+##
+sub check_binary(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
+    my $which = "$ENV{'PATH'} which";
+    foreach my $app (@_) {
+        print::verbose("=> check availability of the command '$app' on the local system...");
+        verbose("\n") if (($main::DEBUG) || ($main::SIMULATION_MODE));
+        execute("which $app 1>/dev/null") ||
+            print::error_and_exit(1, "$app: command not found in PATH=$ENV{'PATH'}");
+        verbose("\tOK\n");
+    }
+}
+
+####
+# check if the IP associated with an interface match another subnet.
+# If no interface argument is provided, then
+# usage: check_subnet(subnet [, interface])
+##
+sub check_subnet($@) {
+    my $subnet = shift;
+    my $IP = (@_) ? getIPFromInterface($_[0]) : getIPFromInterface();
+    print::verbose("=> check subnet $subnet (current IP address found: $IP)");
+    my $pattern=$subnet;
+    $pattern =~ s/\./\\\./g;   # proceed with the '.' characters
+    if ($IP !~ /$pattern/) {
+        ibackup::Exception::Network->throw(error => "The IP adress $IP does not belong to the subnet $subnet\n");
+    } 
+}
 
 #####
 # execute a local command
@@ -365,8 +407,49 @@ sub execute(@) {
     return $exit_status;
 }
 
+######
+# get current IPs adresses using ifconfig.
+# return an hash table associating an interface name with an IP and a state (up or down)
+##
+sub getIPs() {
+    my $interface;
+    my %IPs;
+    foreach ( qx{ (LC_ALL=C /sbin/ifconfig -a 2>&1) } ) {
+        $interface = $1 if /^(\S+?):?\s/;
+        next unless defined $interface;
+        $IPs{$interface}->{STATE}=uc($1) if /\b(up|down)\b/i;
+        $IPs{$interface}->{IP}=$1 if /inet\D+(\d+\.\d+\.\d+\.\d+)/i;
+    }
+    return %IPs;
+}
+
+######
+# get current IP adresses associated with an interface.
+# If the interface parameter is not procided, the checked interfaces ar e (eth0,
+# eth1) on Linux system and (en0, en1) on BSD-like.
+# usage: getIPFromInterface(interface)
+###
+sub getIPFromInterface(@) {
+    my %IPs = getIPs();
+    print::debug("Analysing IPs on the local system. Found:\n");
+    print::debug(Dumper \%IPs);
+    my @interfaces;
+    if (@_) {
+        @interfaces = @_;
+    } else {
+        @interfaces = ('eth0', 'eth1') if ($main::OS[0] eq "Linux");
+        @interfaces = ('en0',  'en1')  if ($main::OS[0] =~ "FreeBSD|OpenBSD|Darwin");
+    }
+    foreach my $i (@interfaces) {
+        return $IPs{$i}->{IP} if ($IPs{$i} && $IPs{$i}->{IP});
+    }
+    # TODO: throw an exception here instead!
+    print::error_and_exit(1,"IP not found for interface(s) @interfaces");
+    return;
+}
+
 #####
-# execute a command on a remote server by ssh 
+# execute a command on a remote server by ssh
 # usage: ssh_remote_execute("user@host", port, "command")
 ###
 sub remote_execute_by_ssh($$@) {
@@ -376,21 +459,92 @@ sub remote_execute_by_ssh($$@) {
     return system::execute($cmd);
 }
 
-####
-# check the presence of the binaries @_ on the local system using 'which'
-# usage:  check_binary(bin1 [, bin2 ...]);
-##
-sub check_binary(@) {
-    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
-    my $which = "$ENV{'PATH'} which";
-    foreach my $app (@_) {
-	print::verbose("=> check availability of the command '$app' on the local system...");
-	verbose("\n") if (($main::DEBUG) || ($main::SIMULATION_MODE));
-       	execute("which $app 1>/dev/null") || 
-            print::error_and_exit(1, "$app: command not found in PATH=$ENV{'PATH'}");
-	verbose("\tOK\n");
-    }
-}
+##############################################################################
+# PACKAGE sync
+# Handle all synchronization aspects etc.
+##############################################################################
+package sync;
+
+use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
+
+# Store information on the synchronization command to be issued
+our %BACKUP_CMD_INFO = (
+    'basecmd'     => 'rsync',
+    'opt'         => '',
+    'src'         => undef,
+    'dst'         => undef,
+    'dirs'        => undef,
+    'proto'       => undef,
+    'port'        => undef,
+    'target'      => undef,
+    );
+our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
+lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
+
+
+##############################################################################
+# PACKAGE config
+# Handle all configuration aspects etc.
+##############################################################################
+package config;
+
+use strict;
+use warnings;
+
+use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
+
+# Configuration settings as extracted/expanded from the configuration file
+our %SETTINGS = (
+    'use_duplicity'         => 'no',
+    'log_file'              => undef,  # TODO: NOW log dir
+    'pass_file'             => undef,
+    'patternfile_exclude'   => undef,
+    'restrict_on_subnet'    => undef,
+    'src_rootdir'           => '/',
+    'dst_rootdir'           => '/',
+    'include_dir'           => undef,
+    'exclude_dir'           => undef,
+    'exclude_dir_exception' => undef,
+    'Directory'             => undef,
+    'target_url'            => undef,
+    'logdir'                => undef,
+    'email'                 => undef,
+    );
+our %DEFAULT_SETTINGS = %SETTINGS;
+lock_hash(%DEFAULT_SETTINGS);        # for extra safety
+
+##############################################################################
+# PACKAGE EXCEPTION
+# Handle exceptions etc.
+##############################################################################
+#package exception;
+package ibackup::Exception;
+
+use Exception::Class (
+    'ibackup::Exception' => {
+        description => 'Generic base class for all exception of this script'
+    },
+    'ibackup::Exception::Network' => {
+        isa => 'ibackup::Exception',
+        description => 'Exception related to network errors (bad subnet etc.)',
+        alias => 'network_error',
+    },
+    );
+# ####
+# #
+# ##
+# sub isa_ibackup_exception(@) {
+#     my ($err, $name) = @_;
+#     return unless defined $err;
+
+#     if ($name) {
+#         my $class = "ibackup::Exception::$name";
+#         return blessed $err && $err->isa($class);
+#     } else {
+#         return blessed $err && $err->isa('ibackup::Exception');
+#     }
+# }
+
 
 
 ##############################################################################
@@ -400,6 +554,8 @@ package main;
 
 use strict;
 use warnings;
+
+use Exception::Class::TryCatch;
 
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
@@ -435,13 +591,11 @@ our @OS = qx(uname);         # Current OS
 
 
 
-
-
 #log::initialize("/tmp/logtest/", 'Sebastien.Varrette@uni.lu');
 #log::initialize('Sebastien.Varrette@uni.lu');
 
 # Initialize the logs
-#log::initialize("/tmp/logtest");
+#log::initialize("/tmp/losssgtest");
 log::initialize();
 
 print::debug("debug");
@@ -449,5 +603,32 @@ print::info(" info");
 print::warn("Warning");
 print::error("My error");
 
+print::notification('Title', "msg");
 
-print::notification('title', "msg");
+print::debug("IP found: ", system::getIPFromInterface());
+
+#try
+eval {
+    system::check_subnet('192.168');
+};
+# catch
+if ( catch my $err ) {
+    if ($err->isa('ibackup::Exception::Network')) {
+        print::warn("Network exception: ", $err->error, "\n");
+    } else {
+        # not recoverable
+        print::warn "Unrecoverable error: $err\n";
+        $err->rethrow;
+    }
+}
+
+# my $e = $@;
+# print "e = $e\n";
+# if ($e = ibackup::Exception::isa_ibackup_exception($e, 'Network')) {
+#     print::warn("Catch exception: ", $e->error, "\n", $e->trace->as_string, "\n");
+#     print::warn(join ' ', $e->euid, $e->egid, $e->uid, $e->gid, $e->pid, $e->time);
+# } else {
+#     print::error("Unknown exception");
+#     $e = Exception::Class->caught();
+#     ref $e ? $e->rethrow : die $e;
+# }
