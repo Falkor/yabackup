@@ -14,7 +14,7 @@ AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
 
-PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
+PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access etc.)"
 AC_SUBST(PACKAGE_SUMMARY)
 PACKAGE_WEBSITE="http://ibackup.gforge.uni.lu"
 AC_SUBST(PACKAGE_WEBSITE)
@@ -92,6 +92,7 @@ AC_CHECK_CPAN_MODULES(
     Data::Dumper 
     Pod::Usage
     Log::Handler
+    Exception::Class
 )
 
 # ----------------------------------------------------------------

@@ -4,6 +4,7 @@
 ##############################################################################
 # File   : backup
 # Authors: Sebastien VARRETTE     <Sebastien.Varrette@uni.lu>
+#          with contributions by:
 #          Guillaume-Jean HERBIET <Guillaume.Herbiet@uni.lu>
 # $Id$
 #
@@ -12,7 +13,7 @@
 #               @PACKAGE_WEBSITE@
 #
 # Copyright (c) 2009 Sebastien Varrette     (http://varrette.gforge.uni.lu/)
-#                    Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu/)
+# with contributions by Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu/)
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -47,10 +48,20 @@ sub print::error(@);
 sub print::info(@);
 sub print::notification($$@);
 sub print::really_continue();
+sub print::version();
 sub print::warning(@);
 sub print::warn(@);
+sub print::hash_content($@);
+
+sub config::ensure_section_exists(@);
+sub config::reset_settings();
+sub config::set_profile($);
+sub config::file_has_profiles(@);
+sub config::settings_has_fields(@);
+
 
 sub format::color_msg($$);
+sub format::interpret_cmd($);
 
 sub log::initialize(@);
 
@@ -70,7 +81,11 @@ package print;
 
 use strict;
 use warnings;
-use List::Util qw[min max];   # To find min/max values
+use List::Util qw[min max];     # To find min/max values
+use Term::ANSIColor;            # To send the ANSI color-change sequences to the
+                                # user's terminal
+use Data::Dumper;
+
 
 #our $print_level = 2;
 
@@ -80,7 +95,7 @@ use List::Util qw[min max];   # To find min/max values
 ###
 sub with_prefix($@) {
     my $prefix = shift;
-    print "$prefix @_" unless $::QUIET;
+    print "$prefix @_" unless $config::QUIET;
 }
 
 #######
@@ -94,9 +109,9 @@ sub error_nolog(@) {
 # considered level
 ##
 sub error(@)    { $log::handler->error(@_); }
-sub debug(@)    { $log::handler->debug(@_) if $main::DEBUG;   }
+sub debug(@)    { $log::handler->debug(@_) if $config::DEBUG;   }
 sub info(@)     { $log::handler->info(@_);  }
-sub verbose(@)  { info(@_) if $main::VERBOSE; }
+sub verbose(@)  { info(@_) if $config::VERBOSE; }
 sub warning(@)  { $log::handler->warn(@_);  }
 sub warn(@)     { warning(@_); }
 sub critical(@) { $log::handler->crit(@_); }
@@ -129,21 +144,21 @@ sub notification($$@) {
     my $notify_cmd="";
 
     # Select notification system based on system
-    if ($main::OS[0] =~ "Darwin") {           # Mac OS X: use growlnotify
+    if ($config::OS[0] =~ "Darwin") { # Mac OS X: use growlnotify
         $priority = max(min($priority, 2), -2);
         $notify_cmd =
-            'growlnotify -p ' . $priority .
-            ' -n '.$main::command.' -a \'iSync\' \'' . $title . '\' '.
-            '-m \''. $text .'\' > /dev/null 2>&1';
-    } elsif ($main::OS[0] =~ "Linux") {
+          'growlnotify -p ' . $priority .
+            ' -n '.$config::command.' -a \'iSync\' \'' . $title . '\' '.
+              '-m \''. $text .'\' > /dev/null 2>&1';
+    } elsif ($config::OS[0] =~ "Linux") {
         $priority = max(min($priority, 1), -1) +1;
         my @levels = ("low", "normal", "critical");
         $notify_cmd =
-            'notify-send -u ' . $levels[$priority] .
+          'notify-send -u ' . $levels[$priority] .
             ' -i gtk-dialog-info \'' . $title . '\' \'' . $text . '\'';
     } else {
         print::warning('ibackup do not support graphical notification for the ',
-                       $main::OS[0], " OS\n");
+                       $config::OS[0], " OS\n");
     }
     system::execute($notify_cmd);
 }
@@ -159,6 +174,35 @@ sub really_continue() {
         exit(0);
     }
 }
+
+####
+# Print script version
+##
+sub version_msg() {
+    print 'This is ', color('bold'), $config::command, color('reset'),
+      ' version ', color('bold'), $config::VERSION, color('reset'), "\n",
+        $config::PACKAGE_SUMMARY;
+
+    print << 'EOF';
+Copyright (c) 2009-2010 Sebastien Varrette (http://varrette.gforge.uni.lu)
+with contributions by Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu)
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+}
+
+#####
+# print the content of a hash table
+# Usage: print::hash_content(hash_ref [, title])
+###
+sub hash_content($@) {
+    my $hash_ref = shift;
+    my $title = defined ($_[0]) ? $_[0] : 'Hash Content';
+    print::debug("============= $title =============\n");
+    print::debug(Dumper $hash_ref);
+}
+
 
 
 ##############################################################################
@@ -180,6 +224,27 @@ sub color_msg($$) {
     return  Term::ANSIColor::color("$color") . "$msg" . Term::ANSIColor::color("reset");
 }
 
+####
+# interpret commands delimited by ` ` in a string.
+# Return the string where `cmd` is replaced by the result of the command
+# usage: interpret_cmd("string")
+##
+sub interpret_cmd($) {
+    my $string = my $res = shift;
+    my @commands = $string =~ /`([^`]+)`/g; # retrieve commands to interpret
+    foreach my $cmd (@commands) {
+        my $cmd_exec = `$cmd` || PRINT_ERROR_THEN_EXIT("Execute of $cmd failed or return and empty string: $!\n");
+        chomp($cmd_exec);
+        $cmd =~ s/\$/\\\$/g;    # Serialize command
+        $cmd =~ s/\|/\\\|/g;    # idem
+        $res =~ s/`$cmd`/$cmd_exec/;
+    }
+    return $res;
+}
+
+
+
+
 ##############################################################################
 # PACKAGE LOG
 # Handle all logging features
@@ -188,7 +253,7 @@ package log;
 use strict;
 use warnings;
 
-use Log::Handler;  # Log manager
+use Log::Handler;               # Log manager
 #
 # The following log levels are defined:
 #     7   debug
@@ -236,8 +301,7 @@ sub initialize(@) {
 
     # Recognize a mail address instead of a directory as
     if ((scalar(@_) == 1) &&
-        ($logdir =~ /\b[\w0-9._%+-]+@(?:[\w0-9-]+\.)+[\w]{2,4}\b/))
-    {
+        ($logdir =~ /\b[\w0-9._%+-]+@(?:[\w0-9-]+\.)+[\w]{2,4}\b/)) {
         print "First argument is an email: $logdir\n";
         $email  = $logdir;
         $logdir = undef;
@@ -252,49 +316,49 @@ sub initialize(@) {
     # Redirect debug logs to STDOUT (in yellow)
     $debug_msg_layout =~ s/%L/$yellow_level/g;
     $handler->add(
-        screen => {
-            log_to   => "STDOUT",
-            maxlevel => 7,
-            minlevel => 7,
-            timeformat      => "$timeformat",
-            message_layout  => "$debug_msg_layout",
-        }
-        );
+                  screen => {
+                             log_to   => "STDOUT",
+                             maxlevel => 7,
+                             minlevel => 7,
+                             timeformat      => "$timeformat",
+                             message_layout  => "$debug_msg_layout",
+                            }
+                 );
 
     # Redirect common logs to STDOUT
     $handler->add(
-        screen => {
-            log_to   => "STDOUT",
-            maxlevel => 6,
-            minlevel => 5,
-            timeformat      => "$timeformat",
-            message_layout  => "$msg_layout",
-        }
-        );
+                  screen => {
+                             log_to   => "STDOUT",
+                             maxlevel => 6,
+                             minlevel => 5,
+                             timeformat      => "$timeformat",
+                             message_layout  => "$msg_layout",
+                            }
+                 );
 
     # redirect warnings to STDERR
     $warning_msg_layout =~ s/%L/$magenta_level/g;
     $handler->add(
-        screen => {
-            log_to   => "STDERR",
-            maxlevel => 4,
-            minlevel => 4,
-            timeformat      => "$timeformat",
-            message_layout  => "$warning_msg_layout",
-        }
-        );
+                  screen => {
+                             log_to   => "STDERR",
+                             maxlevel => 4,
+                             minlevel => 4,
+                             timeformat      => "$timeformat",
+                             message_layout  => "$warning_msg_layout",
+                            }
+                 );
 
     # Redirect errors to STDERR
     $error_msg_layout =~ s/%L/$red_level/g;
     $handler->add(
-        screen => {
-            log_to   => "STDERR",
-            maxlevel => 3,  # error
-            minlevel => 0,  # emerg
-            timeformat      => "$timeformat",
-            message_layout  => "$error_msg_layout",
-        }
-        );
+                  screen => {
+                             log_to   => "STDERR",
+                             maxlevel => 3, # error
+                             minlevel => 0, # emerg
+                             timeformat      => "$timeformat",
+                             message_layout  => "$error_msg_layout",
+                            }
+                 );
 
     # ===  Initialize file log (in $logdir) ===
     if (defined($logdir)) {
@@ -307,25 +371,25 @@ sub initialize(@) {
 
         # Initialie the log file for common logs
         $handler->add(
-            file => {
-                filename   => "${logdir}/common.log",
-                maxlevel   => 7,  # debug
-                minlevel   => 5,  # notice
-                timeformat      => "$timeformat",
-                message_layout  => "$msg_layout",
-            }
-            );
+                      file => {
+                               filename   => "${logdir}/common.log",
+                               maxlevel   => 7, # debug
+                               minlevel   => 5, # notice
+                               timeformat      => "$timeformat",
+                               message_layout  => "$msg_layout",
+                              }
+                     );
 
         # Initialize the log file for error logs
         $handler->add(
-            file => {
-                filename => "${logdir}/error.log",
-                maxlevel => 4,  # warning
-                minlevel => 0,  # emerg
-                timeformat      => "$timeformat",
-                message_layout  => "$msg_layout",
-            }
-            );
+                      file => {
+                               filename => "${logdir}/error.log",
+                               maxlevel => 4, # warning
+                               minlevel => 0, # emerg
+                               timeformat      => "$timeformat",
+                               message_layout  => "$msg_layout",
+                              }
+                     );
     }
 
     # Eventually mail errors/warnings
@@ -336,17 +400,17 @@ sub initialize(@) {
         print::debug("Setup log by mail (from=$from) to $email\n");
 
         $handler->add(
-            sendmail => {
-                from     => "${username}\@${hostname}",
-                to       => "$email",
-                subject  => "(ibackup)",
-                maxlevel => 4,
-                minlevel => 0,
-                message_pattern => '%L',
-                timeformat      => "$timeformat",
-                message_layout  => "$msg_layout",
-            }
-            );
+                      sendmail => {
+                                   from     => "${username}\@${hostname}",
+                                   to       => "$email",
+                                   subject  => "(ibackup)",
+                                   maxlevel => 4,
+                                   minlevel => 0,
+                                   message_pattern => '%L',
+                                   timeformat      => "$timeformat",
+                                   message_layout  => "$msg_layout",
+                                  }
+                     );
     }
 }
 
@@ -369,11 +433,9 @@ sub check_binary(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
     my $which = "$ENV{'PATH'} which";
     foreach my $app (@_) {
-        print::verbose("=> check availability of the command '$app' on the local system...");
-        verbose("\n") if (($main::DEBUG) || ($main::SIMULATION_MODE));
-        execute("which $app 1>/dev/null") ||
+        print::verbose("=> check availability of the command '$app' on the local system.");
+        system::execute("which $app 1>/dev/null") &&
             print::error_and_exit(1, "$app: command not found in PATH=$ENV{'PATH'}");
-        verbose("\tOK\n");
     }
 }
 
@@ -387,10 +449,10 @@ sub check_subnet($@) {
     my $IP = (@_) ? getIPFromInterface($_[0]) : getIPFromInterface();
     print::verbose("=> check subnet $subnet (current IP address found: $IP)");
     my $pattern=$subnet;
-    $pattern =~ s/\./\\\./g;   # proceed with the '.' characters
+    $pattern =~ s/\./\\\./g;    # proceed with the '.' characters
     if ($IP !~ /$pattern/) {
-        ibackup::Exception::Network->throw(error => "The IP adress $IP does not belong to the subnet $subnet\n");
-    } 
+        ibackup::Exception::Network->throw(error => "The IP adress $IP does not belong to the subnet $subnet");
+    }
 }
 
 #####
@@ -400,8 +462,8 @@ sub check_subnet($@) {
 sub execute(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
     print::debug('[' . (caller(0))[3] . "] @_\n");
-    ($main::SIMULATION_MODE) ?
-        print format::color_msg('bold', "@_\n") : system("@_");
+    ($config::SIMULATION_MODE) ?
+      print format::color_msg('bold', "@_\n") : system("@_");
     my $exit_status = $?;
     print::debug('[' . (caller(0))[3] . "] exit status : $exit_status\n");
     return $exit_status;
@@ -437,8 +499,8 @@ sub getIPFromInterface(@) {
     if (@_) {
         @interfaces = @_;
     } else {
-        @interfaces = ('eth0', 'eth1') if ($main::OS[0] eq "Linux");
-        @interfaces = ('en0',  'en1')  if ($main::OS[0] =~ "FreeBSD|OpenBSD|Darwin");
+        @interfaces = ('eth0', 'eth1') if ($config::OS[0] eq "Linux");
+        @interfaces = ('en0',  'en1')  if ($config::OS[0] =~ "FreeBSD|OpenBSD|Darwin");
     }
     foreach my $i (@interfaces) {
         return $IPs{$i}->{IP} if ($IPs{$i} && $IPs{$i}->{IP});
@@ -465,19 +527,19 @@ sub remote_execute_by_ssh($$@) {
 ##############################################################################
 package sync;
 
-use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
 
 # Store information on the synchronization command to be issued
 our %BACKUP_CMD_INFO = (
-    'basecmd'     => 'rsync',
-    'opt'         => '',
-    'src'         => undef,
-    'dst'         => undef,
-    'dirs'        => undef,
-    'proto'       => undef,
-    'port'        => undef,
-    'target'      => undef,
-    );
+                        'basecmd'     => 'rsync',
+                        'opt'         => '',
+                        'src'         => undef,
+                        'dst'         => undef,
+                        'dirs'        => undef,
+                        'proto'       => undef,
+                        'port'        => undef,
+                        'target'      => undef,
+                       );
 our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
 
@@ -491,60 +553,189 @@ package config;
 use strict;
 use warnings;
 
-use Hash::Util qw{lock_hash}; # To be able to lock keys/values in hash tables
+use Storable qw(dclone);        # for recursive copy of nested hash
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Getopt::Long;
+use Data::Dumper;
+
+# Generic variables
+our $VERSION = '@VERSION@';                 # Script version
+our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@'; # Package summary
+our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@'; # Package website
+our $VERBOSE = 1;            # option variable for verbose mode (default: false)
+our $DEBUG   = 1;            # option variable for debug mode with default
+# value (false)
+our $QUIET   = 0;               # By default, display all informations
+our $numargs = scalar(@ARGV);   # Number of arguments
+our $command = `basename $0`;   # base command
+chomp($command);
+
+# Specific variables
+our $SIMULATION_MODE = 0;       # By default, don't simulate
+our $SYNC_MODE = "--update"; # By default, update directories, don't delete obsolete files
+our $HISTORICAL      = 0;   # By default do not keep an history of older backups
+our $MAC_FORK        = 0; # option variable for Mac OS resource forks with default value (false)
+our $NOTIFICATION    = 0; # By default, don't use system user notification feature
+our $RETRIEVE_MODE   = 0; # By default, push data on the backup target and don't retrieve anything
+our $PRE_SCRIPT;          # Complete path to pre-backup script
+our $POST_SCRIPT;         # Complete path to post-backup script
+
+our $file;                # Configuration file.
+our @backup_sections;     # backup sections to be used in the configuration file
+our @OS = qx(uname);      # Current OS
 
 # Configuration settings as extracted/expanded from the configuration file
 our %SETTINGS = (
-    'use_duplicity'         => 'no',
-    'log_file'              => undef,  # TODO: NOW log dir
-    'pass_file'             => undef,
-    'patternfile_exclude'   => undef,
-    'restrict_on_subnet'    => undef,
-    'src_rootdir'           => '/',
-    'dst_rootdir'           => '/',
-    'include_dir'           => undef,
-    'exclude_dir'           => undef,
-    'exclude_dir_exception' => undef,
-    'Directory'             => undef,
-    'target_url'            => undef,
-    'logdir'                => undef,
-    'email'                 => undef,
-    );
+                 'use_duplicity'         => 'no',
+                 'log_file'              => undef, # TODO: NOW log dir
+                 'pass_file'             => undef,
+                 'patternfile_exclude'   => undef,
+                 'restrict_on_subnet'    => undef,
+                 'src_rootdir'           => '/',
+                 'dst_rootdir'           => '/',
+                 'include_dir'           => undef,
+                 'exclude_dir'           => undef,
+                 'exclude_dir_exception' => undef,
+                 'Directory'             => undef,
+                 'target_url'            => undef,
+                 'logdir'                => undef,
+                 'email'                 => undef,
+                );
 our %DEFAULT_SETTINGS = %SETTINGS;
-lock_hash(%DEFAULT_SETTINGS);        # for extra safety
+lock_hash(%DEFAULT_SETTINGS);   # for extra safety
+
+our %GETOPT_CONFIG = (
+                      # Specific options
+                      's|section=s'     => \@backup_sections, # sections to consider
+                      'f|config-file=s' => \$file, # Configuration file
+                      'n|dry-run'       => \$SIMULATION_MODE, # Simulation mode
+                      'm|mac-fork'      => \$MAC_FORK, # Mac resource fork
+                      'notification'    => \$NOTIFICATION, # User notification features
+                      'e|exact-sync|delete' => sub { $SYNC_MODE="--delete" }, # Exact synchro
+                      'history'         => sub { # Keep history of backups
+                          $HISTORICAL = 1;
+                          $SYNC_MODE="--delete"
+                      },
+                      'p|push'          => sub { $RETRIEVE_MODE = 0}, # push data on the backup target
+                      'r|restore|retrieve' => sub { $RETRIEVE_MODE = 1}, # restore data from the backup
+                      'pre-script=s'    => \$PRE_SCRIPT, # script to be executed before the sync
+                      'post-script=s'   => \$POST_SCRIPT, # script to be executed afetr the sync
+                      # Generic (classical) options
+                      'v|verbose'  => \$VERBOSE, # Verbose mode
+                      'q|quiet'    => \$QUIET,   # Quiet mode
+                      'debug'      => sub { $DEBUG = 1; $VERBOSE = 1; }, # Debug mode
+                      'h|help'     => sub { ::pod2usage(-exitval => 1, # Show help
+                                                        -verbose => 2); },
+                      'version'    => sub { print::version_msg(); exit(0); } # Show version
+                     );
+
+our %CONFIG_FILE_CONTENT;      # Hash table constructed from the analysis of the
+                               # content of the configuration file via Config::General
+
+####
+# check the existence of a given profile (i.e. section) in the configuration
+# file
+# config::file_has_profile('profile')
+###
+sub file_has_profile($) {
+    my $profil = shift;
+    return exists($CONFIG_FILE_CONTENT{$profil});
+}
+
+####
+# check the existence of a given field in the configuration settings
+# i.e. $SETTINGS{'field_name'}
+# config::settings_has_field('field_name')
+###
+sub settings_has_fields(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
+    my $res = 1;
+    foreach my $field (@_) {
+        if (not exists($SETTINGS{$field})) {
+            print::warning("The section $field is absent from the settings");
+            $res = 0;
+        }
+    }
+    return $res;
+}
+
+
+# Usage: ensure_section_exists('section_name')
+##
+sub ensure_section_exists(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
+    foreach my $sec (@_) {
+        print::error_and_exit(1,
+                              "The section $sec cannot be found in the configuration file ",
+                              "and is required (man backup.conf for more info)")
+            unless exists($CONFIG_FILE_CONTENT{$sec});
+    }
+}
+
+####
+# reset the settings
+##
+sub reset_settings() {
+    %config::SETTINGS      = %config::DEFAULT_SETTINGS;
+    %sync::BACKUP_CMD_INFO = %sync::DEFAULT_BACKUP_CMD_INFO;
+}
+
+####
+# Update the backup settings i.e. the hash $SETTINGS from the informations
+# stored in $CONFIG_FILE_CONTENT{profile} i.e. a given profile (or section) in
+# the configuration file.
+# Usage: update_settings_from("profile")
+##
+sub set_profile($) {
+    my $profile = shift;
+    my %subsection = %{ dclone($CONFIG_FILE_CONTENT{$profile})}; # deep copy
+    while (my ($key, $val) = each(%subsection)) {
+        # Special treatment for the SSH agent
+        if ($key eq 'ssh_auth_sock') {
+            $ENV{SSH_AUTH_SOCK} = format::interpret_cmd($subsection{'ssh_auth_sock'});
+            print::debug('Setting the environment variable SSH_AUTH_SOCK ',
+                         "to $ENV{SSH_AUTH_SOCK}");
+            next;
+        }
+        if (($key eq 'Directory') && defined($SETTINGS{$key})) {
+            # Here we need to append the directories definitions
+            while ( my ($dir, $dir_setting) = each(%{$subsection{$key}})) {
+                $SETTINGS{$key}->{$dir} = $dir_setting;
+            }
+            next;
+        }
+        if (exists($SETTINGS{$key})) {
+            $SETTINGS{$key} = $val;
+        } else {
+            print::error_and_exit(1, "The directive $key is not recognized");
+        }
+    }
+}
+
+
+
 
 ##############################################################################
 # PACKAGE EXCEPTION
-# Handle exceptions etc.
+# Define the exceptions throwed by ibackup
 ##############################################################################
-#package exception;
 package ibackup::Exception;
 
 use Exception::Class (
-    'ibackup::Exception' => {
-        description => 'Generic base class for all exception of this script'
-    },
-    'ibackup::Exception::Network' => {
-        isa => 'ibackup::Exception',
-        description => 'Exception related to network errors (bad subnet etc.)',
-        alias => 'network_error',
-    },
-    );
-# ####
-# #
-# ##
-# sub isa_ibackup_exception(@) {
-#     my ($err, $name) = @_;
-#     return unless defined $err;
-
-#     if ($name) {
-#         my $class = "ibackup::Exception::$name";
-#         return blessed $err && $err->isa($class);
-#     } else {
-#         return blessed $err && $err->isa('ibackup::Exception');
-#     }
-# }
-
+                      'ibackup::Exception' => {
+                                               description => 'Generic base class for all exception of this script'
+                                              },
+                      'ibackup::Exception::Network' => {
+                                                        isa => 'ibackup::Exception',
+                                                        description => 'Exception related to network errors (bad subnet etc.)',
+                                                        alias => 'network_error',
+                                                       },
+                      'ibackup::Exception::ConfigFileFormat' => {
+                                                                 isa => 'ibackup::Exception',
+                                                                 description => 'Error in the formatting of the configuration file',
+                                                                 alias => 'c',
+                                                                },
+                     );
 
 
 ##############################################################################
@@ -556,79 +747,241 @@ use strict;
 use warnings;
 
 use Exception::Class::TryCatch;
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Config::General;            # For configuration file parsing
+use Getopt::Long;               # For command line management (long version)
+use Pod::Usage;
+use Data::Dumper;
+use Term::ANSIColor;
 
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
 
-# Generic variables
-our $VERSION = '@VERSION@';   # Script version
-our $VERBOSE = 1;             # option variable for verbose mode (default: false)
-our $DEBUG   = 1;             # option variable for debug mode with default
-# value (false)
-our $QUIET   = 0;             # By default, display all informations
-our $numargs = scalar(@ARGV); # Number of arguments
-our $command = `basename $0`; # base command
-chomp($command);
-
-# Specific variables
-our $SIMULATION_MODE = 0;    # By default, don't simulate
-our $SYNC_MODE       = "--update"; # By default, update directories, don't delete
-# obsolete files
-our $HISTORICAL      = 0;    # By default do not keep an history of older backups
-our $MAC_FORK        = 0;    # option variable for Mac OS resource forks with
-# default value (false)
-our $NOTIFICATION    = 0;    # By default, don't use system user notification feature
-our $RETRIEVE_MODE   = 0;    # By default, push data on the backup target and
-# don't retrieve anything
-our $PRE_SCRIPT;             # Complete path to pre-backup script
-our $POST_SCRIPT;            # Complete path to post-backup script
-
-our $config_file;            # Configuration file.
-our @backup_sections;        # backup sections to be used in the configuration file
-our @OS = qx(uname);         # Current OS
-
-
-
-
-
-#log::initialize("/tmp/logtest/", 'Sebastien.Varrette@uni.lu');
-#log::initialize('Sebastien.Varrette@uni.lu');
-
 # Initialize the logs
-#log::initialize("/tmp/losssgtest");
 log::initialize();
 
-print::debug("debug");
-print::info(" info");
-print::warn("Warning");
-print::error("My error");
+# Process command line
+my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
+print::error_and_exit(1, "Please check the format of the command-line. ",
+                      "Use '$config::command --help' for more details") unless ($getoptRes);
 
-print::notification('Title', "msg");
-
-print::debug("IP found: ", system::getIPFromInterface());
-
-#try
-eval {
-    system::check_subnet('192.168');
-};
-# catch
-if ( catch my $err ) {
-    if ($err->isa('ibackup::Exception::Network')) {
-        print::warn("Network exception: ", $err->error, "\n");
-    } else {
-        # not recoverable
-        print::warn "Unrecoverable error: $err\n";
-        $err->rethrow;
-    }
+# Ensure the notification command exists (if used)
+if ($config::NOTIFICATION) {
+    system::check_binary('growlnotify') if ($config::OS[0] =~ "Darwin"); # Mac OS X: check growlnotify
+    system::check_binary('notify-send') if ($config::OS[0] =~ "Linux"); # Linux: check notify-send
 }
 
-# my $e = $@;
-# print "e = $e\n";
-# if ($e = ibackup::Exception::isa_ibackup_exception($e, 'Network')) {
-#     print::warn("Catch exception: ", $e->error, "\n", $e->trace->as_string, "\n");
-#     print::warn(join ' ', $e->euid, $e->egid, $e->uid, $e->gid, $e->pid, $e->time);
-# } else {
-#     print::error("Unknown exception");
-#     $e = Exception::Class->caught();
-#     ref $e ? $e->rethrow : die $e;
+# Disable quiet mode on retrieval of data
+if ($config::QUIET && $config::RETRIEVE_MODE) {
+    $config::QUIET = 0;
+    print::info("Quiet mode desactivated when retrieving data\n");
+}
+
+if (($config::SYNC_MODE eq "--delete") && (! $config::QUIET)) {
+    print::warning("This option force an exact duplication and can lead to deletion of files.\n");
+    print::really_continue();
+}
+
+# Allow comma-separated backup_sections:
+#  --sections=toto,tutu is equivalent to --sections=toto --sections=tutu
+@config::backup_sections = split(/,/,join(',',@config::backup_sections));
+@config::backup_sections = ('default') unless (@config::backup_sections);
+
+# Find the relevant configuration file
+unless ($config::file) {
+    my @conffile_list = ('/etc/backup.conf', "$ENV{HOME}/.backup.conf");
+    # if no configuration file found in the command-line arguments, check successively for files listed
+    # in @conffile_list
+    foreach my $f (@conffile_list) {
+        $config::file = $f if (-e $f);
+    }
+    print::error_and_exit(1, "No configuration file found among @conffile_list")
+        unless ($config::file);
+}
+print::verbose("=> configuration file : $config::file");
+
+# Now put the content of the configuration file into an hash table
+%config::CONFIG_FILE_CONTENT = Config::General::ParseConfig(-ConfigFile => $config::file,
+                                                            -InterPolateEnv => 1);
+print::error_and_exit(1,
+                      "Empty backup configuration:",
+                      "ensure that the content of $config::file is correct!")
+  unless (%config::CONFIG_FILE_CONTENT);
+
+lock_hash(%config::CONFIG_FILE_CONTENT);
+print::debug("Creation of the hash table from the configuration file $config::file : ");
+print::debug(Dumper \%config::CONFIG_FILE_CONTENT);
+
+print::debug("Backup section(s) to consider in the configuration file :",
+             color('bold'), @config::backup_sections, color('reset'));
+
+# Check the configuration file format : there should be a section 'global' and
+# one for each backup profile considered
+config::ensure_section_exists('global', @config::backup_sections);
+
+# TODO: execute pre-script if available
+
+# ============================================================================
+# ========== Now proceed with each section (i.e. each backup profile =========
+# ============================================================================
+foreach my $sec (@config::backup_sections) {
+    print::info('backup profile: ----------',
+                color('bold'), "$sec ", color('reset'),
+                '----------');
+    # Restore global settings
+    config::reset_settings();
+    print::verbose('Add the global profile');
+    config::set_profile('global');
+    print::verbose("Add the $sec profile");
+    config::set_profile("$sec");
+    print::hash_content(\%config::SETTINGS, 'backup SETTINGS configured');
+    config::settings_has_fields('src_rootdir', 'dst_rootdir', 'include_dir', 'target_url', 'test');
+
+}
+
+# TODO: execute post-script if available
+
+
+
+
+
+
+
+#print::debug("IP found: ", system::getIPFromInterface());
+
+# #try
+# eval {
+#     system::check_subnet('193.168');
+# };
+# # catch
+# if ( catch my $err ) {
+#     if ($err->isa('ibackup::Exception::Network')) {
+#         print::warn("Network exception: ", $err->error);
+#     } else {
+#         # not recoverable
+#         print::warn "Unrecoverable error: $err\n";
+#         $err->rethrow;
+#     }
 # }
+
+
+
+# print::debug("debug");
+# print::info("info");
+# print::verbose("verbose");
+# print::warn("Warning");
+# print::error("error");
+
+#print::notification('Title', "msg");
+
+
+
+#################### Initial POD documentation ######################
+=pod
+
+=head1 NAME
+
+I<backup>, @PACKAGE_SUMMARY@
+
+I<backup> relies for that on B<rsync> (see L<http://samba.anu.edu.au/rsync/>) and
+(in a future release) B<duplicity> (see L<http://duplicity.nongnu.org/>) together with a
+configuration file.
+
+=head1 SYNOPSIS
+
+      backup [options]
+
+=head1 DESCRIPTION
+
+I<backup> rely on a configuration file to describe the characteristics of the
+backup job to be performed (files to include/exclude, target url etc. -- see
+L<CONFIGURATION FILE FORMAT> for more details).
+The main idea is to have the possibility to define several backup profile.
+Here is a illustrative examples:
+
+    # Configuration file example
+    #
+    #### Mandatory global settings ####
+    <global>
+         src_rootdir = $HOME     # Root directory on the (local) source
+         include_dir = *         # backup all sub-directories (relative to src_rootdir)
+    </global>
+
+    #### Mandatory default backup definition ####
+    <default>
+         target_url = drive:///Volumes/Backup  # backup on an external drive 'Backup'
+    </default>
+
+    # Definition of the backup on a local [encrypted] sparse bundle (Mac OS X)
+    <sbimage>
+         target_url  = sparsebundle:///path/to/image.sparsebundle
+         dst_rootdir = myBackup         # Specialized root directory for this backup
+    </sbimage>
+
+    # Definition of the backup on the machine 'toto' (via SSH access)
+    <toto>
+         target_url  = ssh://mylogin@toto.example.org  # backup through ssh
+         dst_rootdir = /backup/`whoami`@`hostname`     # Specialized root directory on target server
+         restrict_on_subnet = 10.7.14                  # backup only when you're working
+    </toto>
+
+    # Definition of the backup on the company NAS (via AFP access)
+    <nas>
+          # backup through AFP (eventually put the password in a separate file and use the directive 'pass_file')
+  target_url  = afp://mylogin:mypassword@nas.company.com/volname
+  dst_rootdir = myBackup               # Root directory for the backup
+  restrict_on_subnet = 10.7.14         # backup only when you're working
+  </nas>
+
+  # Definition of the backup on a remote [encrypted] sparse bundle on the company NAS
+  <nassbimage>
+  target_url  = afp://mylogin:mypassword@nas.company.com/volname/path/to/image.sparsebundle
+  dst_rootdir = myBackup               # Root directory for the backup
+  restrict_on_subnet = 10.7.14         # backup only when you're working
+  </nassbimage>
+
+  So appart from the 'global' section, each backup is defined in a named block that helps
+  to complete and/or overwrite the global settings.
+To run the backup configured by default, just run:
+
+    ./backup -f /path/to/config_file
+
+  To run the backup configured by the 'toto' section, just run:
+
+./backup -f /path/to/config_file -s=toto
+
+  If a configuration file is not passed command-line through the C<-f> option, I<backup>
+  use by default $HOME/.backup.conf and then /etc/backup.conf.
+
+  To restore data from the backup 'toto', run :
+
+  ./backup -f /path/to/config_file -s=toto -r
+
+  Note that I<backup> try to use the configuration files C</etc/backup.conf> or C<~/.backup.conf>
+so that the C<-f> option can be avoided.
+
+=head1 OPTIONS
+
+The following options are available:
+
+
+
+=cut
+
+
+  # POD documentation to be done:
+  #Suggested by Damian Conway in Perl Best Practices.
+  #Name
+  #Usage
+  #Description
+  #Required arguments
+  #Options
+  #Exit status
+  #Diagnostics
+  #Configuration
+  #Dependencies
+  #Incompatibilities
+  #Bugs and limitations
+  #Author
+  #License and copyright
+  #Disclaimer of warranty
