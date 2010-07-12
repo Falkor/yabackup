@@ -53,15 +53,17 @@ sub print::warning(@);
 sub print::warn(@);
 sub print::hash_content($@);
 
-sub config::ensure_section_exists(@);
+sub sync::set_cmd();
+sub sync::parse_target_url();
+
+sub config::ensure_profile_set(@);
 sub config::reset_settings();
 sub config::set_profile($);
-sub config::file_has_profiles(@);
-sub config::settings_has_fields(@);
 
-
-sub format::color_msg($$);
+sub format::color_msg($@);
 sub format::interpret_cmd($);
+
+sub hash::has_keys($@);
 
 sub log::initialize(@);
 
@@ -70,6 +72,7 @@ sub system::check_subnet($@);
 sub system::execute(@);
 sub system::getIPs();
 sub system::getIPFromInterface(@);
+sub system::has_directory(@);
 sub system::remote_execute_by_ssh($$@);
 
 
@@ -218,10 +221,9 @@ use Term::ANSIColor; # To send the ANSI color-change sequences to the user's ter
 #####
 # return a colored message (coloration only appens in the terminal typically)
 ###
-sub color_msg($$) {
+sub color_msg($@) {
     my $color = shift;
-    my $msg = shift;
-    return  Term::ANSIColor::color("$color") . "$msg" . Term::ANSIColor::color("reset");
+    return  Term::ANSIColor::color("$color") . "@_" . Term::ANSIColor::color("reset");
 }
 
 ####
@@ -242,6 +244,31 @@ sub interpret_cmd($) {
     return $res;
 }
 
+##############################################################################
+# PACKAGE HASH
+# Toolkit for managing perl hashes
+##############################################################################
+package hash;
+use strict;
+use warnings;
+
+####
+# check the existence of a set of keys in the hash table passed as reference
+# return: 1 if every key listed exist in the hash, 0 otherwise
+# Usage: hash::has_keys(hash_ref, key1 [,key2 ...])
+##
+sub has_keys($@) {
+    my $hash_ref = shift;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing keys') unless (@_);
+    my $res = 1;
+    foreach my $field (@_) {
+        if (not exists($hash_ref->{$field})) {
+            print::warning("The key $field do not exist");
+            $res = 0;
+        }
+    }
+    return $res;
+}
 
 
 
@@ -455,6 +482,20 @@ sub check_subnet($@) {
     }
 }
 
+####
+# check the existence of a set local directory
+###
+sub has_directory(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory argument') unless (@_);
+    foreach my $dir (@_) {
+        unless ( -d $dir ) {
+            ibackup::Exception::DirectoryNotFound->throw(error => "The directory $dir cannot be found")
+          }
+    }
+}
+
+
+
 #####
 # execute a local command
 # usage: execute(command)
@@ -543,6 +584,110 @@ our %BACKUP_CMD_INFO = (
 our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
 
+####
+# Configure the synchronization command to be executed (This assumes the hash
+# $config::SETTINGS is correctly populated)
+# This function may throw the following exceptions:
+##
+sub set_cmd() {
+    if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
+        ibackup::Exception::ConfigFileFormat->throw(error => "The use of duplicity is not yet supported");
+    }
+    # Set the backup source i.e the root directory of the local folders to
+    # backup, ensuring this directory exists
+    my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
+    system::has_directory( $src_rootdir );
+    $BACKUP_CMD_INFO{'src'} = $src_rootdir;
+
+    # Set the backup destination by analysing the target_url
+    sync::parse_target_url();
+
+}
+
+
+####
+# Analyse the target url (stored in $config::SETTINGS{'target_url'} normally)
+# that specify the backup destination.
+##
+sub parse_target_url() {
+    unless (defined($config::SETTINGS{'target_url'})) {
+        ibackup::Exception::ConfigFileFormat->throw(error => "Undefined target_url for this profile");
+    }
+    $config::SETTINGS{'target_url'} = format::interpret_cmd("$config::SETTINGS{'target_url'}");
+    # let the Perl magic operate here:
+    $config::SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)(:([\w]+))?((\@([-\w\.]+))(:(\d+))?)?(\/([\.\w\/]+))?)/;
+    my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $8, $10, $12);
+    print::debug("Protocol: $proto\n")   if ($proto);
+    print::debug("target  : $target\n")  if ($target);
+    print::debug("user    : $user\n")    if ($user);
+    print::debug("passwd  : $passwd\n")  if ($passwd);
+    print::debug("server  : $server\n")  if ($server);
+    print::debug("port    : $port\n")    if ($port);
+    print::debug("volname : $volname\n") if ($volname);
+
+    unless ($proto && $target) {
+        ibackup::Exception::ConfigFileFormat->throw(error => "Malformed target url $config::SETTINGS{'target_url'}");
+    }
+    $BACKUP_CMD_INFO{'proto'}  = $proto;
+    $BACKUP_CMD_INFO{'target'} = $target;
+
+    my $set_to_msg="set the backup destination to ";
+
+    # Handle each prototype
+    if ($proto eq 'drive') {
+        print::verbose("$set_to_msg the external drive $target\n");
+        set_backup_target_to_drive($target);
+    } elsif ($proto eq 'file') {
+        print::verbose("$set_to_msg the local directory $target\n");
+        set_backup_target_to_drive($target);
+    }
+
+
+
+    #     # Local directory
+    #     case 'file'
+    #       {
+    #        verbose("\tsetup target on the local directory $target\n");
+    #        setup_target_drive($target);
+    #       }
+    #         # Remote server reacheable by ssh
+    #         case 'ssh'
+    #           {
+    #            PRINT_ERROR_THEN_EXIT("Malformed ssh target") unless ($user && $server);
+    #            $port = 22 unless ($port);
+    #            verbose("\tsetup target on the remote server $server.\n");
+    #            verbose("\tConnection to be established for the remote user $user by ssh on port $port\n");
+    #            setup_target_ssh($user, $server, $port);
+    #           }
+    #             # sparsebundle
+    #             case 'sparsebundle'
+    #               {
+    #                PRINT_ERROR_THEN_EXIT("Sparsebundle images are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
+    #                verbose("\tsetup target on the sparsebundle image $target\n");
+    #                setup_target_sparsebundle($target);
+    #               }
+    #                 case 'afp'
+    #                   {
+    #                    PRINT_ERROR_THEN_EXIT("Apple Filing Protocol (AFP) are only supported under Mac OS X") unless ($OS[0] =~ "Darwin");
+    #                    $port = 548 unless ($port);
+    #                    verbose("\tsetup target on the remote server $server.\n");
+    #                    verbose("\tConnection to be established for the remote user $user by afp\n");
+    #                    setup_target_afp($user, $passwd, $server, $port, $volname);
+    #                   }
+    #                     # ERROR: NOT supported => raise error
+    #                     else {
+    #                         PRINT_ERROR_THEN_EXIT("The protocol $proto is not supported");
+    #                     }
+    # }
+
+
+
+}
+
+
+
+
+
 
 ##############################################################################
 # PACKAGE config
@@ -630,47 +775,8 @@ our %GETOPT_CONFIG = (
                      );
 
 our %CONFIG_FILE_CONTENT;      # Hash table constructed from the analysis of the
-                               # content of the configuration file via Config::General
-
-####
-# check the existence of a given profile (i.e. section) in the configuration
-# file
-# config::file_has_profile('profile')
-###
-sub file_has_profile($) {
-    my $profil = shift;
-    return exists($CONFIG_FILE_CONTENT{$profil});
-}
-
-####
-# check the existence of a given field in the configuration settings
-# i.e. $SETTINGS{'field_name'}
-# config::settings_has_field('field_name')
-###
-sub settings_has_fields(@) {
-    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
-    my $res = 1;
-    foreach my $field (@_) {
-        if (not exists($SETTINGS{$field})) {
-            print::warning("The section $field is absent from the settings");
-            $res = 0;
-        }
-    }
-    return $res;
-}
-
-
-# Usage: ensure_section_exists('section_name')
-##
-sub ensure_section_exists(@) {
-    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
-    foreach my $sec (@_) {
-        print::error_and_exit(1,
-                              "The section $sec cannot be found in the configuration file ",
-                              "and is required (man backup.conf for more info)")
-            unless exists($CONFIG_FILE_CONTENT{$sec});
-    }
-}
+                               # content of the configuration file via
+                               # Config::General
 
 ####
 # reset the settings
@@ -688,6 +794,7 @@ sub reset_settings() {
 ##
 sub set_profile($) {
     my $profile = shift;
+    print::verbose("set the '$profile' profile");
     my %subsection = %{ dclone($CONFIG_FILE_CONTENT{$profile})}; # deep copy
     while (my ($key, $val) = each(%subsection)) {
         # Special treatment for the SSH agent
@@ -712,7 +819,23 @@ sub set_profile($) {
     }
 }
 
-
+####
+# ensure the existence of the directives listed in arguments in the merged
+# configuration of a given backup profile i.e. in $config::SETTINGS. Throw an
+# exception of type ibackup::Exception::ConfigFileFormat in case of error.
+##
+sub ensure_profile_set(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
+    foreach my $directive (@_) {
+        unless (exists($config::SETTINGS{$directive})) {
+            my $error_msg =
+              "The directive '" .
+                format::color_msg('bold', "$directive") .
+                    "' is not set in the configuration file";
+            ibackup::Exception::ConfigFileFormat->throw(error => "$error_msg");
+        }
+    }
+}
 
 
 ##############################################################################
@@ -722,19 +845,28 @@ sub set_profile($) {
 package ibackup::Exception;
 
 use Exception::Class (
-                      'ibackup::Exception' => {
-                                               description => 'Generic base class for all exception of this script'
-                                              },
-                      'ibackup::Exception::Network' => {
-                                                        isa => 'ibackup::Exception',
-                                                        description => 'Exception related to network errors (bad subnet etc.)',
-                                                        alias => 'network_error',
-                                                       },
-                      'ibackup::Exception::ConfigFileFormat' => {
-                                                                 isa => 'ibackup::Exception',
-                                                                 description => 'Error in the formatting of the configuration file',
-                                                                 alias => 'c',
-                                                                },
+                      # Main exception class
+                      'ibackup::Exception' =>
+                      {
+                       description => 'Generic base class for all exception of this script'
+                      },
+                      # Specific exceptions
+                      'ibackup::Exception::Network' =>
+                      {
+                       isa         => 'ibackup::Exception',
+                       description => 'Exception related to network errors (bad subnet etc.)',
+                       alias       => 'network_error',
+                      },
+                      'ibackup::Exception::ConfigFileFormat' =>
+                      {
+                       isa         => 'ibackup::Exception',
+                       description => 'Error in the formatting of the configuration file',
+                      },
+                      'ibackup::Exception::DirectoryNotFound' =>
+                      {
+                       isa         => 'ibackup::Exception',
+                       description => 'A directory used in the backup do not exist',
+                      },
                      );
 
 
@@ -790,8 +922,8 @@ if (($config::SYNC_MODE eq "--delete") && (! $config::QUIET)) {
 # Find the relevant configuration file
 unless ($config::file) {
     my @conffile_list = ('/etc/backup.conf', "$ENV{HOME}/.backup.conf");
-    # if no configuration file found in the command-line arguments, check successively for files listed
-    # in @conffile_list
+    # if no configuration file found in the command-line arguments, check
+    # successively for files listed in @conffile_list
     foreach my $f (@conffile_list) {
         $config::file = $f if (-e $f);
     }
@@ -817,25 +949,50 @@ print::debug("Backup section(s) to consider in the configuration file :",
 
 # Check the configuration file format : there should be a section 'global' and
 # one for each backup profile considered
-config::ensure_section_exists('global', @config::backup_sections);
-
+unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
+                       'global', @config::backup_sections)) {
+    print::error_and_exit("Missing profile section in $config::file");
+}
 # TODO: execute pre-script if available
 
 # ============================================================================
-# ========== Now proceed with each section (i.e. each backup profile =========
+# ========== Now proceed with each section (i.e. each backup profile) ========
 # ============================================================================
 foreach my $sec (@config::backup_sections) {
-    print::info('backup profile: ----------',
-                color('bold'), "$sec ", color('reset'),
-                '----------');
+    print::info('---------- ', color('bold'), "$sec ", color('reset'),
+                ' backup profile ----------');
     # Restore global settings
     config::reset_settings();
-    print::verbose('Add the global profile');
+
+    # Now merge the global profile and the selected one
     config::set_profile('global');
-    print::verbose("Add the $sec profile");
     config::set_profile("$sec");
-    print::hash_content(\%config::SETTINGS, 'backup SETTINGS configured');
-    config::settings_has_fields('src_rootdir', 'dst_rootdir', 'include_dir', 'target_url', 'test');
+    print::hash_content(\%config::SETTINGS, 'backup settings configured');
+
+    #try
+    eval {
+        config::ensure_profile_set('src_rootdir', 'dst_rootdir',
+                                   'include_dir', 'target_url');
+        sync::set_cmd();
+
+    };
+    # catch
+    if ( catch my $err ) {
+        if ($err->isa('ibackup::Exception::Network')          ||
+            $err->isa('ibackup::Exception::ConfigFileFormat') ||
+            $err->isa('ibackup::Exception::DirectoryNotFound')) {
+            print::error($err->error);
+        } else {
+            # not recoverable
+            print::warn "Unrecoverable error: $err \n";
+            $err->rethrow;
+        }
+        print::warn("The profile $sec is now ",
+                    format::color_msg('bold', 'skipped'), " !");
+        print "\n";
+        next;
+    }
+
 
 }
 
@@ -958,11 +1115,11 @@ To run the backup configured by default, just run:
   ./backup -f /path/to/config_file -s=toto -r
 
   Note that I<backup> try to use the configuration files C</etc/backup.conf> or C<~/.backup.conf>
-so that the C<-f> option can be avoided.
+  so that the C<-f> option can be avoided.
 
-=head1 OPTIONS
+  =head1 OPTIONS
 
-The following options are available:
+  The following options are available:
 
 
 
