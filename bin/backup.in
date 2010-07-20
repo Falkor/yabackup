@@ -53,10 +53,14 @@ sub print::warning(@);
 sub print::warn(@);
 sub print::hash_content($@);
 
+sub sync::set_backup_target_to_drive($);
 sub sync::set_cmd();
 sub sync::parse_target_url();
 
+
 sub config::ensure_profile_set(@);
+sub config::getPasswordFromFile($$);
+sub config::getPasswordForEntry($);
 sub config::reset_settings();
 sub config::set_profile($);
 
@@ -73,6 +77,7 @@ sub system::execute(@);
 sub system::getIPs();
 sub system::getIPFromInterface(@);
 sub system::has_directory(@);
+sub system::mount_encfs($$@);
 sub system::remote_execute_by_ssh($$@);
 
 
@@ -451,6 +456,13 @@ use strict;
 use warnings;
 use Data::Dumper;
 
+# List of mounted volume through the backup process, per mount type
+our %MOUNTED_VOLUMES = (
+                        'afp'          => undef,
+                        'drive'        => undef,
+                        'encfs'        => undef,
+                        'sparsebundle' => undef,
+                       );
 
 ####
 # check the presence of the binaries @_ on the local system using 'which'
@@ -493,8 +505,6 @@ sub has_directory(@) {
           }
     }
 }
-
-
 
 #####
 # execute a local command
@@ -551,6 +561,46 @@ sub getIPFromInterface(@) {
     return;
 }
 
+####
+# Mount a local EncFS folder
+# Usage: mount_encfs(rawdir, mountpoint [, password])
+###
+sub mount_encfs($$@) {
+    my $rawdir     = shift;
+    my $mountpoint = shift;
+    print::verbose("=> prepare to mount the EncFS directory '$mountpoint'");
+
+    # Ensure the encfs program is available
+    system::check_binary('encfs');
+    # Retrieve the password
+    my $password   = (@_) ? shift : config::getPasswordForEntry("encfs://$mountpoint");
+
+    print::debug("EncFS rawdir     : $rawdir");
+    print::debug("EncFS mountpoint : $mountpoint");
+    print::debug("EncFS mount passphrase : $password");
+
+    # Analyze the EncFS raw directory
+    unless ( -d "$rawdir" ) {
+        print::warning("Unable to find the EncFS raw directory $rawdir");
+        # throw an exception if run in quiet mode
+        ibackup::Exception::DirectoryNotFound->throw(error => "EncFS raw directory not found")
+            if ($config::QUIET);
+        print::warning("=> about to create the directory $rawdir");
+        print::really_continue();
+        system::execute("mkdir -p $rawdir") && print::error_and_exit("Unable to create directory $rawdir");
+
+
+        #execute("mkdir $mount_point") && PRINT_ERROR_THEN_EXIT("Unable to create directory $mount_point\n");
+    }
+
+
+    # Ensure you deal with a valid EncFS directory
+
+
+}
+
+
+
 #####
 # execute a command on a remote server by ssh
 # usage: ssh_remote_execute("user@host", port, "command")
@@ -561,6 +611,7 @@ sub remote_execute_by_ssh($$@) {
     my $cmd = "ssh -p $port $host @command 1>/dev/null";
     return system::execute($cmd);
 }
+
 
 ##############################################################################
 # PACKAGE sync
@@ -583,6 +634,49 @@ our %BACKUP_CMD_INFO = (
                        );
 our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
+
+###
+# setup the target of the backup command to an external drive or a local directory
+# usage: set_backup_target_to_drive(path)
+##
+sub set_backup_target_to_drive($) {
+    my $path = shift;
+    $BACKUP_CMD_INFO{'dst'} = format::interpret_cmd($path);
+    # Ensure the target drive starts with a '/'
+    if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
+        print::warning("The target drive path ($BACKUP_CMD_INFO{'dst'})",
+                       "does not starts with a '/' => '/' character added\n");
+        $BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
+    }
+    # Now ensure the target directory exists
+    unless ( -d "$BACKUP_CMD_INFO{'dst'}") {
+        ibackup::Exception::DirectoryNotFound->throw(error => "The target $BACKUP_CMD_INFO{'dst'} cannot be found");
+    }
+    # Add the drive to the list of mounted volumes
+    push(@{$system::MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'})
+      unless ($BACKUP_CMD_INFO{'proto'} eq 'file');
+    if (defined $config::SETTINGS{'encfs_rawdir'}) {
+        system::mount_encfs($config::SETTINGS{'encfs_rawdir'}, $path)
+    }
+}
+
+
+###
+# setup the target of the backup command to a remote server reachable by SSH
+# usage: set_backup_target_to_ssh_server(user, server, port)
+##
+sub set_backup_target_to_ssh_server($$$) {
+    my ($user, $server, $port) = @_;
+    $BACKUP_CMD_INFO{'port'}   = $port;
+    $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
+    if ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync') {
+	$BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
+	$BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:";
+    } else {
+        ibackup::Exception::ConfigFileFormat->throw(error => "The use of duplicity is not yet supported");
+    }
+}
+
 
 ####
 # Configure the synchronization command to be executed (This assumes the hash
@@ -631,25 +725,25 @@ sub parse_target_url() {
     $BACKUP_CMD_INFO{'proto'}  = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
 
-    my $set_to_msg="set the backup destination to ";
+    my $set_to_msg="=> set the backup destination to";
 
-    # Handle each prototype
+    # Handle each protocol
     if ($proto eq 'drive') {
         print::verbose("$set_to_msg the external drive $target\n");
         set_backup_target_to_drive($target);
     } elsif ($proto eq 'file') {
         print::verbose("$set_to_msg the local directory $target\n");
         set_backup_target_to_drive($target);
+    } elsif ($proto eq 'ssh') {
+        unless ($user && $server) {
+            ibackup::Exception::ConfigFileFormat->throw(error => "Configuration file format error: Malformed ssh target $target");
+        }
+        $port = 22 unless ($port);
+        print::verbose("$set_to_msg the remote server $server");
+        print::verbose("\t SSH connexion to be established (user: $user - port: $port)");
+        set_backup_target_to_ssh_server($user, $server, $port);
     }
 
-
-
-    #     # Local directory
-    #     case 'file'
-    #       {
-    #        verbose("\tsetup target on the local directory $target\n");
-    #        setup_target_drive($target);
-    #       }
     #         # Remote server reacheable by ssh
     #         case 'ssh'
     #           {
@@ -683,10 +777,6 @@ sub parse_target_url() {
 
 
 }
-
-
-
-
 
 
 ##############################################################################
@@ -733,7 +823,7 @@ our @OS = qx(uname);      # Current OS
 our %SETTINGS = (
                  'use_duplicity'         => 'no',
                  'log_file'              => undef, # TODO: NOW log dir
-                 'pass_file'             => undef,
+                 'password_file'         => undef,
                  'patternfile_exclude'   => undef,
                  'restrict_on_subnet'    => undef,
                  'src_rootdir'           => '/',
@@ -745,6 +835,7 @@ our %SETTINGS = (
                  'target_url'            => undef,
                  'logdir'                => undef,
                  'email'                 => undef,
+                 'encfs_rawdir'          => undef,
                 );
 our %DEFAULT_SETTINGS = %SETTINGS;
 lock_hash(%DEFAULT_SETTINGS);   # for extra safety
@@ -836,6 +927,48 @@ sub ensure_profile_set(@) {
         }
     }
 }
+
+####
+# Retrieve password entry from file formatted as follows: 
+#       entry_name1    password1
+#       entry_name2    password2
+#       .....
+#
+# usage: config::getPasswordFromFile(password_file, entry)
+##
+sub getPasswordFromFile($$) {
+    my $file = shift;
+    my $entry = shift;
+    my $password = "";
+    my $found = 0;
+    open(FILE, "$file") || die("Cannot open $file: $!\n");
+    while (<FILE>) {
+	chomp;
+	next unless (/\s*$entry\s+(.*)/);
+	$password = $1;
+	print::debug("Found password for the entry '$entry' in file $file");
+	$found = 14; #psh psh
+        last;
+    }
+    close FILE;
+    ibackup::Exception::ConfigFileFormat->throw(error => "Could not retrieve the password for the entry '$entry' in the password file '$file'") unless ($found);
+    return $password;
+}
+
+####
+# As above, using the password_file $config::SETTINGS{'password_file'}
+# usage: config::getPasswordForEntry(entry)
+##
+sub getPasswordForEntry($) {
+    my $entry = shift;
+    ibackup::Exception::ConfigFileFormat->throw(error => "No password file defined in $config::file (you should set the 'password_file' directive)")
+        unless (defined $config::SETTINGS{'password_file'});
+    my $password_file  = $config::SETTINGS{'password_file'};
+    ibackup::Exception::ConfigFileFormat->throw(error => "Password file $password_file not found!") 
+        unless ( -f "$password_file" );
+    return getPasswordFromFile($password_file, $entry);
+}
+
 
 
 ##############################################################################
@@ -1084,7 +1217,7 @@ Here is a illustrative examples:
 
     # Definition of the backup on the company NAS (via AFP access)
     <nas>
-          # backup through AFP (eventually put the password in a separate file and use the directive 'pass_file')
+          # backup through AFP (eventually put the password in a separate file and use the directive 'password_file')
   target_url  = afp://mylogin:mypassword@nas.company.com/volname
   dst_rootdir = myBackup               # Root directory for the backup
   restrict_on_subnet = 10.7.14         # backup only when you're working
