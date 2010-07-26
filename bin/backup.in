@@ -81,10 +81,12 @@ sub system::check_remote_has_file_over_ssh($$@);
 sub system::check_remote_binary_over_ssh($$@);
 sub system::check_subnet($@);
 sub system::execute(@);
+sub system::execute_and_set_stdin($$);
 sub system::getIPs();
 sub system::getIPFromInterface(@);
 sub system::mount_encfs($$);
 sub system::remote_execute_over_ssh($$@);
+sub system::umount_mounted_volumes();
 
 
 ##############################################################################
@@ -460,11 +462,12 @@ package system;
 
 use strict;
 use warnings;
-use Cwd; # dor realpath
+use Cwd;                        # for realpath
 use File::Basename;
 use Data::Dumper;
 use Term::ReadKey;
 use Exception::Class::TryCatch;
+use Expect;
 
 # List of mounted volume through the backup process, per mount type
 our %MOUNTED_VOLUMES = (
@@ -682,6 +685,31 @@ sub execute(@) {
     return $exit_status;
 }
 
+
+#####
+# execute a local command that expect something on stdin fed with the value of
+# the second argument. Very useful to run a command that expect a password on
+# stdin (ex: -S option of encfs)
+#
+# Usage: execute_and_set_stdin("command", "expected_value");
+##
+sub execute_and_set_stdin($$) {
+    my $cmd                = shift;
+    my $stdin_expected_val = shift;
+    print::debug('[' . (caller(0))[3] . "] $cmd\n");
+    if ($config::SIMULATION_MODE) {
+        print format::color_msg('bold', "$cmd")
+    } else {
+        open my $encfs_exec, '|-', "$cmd" or die "Could not fork $cmd: $!";
+        print {$encfs_exec} "$stdin_expected_val\n";
+        close ($encfs_exec);
+    }
+    my $exit_status = $?;
+    print::debug('[' . (caller(0))[3] . "] exit status : $exit_status\n");
+    return $exit_status;
+}
+
+
 ######
 # get current IPs adresses using ifconfig.
 # return an hash table associating an interface name with an IP and a state (up or down)
@@ -742,11 +770,15 @@ sub mount_encfs($$) {
     my $rawdir     = undef;
     my $mountpoint = shift;
     my $password   = (@_) ? shift : undef;
+    # convenient variables
     my $proto = $sync::BACKUP_CMD_INFO{'proto'};
+    my $passfile_entry =
+      "$sync::BACKUP_CMD_INFO{'proto'}+encfs://$sync::BACKUP_CMD_INFO{'dst'}";
 
-    print::verbose("=> prepare to mount the target '$sync::BACKUP_CMD_INFO{'dst'}' using EncFS");
+    print::info("=> prepare to mount the target '$sync::BACKUP_CMD_INFO{'dst'}'",
+                "using EncFS");
 
-    # Ensure the encfs program is available (locally)
+    # Ensure the encfs program is available
     system::check_binary('encfs') unless ($proto eq 'ssh');
     system::check_remote_binary_over_ssh($sync::BACKUP_CMD_INFO{'target'},
                                          $sync::BACKUP_CMD_INFO{'port'},
@@ -769,7 +801,7 @@ sub mount_encfs($$) {
         $rawdir = Cwd::realpath("$mountpoint" . '/' . "$rawdir_url");
     }
     print::debug("EncFS rawdir : $rawdir");
-    ibackup::Exception::RuntimeError->throw(error => 
+    ibackup::Exception::RuntimeError->throw(error =>
                                             "The dirname of an EncFS rawdir cannot correspond to the mountpoint")
         if (dirname($rawdir) eq "$mountpoint");
 
@@ -793,34 +825,45 @@ sub mount_encfs($$) {
             # framework of a cronjobs) or in restore mode, rethrow the error
             $err->rethrow if ($config::QUIET or $config::RETRIEVE_MODE);
             # Otherwise, ask for the creation of an EncFS directory
-            # Pre-requisite: the mount point is empty!
-            print::warning("$rawdir' is not a valid EncFS raw directory");
-            print::warning("=> about to create an encrypted virtual filesystem for the target directory '$sync::BACKUP_CMD_INFO{'dst'}'");
-            print::warning("   The encrypted data will be stored in the EncFS raw directory '$rawdir'");
-            print::really_continue();
             my $encfs_cmd = "encfs --standard $rawdir $mountpoint";
-            $encfs_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} $encfs_cmd" if ($proto eq 'ssh');
+            my $note_on_passfile =
+              "If you plan to use this profile in a cronjob, ".
+                "don't forget to place the EncFS password in a password file ".
+                  "(specified by the directive 'password_file' in the ".
+                    "configuration file) i.e an entry as follows:\n".
+                      "\n\t$passfile_entry\tyour_clear_password_here\n\n".
+                        "Of course, ensure the password file is readable only by you ".
+                          "('chmod 600 /path/to/passfile')";
+            print::warning("$rawdir' is not a valid EncFS raw directory");
+            ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                          "The creation of an encrypted virtual filesystem for the target directory '$sync::BACKUP_CMD_INFO{'dst'}' is not supported over SSH.\n" .
+                                                          "You should create the EncFS volume manually, typically by issuing the following command ON THE SERVER:\n\n\t$encfs_cmd\n\n".
+                                                          "$note_on_passfile")
+                if ($proto eq 'ssh');
+            print::warning("=> about to create an encrypted virtual filesystem ",
+                           "for the target directory '$sync::BACKUP_CMD_INFO{'dst'}'");
+            print::warning("   The encrypted data will be stored in the EncFS raw ",
+                           "directory '$rawdir'");
+            print::really_continue();
             system::execute("$encfs_cmd");
             if ($? != 0) {
                 ibackup::Exception::RuntimeError->throw(error =>
                                                         "Could not create the EncFS directory $mountpoint");
             }
+            print::info(format::color_msg('bold', 'Important note:'), "$note_on_passfile");
+            push(@{ $system::MOUNTED_VOLUMES{'encfs'} }, $sync::BACKUP_CMD_INFO{'dst'});
+            return;
         } else {
             $err->rethrow;
         }
     }
 
-
-
-
     # Eventually retrieve the password of the encfs mount that can be either
     # present in the password file (i.e. in $config::SETTINGS{'password_file'})
-    # or prompted to the user (which is not possible in quiet mode) try to get
-    # it from the password file
+    # or prompted to the user (which is not possible in quiet mode)
     unless (defined $password) {
         eval {
-            $password = config::getPasswordForEntry("$sync::BACKUP_CMD_INFO{'proto'}" .
-                                                    "+encfs://$sync::BACKUP_CMD_INFO{'dst'}");
+            $password = config::getPasswordForEntry("$passfile_entry");
         };
         # catch
         if ( catch my $err ) {
@@ -852,22 +895,21 @@ sub mount_encfs($$) {
     ibackup::Exception::PasswordNotFound->throw(error => "Empty EncFS password")
         if ($password eq "");
 
+    # Now mount the EncFS volume and do not expose the password
+    my $encfs_cmd = "encfs --stdinpass --idle=1 $rawdir $mountpoint";
+    $encfs_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} $encfs_cmd"
+      if ($proto eq 'ssh');
 
-
-    #     unless ( -f ".encfs*" ) {
-    #         print::warning("$rawdir is not a valid EncFS rawdir");
-
-    #     }
-
-
-
-
-
-
-    # Ensure you deal with a valid EncFS directory
-
-
-
+    system::execute_and_set_stdin("$encfs_cmd", "$password");
+    # could have been (but this expose the password):
+    # system::execute("echo $password | $encfs_cmd");
+    if ($? != 0) {
+        ibackup::Exception::RuntimeError->throw(error =>
+                                                "Could not mount the EncFS volume $mountpoint");
+    }
+    sleep 1;
+    push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
+         ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
 
 }
 
@@ -883,6 +925,39 @@ sub remote_execute_over_ssh($$@) {
 }
 
 
+#####
+# Umount previously mounted volumes (stored in $system::MOUNTED_VOLUMES)
+# Usage: system::umount_mounted_volumes()
+###
+sub umount_mounted_volumes() {
+    sleep 1;
+    print::debug("List of mounted volumes to unmount:\n" . Dumper \%MOUNTED_VOLUMES);
+    # (bad) Hack to unmount first sparsebundle then afp ;)
+    foreach my $proto (reverse sort keys %system::MOUNTED_VOLUMES) {
+        if (defined ($system::MOUNTED_VOLUMES{$proto})) {
+            my $umount_cmd = undef;
+            $umount_cmd = "umount "       if ($proto =~ "drive|afp|encfs");
+            $umount_cmd = "fusermount -u" if (($proto =~ "encfs") and ($config::OS[0] =~ "Linux"));
+            # TODO: remote umount for ssh+encfs : check remote OS (for umount or fusermount)
+            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u" 
+              if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
+            $umount_cmd = "hdiutil detach -quiet " if ($proto eq 'sparsebundle');
+            print::error_and_exit(1, "No unmount command set!") unless (defined $umount_cmd);
+
+            foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
+                print::info("Unmounting the volume $vol (mounted via $proto)\n");
+                system::execute("$umount_cmd $vol");
+                if ($? != 0) {
+                    ibackup::Exception::RuntimeError->throw(error =>
+                                                            "Unable to unmount $vol (using the command '$umount_cmd': $!");
+                }
+            }
+        }
+    }
+}
+
+
+
 ##############################################################################
 # PACKAGE sync
 # Handle all synchronization aspects etc.
@@ -890,6 +965,7 @@ sub remote_execute_over_ssh($$@) {
 package sync;
 
 use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Cwd;                        # for realpath
 
 # Store information on the synchronization command to be issued
 our %BACKUP_CMD_INFO = (
@@ -961,7 +1037,7 @@ sub set_cmd() {
     # backup, ensuring this directory exists
     my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
     system::check_has_directory( $src_rootdir );
-    $BACKUP_CMD_INFO{'src'} = $src_rootdir;
+    $BACKUP_CMD_INFO{'src'} = Cwd::realpath($src_rootdir);
 
     # Set the backup destination by analysing the target_url
     sync::parse_target_url();
@@ -1206,7 +1282,10 @@ sub ensure_profile_set(@) {
 sub getPasswordFromFile($$) {
     my $file = shift;
     my $entry = my $entry_regexp = shift;
-    $entry_regexp =~ s/\+/\\\+/; # handle the protocol part
+    $entry_regexp =~ s/\+/\\\+/;   # handle the protocol part
+    $entry_regexp =~ s/\/{0,2}$//; # remove trailing slash
+    print::error_and_exit(1, "Empty regular expression to find (associated entry: $entry)")
+        if ($entry_regexp eq '');
     my $password = "";
     my $found = 0;
     open(FILE, "$file") || die("Cannot open $file: $!\n");
@@ -1397,6 +1476,10 @@ foreach my $sec (@config::backup_sections) {
                                    'include_dir', 'target_url');
         sync::set_cmd();
 
+
+
+        # Clean
+        system::umount_mounted_volumes();
     };
     # catch
     if ( catch my $err ) {
