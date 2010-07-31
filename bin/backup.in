@@ -54,9 +54,12 @@ sub print::warn(@);
 sub print::hash_content($@);
 
 sub sync::parse_target_url();
+sub sync::run_cmd();
+sub sync::select_elements();
 sub sync::set_backup_target_to_drive($);
 sub sync::set_backup_target_to_ssh_server($$$);
 sub sync::set_cmd();
+sub sync::set_cmd_options();
 
 sub config::ensure_profile_set(@);
 sub config::getPasswordFromFile($$);
@@ -66,6 +69,7 @@ sub config::set_profile($);
 
 sub format::color_msg($@);
 sub format::interpret_cmd($);
+sub format::listdir_from($$);
 
 sub hash::has_keys($@);
 
@@ -150,30 +154,40 @@ sub error_and_exit($@) {
 ######
 # Send a graphical notification to the user (using growl under Mac or
 # notify-send under Linux)
-# usage: notification(title, text [, priority])
+# usage: notification(title, text [, priority] [, icon_type])
 ##
 sub notification($$@) {
-    my $title    = shift;
-    my $text     = shift;
-    my $priority = shift;
-    $priority    = defined($priority) ? $priority : 0;
+    my $title     = shift;
+    my $text      = shift;
+    my $priority  = shift;
+    $priority     = defined($priority) ? $priority : 0;
+    my $icon_type = shift;
+    my $icon      = "$config::iconsdir/ibackupApplicationIcon.png";
+    if (defined $icon_type) {
+        if ($icon_type =~ /^OK$/i) {
+            $icon = "$config::iconsdir/ibackupOKIcon.png";
+        } elsif ($icon_type =~ /^Warning$/i) {
+            $icon = "$config::iconsdir/ibackupWarningIcon.png";
+        } else {
+            $icon = $icon_type;
+        }
+    }
+    print::debug("icon = $icon");
     my $notify_cmd="";
-
     # Select notification system based on system
     if ($config::OS[0] =~ "Darwin") { # Mac OS X: use growlnotify
         $priority = max(min($priority, 2), -2);
         $notify_cmd =
-          'growlnotify -p ' . $priority .
-            ' -n '.$config::command.' -a \'iSync\' \'' . $title . '\' '.
-              '-m \''. $text .'\' > /dev/null 2>&1';
+          "growlnotify -p '$priority' -n '$config::command' --image '$icon' '" . 
+            $title . "' -m '$text' > /dev/null 2>&1";
     } elsif ($config::OS[0] =~ "Linux") {
         $priority = max(min($priority, 1), -1) +1;
         my @levels = ("low", "normal", "critical");
         $notify_cmd =
           'notify-send -u ' . $levels[$priority] .
-            ' -i gtk-dialog-info \'' . $title . '\' \'' . $text . '\'';
+            ' -i $icon \'' . $title . '\' \'' . $text . '\'';
     } else {
-        print::warning('ibackup do not support graphical notification for the ',
+        print::warning('$config::command do not support graphical notification for the ',
                        $config::OS[0], " OS\n");
     }
     system::execute($notify_cmd);
@@ -183,7 +197,9 @@ sub notification($$@) {
 # Ask the user is he wishes to continue.
 ##
 sub really_continue() {
-    print "Are you sure you want to continue? [yN] ";
+    print "\n => ",
+      format::color_msg('bold', 'Are you sure'),
+          ' you want to continue? [yN]: ';
     chomp(my $ans = <STDIN>);
     unless ($ans && ($ans =~ /y|yes|1/i)) {
         #sync::clean_after_sync();
@@ -235,8 +251,17 @@ use Term::ANSIColor; # To send the ANSI color-change sequences to the user's ter
 # return a colored message (coloration only appens in the terminal typically)
 ###
 sub color_msg($@) {
-    my $color = shift;
-    return  Term::ANSIColor::color("$color") . "@_" . Term::ANSIColor::color("reset");
+    my @colorlist = split(' ', shift);
+    my $res = "";
+    foreach (@colorlist) {
+        $res .= Term::ANSIColor::color("$_");
+    }
+    $res .= "@_";
+    foreach (@colorlist) {
+        $res .= Term::ANSIColor::color('reset');
+    }
+    return $res;
+    #    return  Term::ANSIColor::color("$color") . "@_" . Term::ANSIColor::color("reset");
 }
 
 ####
@@ -257,6 +282,78 @@ sub interpret_cmd($) {
     return $res;
 }
 
+####
+# Given a space separated list of patterns and a root directory, return the list
+# of effective file/directory names inside the rootdir that match the patterns.
+# In particular, expand the wildcards '*' present in the string list and permit
+# more complicated expansion based on ^ and $ characters (to match beginning and
+# end of name).
+#
+# Usage: @res = format::listdir_from("pattern list", "rootdir")
+#
+# Example: format::listdir_from('*', '/home/login') return the complete list of
+# files/directories contained in the folder /home/login (i.e. most probably the
+# homedir of the user 'login')
+##
+sub listdir_from($$) {
+    my $patternlist = shift;
+    my @patterns = split(/\s+/, $patternlist);
+    return @patterns if ($patternlist !~ /\*/);
+
+    my $rootdir = shift;
+    my @res = ();
+    #    for my $index (0 .. scalar(@patterns)-1) {
+    for my $index (0 .. @patterns-1) {
+        my $pattern = $patterns[$index];
+        if ($pattern !~  /\*|\^|\$/) {
+            push(@res, $pattern);
+            next;
+        } else {
+            my $tmp_pattern = $pattern;
+            opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
+            $tmp_pattern =~ s/\./\\\./g;       # proceed with the '.' characters
+            $tmp_pattern =~ s/\*/\.\*/g;       # proceed with the '*' characters
+            my @element_list = map { $_->[0] } # extract subdir name
+              #              grep { -d $_->[1] }              # check absolute path is a dir
+              map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
+                grep { !/^\.\.$/}            # filter out .. entry
+                  grep { !/^\.$/}            # filter out . entry
+                    grep { /$tmp_pattern/ }  # apply pattern filter
+                      readdir(DIR);
+            closedir(DIR);
+            push(@res, @element_list);
+        }
+    }
+    return @res;
+}
+
+##############################################################################
+# PACKAGE ARRAY
+# Toolkit for managing perl arrays
+##############################################################################
+package array;
+use strict;
+use warnings;
+
+####
+# Construct the difference between two arrays @A and @B i.e the elements in @A
+# that are not in @B
+# Usage: @diff = array::get_difference(\@A, \@B)
+##
+sub get_difference($$) {
+    my $a_ref = shift;
+    my $b_ref = shift;
+    my %seen = ();              # lookup table
+    my @res = ();               # initialize the final receip
+    @seen{@{$b_ref}} = ();      # build lookup table
+    foreach my $item (@{$a_ref}) {
+        push(@res, $item) unless exists $seen{$item};
+    }
+    return @res;
+}
+
+
+
 ##############################################################################
 # PACKAGE HASH
 # Toolkit for managing perl hashes
@@ -276,7 +373,7 @@ sub has_keys($@) {
     my $res = 1;
     foreach my $field (@_) {
         if (not exists($hash_ref->{$field})) {
-            print::warning("The key $field do not exist");
+            print::warning("The key '$field' do not exist");
             $res = 0;
         }
     }
@@ -360,7 +457,7 @@ sub initialize(@) {
                              log_to   => "STDOUT",
                              maxlevel => 7,
                              minlevel => 7,
-                             timeformat      => "$timeformat",
+                             timeformat      => "", #$timeformat",
                              message_layout  => "$debug_msg_layout",
                             }
                  );
@@ -371,7 +468,7 @@ sub initialize(@) {
                              log_to   => "STDOUT",
                              maxlevel => 6,
                              minlevel => 5,
-                             timeformat      => "$timeformat",
+                             timeformat      => "", #$timeformat",
                              message_layout  => "$msg_layout",
                             }
                  );
@@ -383,7 +480,7 @@ sub initialize(@) {
                              log_to   => "STDERR",
                              maxlevel => 4,
                              minlevel => 4,
-                             timeformat      => "$timeformat",
+                             timeformat      => "", #$timeformat",
                              message_layout  => "$warning_msg_layout",
                             }
                  );
@@ -393,9 +490,9 @@ sub initialize(@) {
     $handler->add(
                   screen => {
                              log_to   => "STDERR",
-                             maxlevel => 3, # error
-                             minlevel => 0, # emerg
-                             timeformat      => "$timeformat",
+                             maxlevel => 3,         # error
+                             minlevel => 0,         # emerg
+                             timeformat      => "", #$timeformat",
                              message_layout  => "$error_msg_layout",
                             }
                  );
@@ -515,12 +612,12 @@ sub check_remote_binary_over_ssh($$@) {
 sub check_subnet($@) {
     my $subnet = shift;
     my $IP = (@_) ? getIPFromInterface($_[0]) : getIPFromInterface();
-    print::verbose("=> check subnet $subnet (current IP address found: $IP)");
+    print::verbose("=> check subnet '$subnet' (current IP address found: '$IP')");
     my $pattern=$subnet;
     $pattern =~ s/\./\\\./g;    # proceed with the '.' characters
     if ($IP !~ /$pattern/) {
         ibackup::Exception::Network->throw(error =>
-                                           "The IP adress $IP does not belong to the subnet $subnet");
+                                           "Network error: the IP adress '$IP' does not belong to the subnet '$subnet'");
     }
 }
 
@@ -668,8 +765,6 @@ sub check_remote_has_directory_or_create_over_ssh($$@) {
         }
     }
 }
-
-
 
 #####
 # execute a local command
@@ -897,8 +992,9 @@ sub mount_encfs($$) {
 
     # Now mount the EncFS volume and do not expose the password
     my $encfs_cmd = "encfs --stdinpass --idle=1 $rawdir $mountpoint";
-    $encfs_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} $encfs_cmd"
-      if ($proto eq 'ssh');
+    $encfs_cmd =
+      "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} " .
+        "$encfs_cmd" if ($proto eq 'ssh');
 
     system::execute_and_set_stdin("$encfs_cmd", "$password");
     # could have been (but this expose the password):
@@ -907,6 +1003,8 @@ sub mount_encfs($$) {
         ibackup::Exception::RuntimeError->throw(error =>
                                                 "Could not mount the EncFS volume $mountpoint");
     }
+    print::notification('$config::command',
+                        "Encfs Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully mounted");
     sleep 1;
     push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
          ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
@@ -931,7 +1029,6 @@ sub remote_execute_over_ssh($$@) {
 ###
 sub umount_mounted_volumes() {
     sleep 1;
-    print::debug("List of mounted volumes to unmount:\n" . Dumper \%MOUNTED_VOLUMES);
     # (bad) Hack to unmount first sparsebundle then afp ;)
     foreach my $proto (reverse sort keys %system::MOUNTED_VOLUMES) {
         if (defined ($system::MOUNTED_VOLUMES{$proto})) {
@@ -939,7 +1036,7 @@ sub umount_mounted_volumes() {
             $umount_cmd = "umount "       if ($proto =~ "drive|afp|encfs");
             $umount_cmd = "fusermount -u" if (($proto =~ "encfs") and ($config::OS[0] =~ "Linux"));
             # TODO: remote umount for ssh+encfs : check remote OS (for umount or fusermount)
-            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u" 
+            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u"
               if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
             $umount_cmd = "hdiutil detach -quiet " if ($proto eq 'sparsebundle');
             print::error_and_exit(1, "No unmount command set!") unless (defined $umount_cmd);
@@ -951,6 +1048,7 @@ sub umount_mounted_volumes() {
                     ibackup::Exception::RuntimeError->throw(error =>
                                                             "Unable to unmount $vol (using the command '$umount_cmd': $!");
                 }
+                pop @{$MOUNTED_VOLUMES{$proto}};
             }
         }
     }
@@ -964,112 +1062,23 @@ sub umount_mounted_volumes() {
 ##############################################################################
 package sync;
 
+use Storable qw(dclone);        # for recursive copy of nested hash
 use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
 use Cwd;                        # for realpath
 
 # Store information on the synchronization command to be issued
 our %BACKUP_CMD_INFO = (
-                        'basecmd'     => 'rsync',
-                        'opt'         => '',
-                        'src'         => undef,
-                        'dst'         => undef,
-                        'dirs'        => undef,
-                        'proto'       => undef,
-                        'port'        => undef,
-                        'target'      => undef,
+                        'basecmd'  => 'rsync', # synchronization command
+                        'opt'      => '',      # command-line options
+                        'src'      => undef,   # source
+                        'dst'      => undef,   # destination
+                        'tosync'   => undef,   # list of element names to sync
+                        'proto'    => undef,   # protocol used
+                        'port'     => undef,   # port number on backup target
+                        'target'   => undef,   # backup target
                        );
 our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
-
-###
-# setup the target of the backup command to an external drive or a local directory
-# usage: set_backup_target_to_drive(path)
-##
-sub set_backup_target_to_drive($) {
-    my $path = shift;
-    $BACKUP_CMD_INFO{'dst'} = format::interpret_cmd($path);
-    # Ensure the target drive starts with a '/'
-    if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
-        print::warning("The target drive path ($BACKUP_CMD_INFO{'dst'})",
-                       "does not starts with a '/' => '/' character added\n");
-        $BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
-    }
-
-    # Ensure the drive is present
-    if ($BACKUP_CMD_INFO{'proto'} eq 'drive') {
-        ibackup::Exception::DirectoryNotFound->throw(error => "The drive $BACKUP_CMD_INFO{'dst'} is not mounted")
-            unless ( -d "$BACKUP_CMD_INFO{'dst'}");
-        push(@{$system::MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
-    }
-}
-
-###
-# setup the target of the backup command to a remote server reachable by SSH
-# usage: set_backup_target_to_ssh_server(user, server, port)
-##
-sub set_backup_target_to_ssh_server($$$) {
-    my ($user, $server, $port) = @_;
-    # Check the SSH connectivity
-    system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
-        ibackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
-
-    $BACKUP_CMD_INFO{'port'}   = $port;
-    $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
-    ibackup::Exception::UnsupportedFeature->throw(error =>
-                                                  "The use of duplicity (or anything different than rsync) is not yet supported")
-        unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
-    $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
-    $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:";
-}
-
-
-####
-# Configure the synchronization command to be executed (This assumes the hash
-# $config::SETTINGS is correctly populated)
-# This function may throw the following exceptions:
-##
-sub set_cmd() {
-    if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
-        ibackup::Exception::UnsupportedFeature->throw(error =>
-                                                      "The use of duplicity is not yet supported");
-    }
-    # Set the backup source i.e the root directory of the local folders to
-    # backup, ensuring this directory exists
-    my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
-    system::check_has_directory( $src_rootdir );
-    $BACKUP_CMD_INFO{'src'} = Cwd::realpath($src_rootdir);
-
-    # Set the backup destination by analysing the target_url
-    sync::parse_target_url();
-
-    # Analyze the dst_rootdir to eventually complement $BACKUP_CMD_INFO{'dst'}
-    my $dst_rootdir = format::interpret_cmd($config::SETTINGS{'dst_rootdir'});
-    $BACKUP_CMD_INFO{'dst'} .= '/' unless ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
-    $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir";
-    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
-    # Ensure the destination directory exists (or propose its creation if not in
-    # QUIET mode
-    if ($BACKUP_CMD_INFO{'proto'} ne 'ssh') {
-        system::check_has_directory_or_create($BACKUP_CMD_INFO{'dst'});
-    } else {
-        system::check_remote_has_directory_or_create_over_ssh($BACKUP_CMD_INFO{'target'},
-                                                              $BACKUP_CMD_INFO{'port'},
-                                                              "$dst_rootdir");
-    }
-
-    # Now handle an eventual EncFS folder encryption on the target (folder or
-    # volume) characterized by the presence of the directive 'encfs_rawdir' in
-    # the configuration file
-    if (defined $config::SETTINGS{'encfs_rawdir'}) {
-        system::mount_encfs($config::SETTINGS{'encfs_rawdir'},
-                            ($BACKUP_CMD_INFO{'proto'} ne 'ssh') ? "$BACKUP_CMD_INFO{'dst'}" : "$dst_rootdir");
-    }
-
-
-
-
-}
-
 
 ####
 # Analyse the target url (stored in $config::SETTINGS{'target_url'} normally)
@@ -1077,7 +1086,8 @@ sub set_cmd() {
 ##
 sub parse_target_url() {
     unless (defined($config::SETTINGS{'target_url'})) {
-        ibackup::Exception::ConfigFileFormat->throw(error => "Undefined target_url for this profile");
+        ibackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "Undefined target_url for this profile");
     }
     $config::SETTINGS{'target_url'} = format::interpret_cmd("$config::SETTINGS{'target_url'}");
     # let the Perl magic operate here:
@@ -1120,6 +1130,216 @@ sub parse_target_url() {
     }
 }
 
+###
+# setup the target of the backup command to an external drive or a local directory
+# usage: set_backup_target_to_drive(path)
+##
+sub set_backup_target_to_drive($) {
+    my $path = shift;
+    $BACKUP_CMD_INFO{'dst'} = format::interpret_cmd($path);
+    # Ensure the target drive starts with a '/'
+    if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
+        print::warning("The target drive path ($BACKUP_CMD_INFO{'dst'})",
+                       "does not starts with a '/' => '/' character added\n");
+        $BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
+    }
+
+    # Ensure the drive is present
+    if ($BACKUP_CMD_INFO{'proto'} eq 'drive') {
+        ibackup::Exception::DirectoryNotFound->throw(error => "The drive $BACKUP_CMD_INFO{'dst'} is not mounted")
+            unless ( -d "$BACKUP_CMD_INFO{'dst'}");
+        push(@{$system::MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+    }
+}
+
+###
+# setup the target of the backup command to a remote server reachable by SSH
+# usage: set_backup_target_to_ssh_server(user, server, port)
+##
+sub set_backup_target_to_ssh_server($$$) {
+    my ($user, $server, $port) = @_;
+    # Check the SSH connectivity
+    system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
+        ibackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
+
+    $BACKUP_CMD_INFO{'port'}   = $port;
+    $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
+    ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "The use of duplicity (or anything different than rsync) is not yet supported")
+        unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
+    $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
+    $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:";
+}
+
+####
+# run the synchronization command
+##
+sub run_cmd() {
+    # Warn the user
+    print::info("=> about to",
+                ($config::RETRIEVE_MODE) ? format::color_msg('bold red', "RESTORE") : 'backup',
+                "the following elements: '@{$BACKUP_CMD_INFO{'tosync'}}'",
+                "\n\t  ",
+                ($config::RETRIEVE_MODE) ? 'from' : 'to',
+                "the backup target",
+                format::color_msg('bold', "'$BACKUP_CMD_INFO{'dst'}'"));
+    print::warning("This will",
+                   format::color_msg('bold red',
+                                     uc("overwrite files on your local system")),
+                   "!!!") if ($config::RETRIEVE_MODE);
+    print::really_continue() unless ($config::QUIET);
+    print::notification('Starting ' .
+                        ($config::RETRIEVE_MODE ? 'restoration' : 'backup'),
+                        "From: $BACKUP_CMD_INFO{$config::RETRIEVE_MODE ? 'dst' : 'src'}\n" .
+                        "To: $BACKUP_CMD_INFO{  $config::RETRIEVE_MODE ? 'src' : 'dst'}");
+    my $has_failed = 0;
+    # First proceed the subdirectories
+    my @dirs_to_sync =
+      map { $_->[0] }           # extract subdir name
+        grep { -d $_->[1] }     # filter over directories
+          map  { [ $_, "$BACKUP_CMD_INFO{'src'}/$_" ] } # create name, absolute path
+            @{$BACKUP_CMD_INFO{'tosync'}};
+
+    foreach my $dir (@dirs_to_sync) {
+        print::info('=> proceeding directory ', format::color_msg('bold', "$dir"));
+
+
+    }
+}
+
+####
+# Configure the synchronization command to be executed (This assumes the hash
+# $config::SETTINGS is correctly populated)
+# This function may throw the following exceptions:
+##
+sub set_cmd() {
+    if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
+        ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                      "The use of duplicity is not yet supported");
+    }
+    # Set the backup source i.e the root directory of the local folders to
+    # backup, ensuring this directory exists
+    my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
+    system::check_has_directory( $src_rootdir );
+    $BACKUP_CMD_INFO{'src'} = Cwd::realpath($src_rootdir);
+
+    # Set the backup destination by analysing the target_url
+    sync::parse_target_url();
+
+    # Analyze the dst_rootdir to eventually complement $BACKUP_CMD_INFO{'dst'}
+    my $dst_rootdir = format::interpret_cmd($config::SETTINGS{'dst_rootdir'});
+    $BACKUP_CMD_INFO{'dst'} .= '/'
+      unless (($BACKUP_CMD_INFO{'proto'} eq 'ssh') or ($dst_rootdir =~ /^\//));
+    $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir";
+
+    # Ensure the destination directory exists (or propose its creation if not in
+    # QUIET mode
+    if ($BACKUP_CMD_INFO{'proto'} ne 'ssh') {
+        system::check_has_directory_or_create($BACKUP_CMD_INFO{'dst'});
+    } else {
+        system::check_remote_has_directory_or_create_over_ssh($BACKUP_CMD_INFO{'target'},
+                                                              $BACKUP_CMD_INFO{'port'},
+                                                              "$dst_rootdir");
+    }
+
+    # Now handle an eventual EncFS folder encryption on the target (folder or
+    # volume) characterized by the presence of the directive 'encfs_rawdir' in
+    # the configuration file
+    if (defined $config::SETTINGS{'encfs_rawdir'}) {
+        system::mount_encfs($config::SETTINGS{'encfs_rawdir'},
+                            ($BACKUP_CMD_INFO{'proto'} ne 'ssh') ? "$BACKUP_CMD_INFO{'dst'}" : "$dst_rootdir");
+    }
+
+    # Setup directories to backup/restore i.e set $BACKUP_CMD_INFO{'tosync'}
+    # TODO: better handle restore mode i.e. list element on the target!
+    print::verbose("=> select the elements - file(s)/directorie(s) - to synchronize");
+    sync::select_elements();
+    print::verbose("\t found in $config::SETTINGS{'src_rootdir'}: @{$BACKUP_CMD_INFO{'tosync'}}");
+    ibackup::Exception::RuntimeError->throw(error =>
+                                            "No element found to synchronize!")
+        unless (@{$BACKUP_CMD_INFO{'tosync'}});
+
+    # Set the command-line options i.e populate $BACKUP_CMD_INFO{'opt'}
+    sync::set_cmd_options();
+
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
+}
+
+####
+# Select the elements (files or folders) to synchronize (i.e to backup or to
+# restore) i.e. set $BACKUP_CMD_INFO{'tosync'},
+# $BACKUP_CMD_INFO{'opt'} using the informations given in the configuration file
+# i.e the directives 'sync_include', 'sync_exclude' and
+# 'sync_exclude_exception'.  Note that these directives specialize the treatment
+# of the elements directly UNDER $config::SETTINGS{'src_rootdir'} in the FS
+# hierarchy. Finally,the use of the wildcards * in all 'sync_' directives is
+# supported.
+# For instance '*' select all subdirectories (including the hidden
+# one) of src_rootdir.  You may use more complicated pattern mixing ^, * and $
+# special characters such as
+#        ^AR* : all directories that start with AR
+#        *ES$ : all directories that ends with ES
+#        ^.* : all hidden directories (the one that start by '.')
+#
+# Usage: sync::select_elements
+##
+sub select_elements() {
+    # Construct list of the sub-directories of $config::SETTINGS{'src_rootdir'}
+    # to include in the synchronization
+    config::ensure_profile_set('sync_include');
+    my @sync_include = format::listdir_from($config::SETTINGS{'sync_include'},
+                                            $config::SETTINGS{'src_rootdir'});
+    # Eventually exclude some directories from this list
+    if (defined($config::SETTINGS{'sync_exclude'})) {
+        my @sync_exclude = format::listdir_from($config::SETTINGS{'sync_exclude'},
+                                                $config::SETTINGS{'src_rootdir'});
+        if (defined($config::SETTINGS{'sync_exclude_exception'})) {
+            my @sync_exclude_exception = format::listdir_from($config::SETTINGS{'sync_exclude_exception'},
+                                                              $config::SETTINGS{'src_rootdir'});
+            @sync_exclude = array::get_difference(\@sync_exclude, \@sync_exclude_exception);
+        }
+        @sync_include = array::get_difference(\@sync_include, \@sync_exclude);
+    }
+
+    # Eventually apply the patterns listed in 'exclude_pattern'
+    if (defined($config::SETTINGS{'exclude_pattern'})) {
+        my @additionnal_exclude = format::listdir_from($config::SETTINGS{'exclude_pattern'},
+                                                       $config::SETTINGS{'src_rootdir'});
+        @sync_include = array::get_difference(\@sync_include, \@additionnal_exclude);
+    }
+
+    # populate final receipt for the directories to backup
+    $BACKUP_CMD_INFO{'tosync'} = dclone \@sync_include;
+}
+
+####
+# Specialize the command-line options of the synchronization command
+# i.e. populate $BACKUP_CMD_INFO{'opt'}
+# Usage: sync::set_cmd_options()
+##
+sub set_cmd_options() {
+    if (defined $config::SETTINGS{'exclude_pattern_file'}) {
+        if (-f "$config::SETTINGS{'exclude_pattern_file'}") {
+            $BACKUP_CMD_INFO{'opt'} .= " --exclude-from=$config::SETTINGS{'exclude_pattern_file'}";
+        } else {
+            print::warning("The pattern file for exclusion $config::SETTINGS{'exclude_pattern_file'}",
+                           'does not exists and will be ignored');
+        }
+    }
+    if (defined $config::SETTINGS{'exclude_pattern'}) {
+        foreach my $pattern (split(' ', $config::SETTINGS{'exclude_pattern'})) {
+            $BACKUP_CMD_INFO{'opt'} .= " --exclude='$pattern'";
+        }
+    }
+    # Add classical options
+    $BACKUP_CMD_INFO{'opt'} .= " -avz";
+    $BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change"
+      if ($config::MAC_FORK and ($BACKUP_CMD_INFO{'proto'} ne 'ssh'));
+    #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $config::VERBOSE;
+    $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $config::QUIET;
+    $BACKUP_CMD_INFO{'opt'} .= " $config::SYNC_MODE";
+}
+
 
 ##############################################################################
 # PACKAGE config
@@ -1136,7 +1356,9 @@ use Getopt::Long;
 use Data::Dumper;
 
 # Generic variables
-our $VERSION = '@VERSION@';                 # Script version
+#our $prefix  = "@prefix@";  # Installation prefix (inherited from the autotools)
+our $prefix  = "/usr/local/stow/ibackup-1.0"; 
+our $VERSION = '@VERSION@'; # Script version
 our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@'; # Package summary
 our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@'; # Package website
 our $VERBOSE = 0;            # option variable for verbose mode (default: false)
@@ -1147,15 +1369,23 @@ our $numargs = scalar(@ARGV);   # Number of arguments
 our $command = `basename $0`;   # base command
 chomp($command);
 
+# TODO: remove comment!!!!!!
+#our $iconsdir = "@datarootdir@/icons/$command"; # icons folder (as in Makefile.am)
+our $iconsdir = "/usr/local/stow/ibackup-1.0/share/icons/ibackup"; # icons folder (as in Makefile.am)
+
 # Specific variables
-our $SIMULATION_MODE = 0;       # By default, don't simulate
+our $SIMULATION_MODE   = 0;     # By default, don't simulate
 our $SYNC_MODE = "--update"; # By default, update directories, don't delete obsolete files
-our $HISTORICAL      = 0;   # By default do not keep an history of older backups
-our $MAC_FORK        = 0; # option variable for Mac OS resource forks with default value (false)
-our $NOTIFICATION    = 0; # By default, don't use system user notification feature
-our $RETRIEVE_MODE   = 0; # By default, push data on the backup target and don't retrieve anything
-our $PRE_SCRIPT;          # Complete path to pre-backup script
-our $POST_SCRIPT;         # Complete path to post-backup script
+#our $BACKUP_HISTORY_MODE = 0; # By default do not keep an history of older
+                                # backups (obsolete once duplicity/rdiff-backup
+                                # support available?
+
+our $MAC_FORK          = 0; # option variable for Mac OS resource forks with default value (false)
+our $NOTIFICATION      = 0; # By default, don't use system user notification feature
+our $RETRIEVE_MODE     = 0; # By default, push data on the backup target and don't retrieve anything
+our $LIST_PROFILE_MODE = 0; # by default, don't list the profiles available
+our $PRE_SCRIPT;            # Complete path to pre-backup script
+our $POST_SCRIPT;           # Complete path to post-backup script
 
 our $file;                # Configuration file.
 our @backup_sections;     # backup sections to be used in the configuration file
@@ -1163,41 +1393,44 @@ our @OS = qx(uname);      # Current OS
 
 # Configuration settings as extracted/expanded from the configuration file
 our %SETTINGS = (
-                 'use_duplicity'         => 'no',
-                 'log_file'              => undef, # TODO: NOW log dir
-                 'password_file'         => undef,
-                 'patternfile_exclude'   => undef,
-                 'restrict_on_subnet'    => undef,
-                 'src_rootdir'           => '/',
-                 'dst_rootdir'           => '/',
-                 'include_dir'           => undef,
-                 'exclude_dir'           => undef,
-                 'exclude_dir_exception' => undef,
-                 'Directory'             => undef,
-                 'target_url'            => undef,
-                 'logdir'                => undef,
-                 'email'                 => undef,
-                 'encfs_rawdir'          => undef,
+                 'use_duplicity'          => 'no',
+                 'password_file'          => undef,
+                 'restrict_on_subnet'     => undef,
+                 'src_rootdir'            => '/',
+                 'dst_rootdir'            => '/',
+                 'sync_include'           => '*',
+                 'sync_exclude'           => undef,
+                 'sync_exclude_exception' => undef,
+                 'exclude_pattern'        => undef,
+                 'exclude_pattern_file'   => undef,
+                 'Directory'              => undef,
+                 'target_url'             => undef,
+                 'logdir'                 => undef,
+                 'email'                  => undef,
+                 'encfs_rawdir'           => undef,
                 );
 our %DEFAULT_SETTINGS = %SETTINGS;
 lock_hash(%DEFAULT_SETTINGS);   # for extra safety
 
 our %GETOPT_CONFIG = (
                       # Specific options
-                      's|section=s'     => \@backup_sections, # sections to consider
-                      'f|config-file=s' => \$file, # Configuration file
-                      'n|dry-run'       => \$SIMULATION_MODE, # Simulation mode
-                      'm|mac-fork'      => \$MAC_FORK, # Mac resource fork
-                      'notification'    => \$NOTIFICATION, # User notification features
                       'e|exact-sync|delete' => sub { $SYNC_MODE="--delete" }, # Exact synchro
-                      'history'         => sub { # Keep history of backups
-                          $HISTORICAL = 1;
-                          $SYNC_MODE="--delete"
-                      },
+                      'f|config-file=s' => \$file, # Configuration file
+                      #                      'history'         => sub {   # Keep history of backups
+                      #                          $BACKUP_HISTORY_MODE = 1;
+                      #                          $SYNC_MODE="--delete"
+                      #                      },
+                      'l|list-profiles' => \$LIST_PROFILE_MODE, # List available profiles
+                      'm|mac-fork'      => \$MAC_FORK, # Mac resource fork (assume rsync >= 3.0 ?)
+                      'n|dry-run'       => \$SIMULATION_MODE, # Simulation mode
+                      'notification'    => \$NOTIFICATION, # User notification features
                       'p|push'          => sub { $RETRIEVE_MODE = 0}, # push data on the backup target
-                      'r|restore|retrieve' => sub { $RETRIEVE_MODE = 1}, # restore data from the backup
+
                       'pre-script=s'    => \$PRE_SCRIPT, # script to be executed before the sync
                       'post-script=s'   => \$POST_SCRIPT, # script to be executed afetr the sync
+                      'r|restore|retrieve' => sub { $RETRIEVE_MODE = 1}, # restore data from the backup
+                      's|section=s'     => \@backup_sections, # sections to consider
+
                       # Generic (classical) options
                       'v|verbose'  => \$VERBOSE, # Verbose mode
                       'q|quiet'    => \$QUIET,   # Quiet mode
@@ -1206,7 +1439,6 @@ our %GETOPT_CONFIG = (
                                                         -verbose => 2); },
                       'version'    => sub { print::version_msg(); exit(0); } # Show version
                      );
-# TODO : --list-profile
 
 our %CONFIG_FILE_CONTENT;      # Hash table constructed from the analysis of the
 # content of the configuration file via
@@ -1387,6 +1619,7 @@ use Pod::Usage;
 use Data::Dumper;
 use Term::ANSIColor;
 
+
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
 
@@ -1397,6 +1630,14 @@ log::initialize();
 my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
 print::error_and_exit(1, "Please check the format of the command-line. ",
                       "Use '$config::command --help' for more details") unless ($getoptRes);
+
+print::notification('title', 'msg');
+print::notification('title', 'msg', 0, 'OK');
+print::notification('title', 'msg', 0, 'Warning');
+exit 1;
+
+
+
 
 # Ensure the notification command exists (if used)
 if ($config::NOTIFICATION) {
@@ -1452,7 +1693,7 @@ print::debug("Backup section(s) to consider in the configuration file :",
 # one for each backup profile considered
 unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
                        'global', @config::backup_sections)) {
-    print::error_and_exit("Missing profile section in $config::file");
+    print::error_and_exit(1, "Missing profile section in $config::file");
 }
 # TODO: execute pre-script if available
 
@@ -1460,8 +1701,9 @@ unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
 # ========== Now proceed with each section (i.e. each backup profile) ========
 # ============================================================================
 foreach my $sec (@config::backup_sections) {
-    print::info('---------- ', color('bold'), "$sec ", color('reset'),
-                ' backup profile ----------');
+    print::info('=> proceeding backup profile: ',
+                '=========== ', format::color_msg('bold', "$sec"),
+                '===========');
     # Restore global settings
     config::reset_settings();
 
@@ -1473,12 +1715,14 @@ foreach my $sec (@config::backup_sections) {
     #try
     eval {
         config::ensure_profile_set('src_rootdir', 'dst_rootdir',
-                                   'include_dir', 'target_url');
-        sync::set_cmd();
+                                   'sync_include', 'target_url');
+        # First check subnet
+        system::check_subnet($config::SETTINGS{'restrict_on_subnet'})
+            if ($config::SETTINGS{'restrict_on_subnet'});
 
-
-
-        # Clean
+        sync::set_cmd();        # configure the synchronization command
+        sync::run_cmd();        # run it
+        # clean everything once synchro is finished
         system::umount_mounted_volumes();
     };
     # catch
@@ -1501,44 +1745,12 @@ foreach my $sec (@config::backup_sections) {
         print "\n";
         next;
     }
-
-
 }
+# re-clean eventually
+#print::hash_content(\%MOUNTED_VOLUMES, 'system::MOUNTED_VOLUMES');
+system::umount_mounted_volumes();
 
 # TODO: execute post-script if available
-
-
-
-
-
-
-
-#print::debug("IP found: ", system::getIPFromInterface());
-
-# #try
-# eval {
-#     system::check_subnet('193.168');
-# };
-# # catch
-# if ( catch my $err ) {
-#     if ($err->isa('ibackup::Exception::Network')) {
-#         print::warn("Network exception: ", $err->error);
-#     } else {
-#         # not recoverable
-#         print::warn "Unrecoverable error: $err\n";
-#         $err->rethrow;
-#     }
-# }
-
-
-
-# print::debug("debug");
-# print::info("info");
-# print::verbose("verbose");
-# print::warn("Warning");
-# print::error("error");
-
-#print::notification('Title', "msg");
 
 
 
@@ -1570,7 +1782,7 @@ Here is a illustrative examples:
     #### Mandatory global settings ####
     <global>
          src_rootdir = $HOME     # Root directory on the (local) source
-         include_dir = *         # backup all sub-directories (relative to src_rootdir)
+         sync_include = *         # backup all sub-directories (relative to src_rootdir)
     </global>
 
     #### Mandatory default backup definition ####

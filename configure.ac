@@ -8,17 +8,16 @@
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.3.2],[ibackup-support@lists.gforge.uni.lu])
+AC_INIT([backup],[1.0],[ibackup-support@lists.gforge.uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
 
-PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access etc.)"
+PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, EncFS volume etc.)"
 AC_SUBST(PACKAGE_SUMMARY)
 PACKAGE_WEBSITE="http://ibackup.gforge.uni.lu"
 AC_SUBST(PACKAGE_WEBSITE)
-
 
 # ----------------------------------------------------------------
 # Checks for programs.

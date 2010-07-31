@@ -23,8 +23,21 @@ EXTRA_DIST = AUTHORS \
     TODO       \
     config/m4  \
     www        \
-    etc
+    etc        \
+    $(icons_DATA)
 
+icons_DATA = $(srcdir)/icons/ibackupApplicationIcon.png \
+	$(srcdir)/icons/ibackupOKIcon.png          \
+	$(srcdir)/icons/ibackupWarningIcon.png
+iconsdir   = $(datarootdir)/icons/ibackup
+
+install-icons:
+	mkdir -p $(iconsdir)
+	for icon in $(icons_DATA); do \
+		$(INSTALL_DATA) $$icon $(iconsdir); \
+	done 
+
+install-data-local: install-icons
 
 if generate_WEBSITE
 WEBSITEDIR=www
