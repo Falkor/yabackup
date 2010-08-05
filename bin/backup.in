@@ -301,6 +301,7 @@ sub interpret_cmd($) {
 # (files or directories) IS NOT CHECKED: this should be tested latter!
 ##
 sub listdir_from($$@) {
+#    print::debug('[' . (caller(0))[3] . "] @_\n");
     my $patternlist = shift;
     my @patterns = split(/\s+/, $patternlist);
     return @patterns if ($patternlist !~ /\*/);
@@ -329,12 +330,15 @@ sub listdir_from($$@) {
             $tmp_pattern =~ s/\*/\.\*/g; # proceed with the '*' characters
             if (defined($host)) {
                 # Expand the pattern over SSH
-                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
-                # Adapt $tmp_pattern to match find regex syntax
-                $tmp_pattern = "\.\/$tmp_pattern";
-                my $find_cmd = "ssh -p $port $host \"find $rootdir -maxdepth 1 -regex '$tmp_pattern'\"";
+#                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
+                if ($tmp_pattern =~ /\^/) {
+                    $tmp_pattern =~ s/\^/\^\.\//;
+                } else {
+                    $tmp_pattern = "\.\/$tmp_pattern";
+                }
+#                $tmp_pattern = "\.\/$tmp_pattern";
+                my $find_cmd = "ssh -p $port $host \"cd $rootdir && find . -maxdepth 1 -regex '$tmp_pattern'\"";
                 my @find_res = system::execute_and_get_output($find_cmd);
-                print::debug("\t found: @find_res");
                 push(@res, @find_res);
             } else {
                 # Expand the pattern on the local system and rely on opendir
@@ -1245,19 +1249,24 @@ sub run_cmd() {
     print::info("=> about to",
                 ($config::RETRIEVE_MODE) ? format::color_msg('bold red', "RESTORE") : 'backup',
                 "the following elements: '@{$BACKUP_CMD_INFO{'tosync'}}'",
-                "\n\t  ",
-                ($config::RETRIEVE_MODE) ? 'from' : 'to',
-                "the backup target",
+                "\n\t   from: ",
+                format::color_msg('bold', "'$BACKUP_CMD_INFO{'src'}'"), 
+                "\n\t   to:   ",
                 format::color_msg('bold', "'$BACKUP_CMD_INFO{'dst'}'"));
-    print::warning("This will",
+    print::warning("This will most probably ",
                    format::color_msg('bold red',
                                      uc("overwrite files on your local system")),
                    "!!!") if ($config::RETRIEVE_MODE);
+    print::warning("This will lead to the", 
+                   format::color_msg('bold red',
+                                     uc("deletion of files/directories in")), 
+                   format::color_msg('bold',"$BACKUP_CMD_INFO{'src'}}"))
+        if ($config::SYNC_MODE eq '--delete');
     print::really_continue() unless ($config::QUIET);
     print::notification('Starting ' .
                         ($config::RETRIEVE_MODE ? "restoration\n" : "backup\n") .
-                        "From: $BACKUP_CMD_INFO{$config::RETRIEVE_MODE ? 'dst' : 'src'}\n" .
-                        "To: $BACKUP_CMD_INFO{  $config::RETRIEVE_MODE ? 'src' : 'dst'}",
+                        "From: $BACKUP_CMD_INFO{'src'}\n" .
+                        "To:   $BACKUP_CMD_INFO{'dst'}",
                         "$config::icon");
     my $has_failed = 0;
     # First proceed the subdirectories
@@ -1266,6 +1275,8 @@ sub run_cmd() {
         grep { -d $_->[1] }     # filter over directories
           map  { [ $_, "$BACKUP_CMD_INFO{'src'}/$_" ] } # create name, absolute path
             @{$BACKUP_CMD_INFO{'tosync'}};
+    # The rest is supposed to be files: Am I wrong? 
+
 
     foreach my $dir (@dirs_to_sync) {
         print::info('=> proceeding directory ', format::color_msg('bold', "$dir"));
@@ -1277,7 +1288,6 @@ sub run_cmd() {
 ####
 # Configure the synchronization command to be executed (This assumes the hash
 # $config::SETTINGS is correctly populated)
-# This function may throw the following exceptions:
 ##
 sub set_cmd() {
     if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
@@ -1320,14 +1330,13 @@ sub set_cmd() {
     }
 
     # Setup directories to backup/restore i.e set $BACKUP_CMD_INFO{'tosync'}
-    # TODO: better handle restore mode i.e. list element on the target!
     print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
 
     print::verbose("=> select the elements - file(s)/directorie(s) - to synchronize");
     sync::select_elements();
-    print::verbose("\t found in $config::SETTINGS{'src_rootdir'}: @{$BACKUP_CMD_INFO{'tosync'}}");
+    print::verbose("\t found in '$sync::BACKUP_CMD_INFO{'src'}': @{$BACKUP_CMD_INFO{'tosync'}}");
     ibackup::Exception::RuntimeError->throw(error =>
-                                            "No element found to synchronize!")
+                                            "No element found to synchronize in '$BACKUP_CMD_INFO{'src'}'!")
         unless (@{$BACKUP_CMD_INFO{'tosync'}});
 
     # Set the command-line options i.e populate $BACKUP_CMD_INFO{'opt'}
@@ -1356,18 +1365,28 @@ sub set_cmd() {
 # Usage: sync::select_elements()
 ##
 sub select_elements() {
-    # Construct list of the sub-directories of $config::SETTINGS{'src_rootdir'}
-    # to include in the synchronization
     config::ensure_profile_set('sync_include');
+    # Select the appropriate rootdir
+    my $rootdir = $config::SETTINGS{'src_rootdir'};
+    my @optional_ssh_args;
+    if ($config::RETRIEVE_MODE) {
+        $rootdir = ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh') ?
+          $config::SETTINGS{'dst_rootdir'} : $sync::BACKUP_CMD_INFO{'dst'};
+        @optional_ssh_args = ($sync::BACKUP_CMD_INFO{'target'}, $sync::BACKUP_CMD_INFO{'port'})
+          if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
+    }
+
+    # Construct list of the sub-directories of $rootdir
+    # to include in the synchronization
     my @sync_include = format::listdir_from($config::SETTINGS{'sync_include'},
-                                            $config::SETTINGS{'src_rootdir'});
+                                            $rootdir, @optional_ssh_args);
     # Eventually exclude some directories from this list
     if (defined($config::SETTINGS{'sync_exclude'})) {
         my @sync_exclude = format::listdir_from($config::SETTINGS{'sync_exclude'},
-                                                $config::SETTINGS{'src_rootdir'});
+                                                $rootdir, @optional_ssh_args);
         if (defined($config::SETTINGS{'sync_exclude_exception'})) {
             my @sync_exclude_exception = format::listdir_from($config::SETTINGS{'sync_exclude_exception'},
-                                                              $config::SETTINGS{'src_rootdir'});
+                                                              $rootdir, @optional_ssh_args);
             @sync_exclude = array::get_difference(\@sync_exclude, \@sync_exclude_exception);
         }
         @sync_include = array::get_difference(\@sync_include, \@sync_exclude);
@@ -1376,31 +1395,18 @@ sub select_elements() {
     # Eventually apply the patterns listed in 'exclude_pattern'
     if (defined($config::SETTINGS{'exclude_pattern'})) {
         my @additionnal_exclude = format::listdir_from($config::SETTINGS{'exclude_pattern'},
-                                                       $config::SETTINGS{'src_rootdir'});
+                                                       $rootdir, @optional_ssh_args);
         @sync_include = array::get_difference(\@sync_include, \@additionnal_exclude);
     }
 
     # Now @sync_include contains the exact list of directories/files directly
-    # under $BACKUP_CMD_INFO{'src'} that should be considered for the backup: Do
-    # the same operation relative to $BACKUP_CMD_INFO{'dst'} in the case of
-    # restoration
-    if ($config::RETRIEVE_MODE) {
+    # under $rootdir that should be considered for the backup/restoration
 
-
-
-        print::debug("=> do the same on dst");
-        my $dst_rootdir = ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh') ?
-          $config::SETTINGS{'dst_rootdir'} : $sync::BACKUP_CMD_INFO{'dst'};
-        my @ssh_args;
-        @ssh_args = ($sync::BACKUP_CMD_INFO{'target'}, $sync::BACKUP_CMD_INFO{'port'})
-          if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
-        my @dst_sync_include = format::listdir_from($config::SETTINGS{'sync_include'},
-                                                    $dst_rootdir, @ssh_args);
-        print::debug("Found on dst $sync::BACKUP_CMD_INFO{'dst'} : @dst_sync_include");
-
-
-    }
-
+    # Invert $BACKUP_CMD_INFO{'src'} and $BACKUP_CMD_INFO{'dst'} when on
+    # restoration.
+    # Various place are possible for this call, I choose here to
+    # ensure the src and dst are coherent after the call to select_element()
+    sync::set_restoration_mode() if ($config::RETRIEVE_MODE);
 
     # populate final receipt for the directories to backup
     $BACKUP_CMD_INFO{'tosync'} = dclone \@sync_include;
@@ -1435,13 +1441,12 @@ sub set_cmd_options() {
 }
 
 ####
-# Specialize the command-line for a restoration i.e. invert src and dst.
+# Specialize the command-line for a restoration i.e. invert src and dst in
+# $sync::BACKUP_CMD_INFO
 # Usage: sync::set_restoration_mode()
 ##
 sub set_restoration_mode() {
-
-
-    #    ($BACKUP_CMD_INFO{'src'}, $BACKUP_CMD_INFO{'dst'}) = ($BACKUP_CMD_INFO{'dst'}, $BACKUP_CMD_INFO{'src'});
+    ($BACKUP_CMD_INFO{'src'}, $BACKUP_CMD_INFO{'dst'}) = ($BACKUP_CMD_INFO{'dst'}, $BACKUP_CMD_INFO{'src'});
 }
 
 
