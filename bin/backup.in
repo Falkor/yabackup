@@ -46,7 +46,7 @@ sub print::error_and_exit($@);
 sub print::error_nolog(@);
 sub print::error(@);
 sub print::info(@);
-sub print::notification($$@);
+sub print::notification($@);
 sub print::really_continue();
 sub print::version();
 sub print::warning(@);
@@ -60,16 +60,19 @@ sub sync::set_backup_target_to_drive($);
 sub sync::set_backup_target_to_ssh_server($$$);
 sub sync::set_cmd();
 sub sync::set_cmd_options();
+sub sync::set_restoration_mode();
 
 sub config::ensure_profile_set(@);
 sub config::getPasswordFromFile($$);
 sub config::getPasswordForEntry($);
 sub config::reset_settings();
+sub config::set_icon(@);
 sub config::set_profile($);
+sub config::test_icons();
 
 sub format::color_msg($@);
 sub format::interpret_cmd($);
-sub format::listdir_from($$);
+sub format::listdir_from($$@);
 
 sub hash::has_keys($@);
 
@@ -85,6 +88,7 @@ sub system::check_remote_has_file_over_ssh($$@);
 sub system::check_remote_binary_over_ssh($$@);
 sub system::check_subnet($@);
 sub system::execute(@);
+sub system::execute_and_get_output(@);
 sub system::execute_and_set_stdin($$);
 sub system::getIPs();
 sub system::getIPFromInterface(@);
@@ -154,43 +158,39 @@ sub error_and_exit($@) {
 ######
 # Send a graphical notification to the user (using growl under Mac or
 # notify-send under Linux)
-# usage: notification(title, text [, priority] [, icon_type])
+# usage: notification(text [, icon] [, title])
 ##
-sub notification($$@) {
-    my $title     = shift;
-    my $text      = shift;
-    my $priority  = shift;
-    $priority     = defined($priority) ? $priority : 0;
-    my $icon_type = shift;
-    my $icon      = "$config::iconsdir/ibackupApplicationIcon.png";
-    if (defined $icon_type) {
-        if ($icon_type =~ /^OK$/i) {
-            $icon = "$config::iconsdir/ibackupOKIcon.png";
-        } elsif ($icon_type =~ /^Warning$/i) {
-            $icon = "$config::iconsdir/ibackupWarningIcon.png";
-        } else {
-            $icon = $icon_type;
+sub notification($@) {
+    if ($config::NOTIFICATION) {
+        my $text  = shift;
+        my $icon  = shift;
+        my $title = shift;
+        $icon = "$config::icon" unless defined($icon);
+        unless (defined($title)) {
+            $title = "$config::command";
+            $title .= "  (profile: $sync::current_profile)" if defined($sync::current_profile);
         }
+        my $priority = 0;
+
+        my $notify_cmd="";
+        # Select notification system based on system
+        if ($config::OS[0] =~ "Darwin") { # Mac OS X: use growlnotify
+            $priority = max(min($priority, 2), -2);
+            $notify_cmd =
+              "growlnotify -p '$priority' -n '$config::command' --image '$config::iconsdir/$icon' '" .
+                $title . "' -m '$text' > /dev/null 2>&1";
+        } elsif ($config::OS[0] =~ "Linux") {
+            $priority = max(min($priority, 1), -1) +1;
+            my @levels = ("low", "normal", "critical");
+            $notify_cmd =
+              'notify-send -u ' . $levels[$priority] .
+                ' -i $icon \'' . $title . '\' \'' . $text . '\'';
+        } else {
+            print::warning('$config::command do not support graphical notification for the ',
+                           $config::OS[0], " OS\n");
+        }
+        system::execute($notify_cmd);
     }
-    print::debug("icon = $icon");
-    my $notify_cmd="";
-    # Select notification system based on system
-    if ($config::OS[0] =~ "Darwin") { # Mac OS X: use growlnotify
-        $priority = max(min($priority, 2), -2);
-        $notify_cmd =
-          "growlnotify -p '$priority' -n '$config::command' --image '$icon' '" . 
-            $title . "' -m '$text' > /dev/null 2>&1";
-    } elsif ($config::OS[0] =~ "Linux") {
-        $priority = max(min($priority, 1), -1) +1;
-        my @levels = ("low", "normal", "critical");
-        $notify_cmd =
-          'notify-send -u ' . $levels[$priority] .
-            ' -i $icon \'' . $title . '\' \'' . $text . '\'';
-    } else {
-        print::warning('$config::command do not support graphical notification for the ',
-                       $config::OS[0], " OS\n");
-    }
-    system::execute($notify_cmd);
 }
 
 ######
@@ -202,7 +202,7 @@ sub really_continue() {
           ' you want to continue? [yN]: ';
     chomp(my $ans = <STDIN>);
     unless ($ans && ($ans =~ /y|yes|1/i)) {
-        #sync::clean_after_sync();
+        system::umount_mounted_volumes();
         exit(0);
     }
 }
@@ -289,19 +289,34 @@ sub interpret_cmd($) {
 # more complicated expansion based on ^ and $ characters (to match beginning and
 # end of name).
 #
-# Usage: @res = format::listdir_from("pattern list", "rootdir")
+# Usage: @res = format::listdir_from("pattern list", "rootdir" [, "user@host" [, port]])
 #
 # Example: format::listdir_from('*', '/home/login') return the complete list of
 # files/directories contained in the folder /home/login (i.e. most probably the
-# homedir of the user 'login')
+# homedir of the user 'login'). If the SSH connection arguments are provided,
+# then the rootdir is considered on the remote server and the wildcards are
+# expanded on the remote server.
+#
+# /!\ If no wildcard is used in the pattern list, the existence of the elements
+# (files or directories) IS NOT CHECKED: this should be tested latter!
 ##
-sub listdir_from($$) {
+sub listdir_from($$@) {
     my $patternlist = shift;
     my @patterns = split(/\s+/, $patternlist);
     return @patterns if ($patternlist !~ /\*/);
 
     my $rootdir = shift;
+    my $host = shift;
+    my $port = (@_ ? shift : 22);
     my @res = ();
+
+    if (defined($host) and ($rootdir !~ /^\//)) {
+        # SSH expand and rootdir is relative to the user homedir that should be
+        # retrieved to use absolute path in find
+        print::debug("Retrieve \$HOME for $host");
+        my @remote_homedir = system::execute_and_get_output("ssh -p $port $host -- echo '\$HOME'");
+        $rootdir = $remote_homedir[0] . "/$rootdir";
+    }
     #    for my $index (0 .. scalar(@patterns)-1) {
     for my $index (0 .. @patterns-1) {
         my $pattern = $patterns[$index];
@@ -310,18 +325,31 @@ sub listdir_from($$) {
             next;
         } else {
             my $tmp_pattern = $pattern;
-            opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
-            $tmp_pattern =~ s/\./\\\./g;       # proceed with the '.' characters
-            $tmp_pattern =~ s/\*/\.\*/g;       # proceed with the '*' characters
-            my @element_list = map { $_->[0] } # extract subdir name
-              #              grep { -d $_->[1] }              # check absolute path is a dir
-              map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
-                grep { !/^\.\.$/}            # filter out .. entry
-                  grep { !/^\.$/}            # filter out . entry
-                    grep { /$tmp_pattern/ }  # apply pattern filter
-                      readdir(DIR);
-            closedir(DIR);
-            push(@res, @element_list);
+            $tmp_pattern =~ s/\./\\\./g; # proceed with the '.' characters
+            $tmp_pattern =~ s/\*/\.\*/g; # proceed with the '*' characters
+            if (defined($host)) {
+                # Expand the pattern over SSH
+                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
+                # Adapt $tmp_pattern to match find regex syntax
+                $tmp_pattern = "\.\/$tmp_pattern";
+                my $find_cmd = "ssh -p $port $host \"find $rootdir -maxdepth 1 -regex '$tmp_pattern'\"";
+                my @find_res = system::execute_and_get_output($find_cmd);
+                print::debug("\t found: @find_res");
+                push(@res, @find_res);
+            } else {
+                # Expand the pattern on the local system and rely on opendir
+                # (far more efficient)
+                opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
+                my @element_list = map { $_->[0] } # extract subdir name
+                  #              grep { -d $_->[1] }              # check absolute path is a dir
+                  map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
+                    grep { !/^\.\.$/}            # filter out .. entry
+                      grep { !/^\.$/}            # filter out . entry
+                        grep { /$tmp_pattern/ }  # apply pattern filter
+                          readdir(DIR);
+                closedir(DIR);
+                push(@res, @element_list);
+            }
         }
     }
     return @res;
@@ -638,14 +666,19 @@ sub check_has_directory(@) {
 ####
 # check the existence of a set of local files (filenames are globbing sso
 # wildcards can be given in the names
-# Usage: check_has_directory(file1 [, file2 ...])
+# Usage: check_has_file(file1 [, file2 ...])
 ###
 sub check_has_file(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing file argument') unless (@_);
-    ibackup::Exception::FileNotFound->throw(error =>
-                                            "The file(s) @_ cannot be found")
-        unless (<@_>);
-    foreach my $file (<@_>) {
+    my @files = @_;
+    if ("@files" =~ /\*/) {
+        @files = <@_>;
+        # Necessity to glob
+        ibackup::Exception::FileNotFound->throw(error =>
+                                                "The file(s) @files cannot be found")
+            unless (@files);
+    }
+    foreach my $file (@files) {
         unless ( -f $file ) {
             ibackup::Exception::FileNotFound->throw(error =>
                                                     "The file $file cannot be found")
@@ -767,7 +800,7 @@ sub check_remote_has_directory_or_create_over_ssh($$@) {
 }
 
 #####
-# execute a local command
+# execute a local command and return the exit code
 # usage: execute(command)
 ###
 sub execute(@) {
@@ -780,6 +813,28 @@ sub execute(@) {
     return $exit_status;
 }
 
+####
+# execute a local command and return the result of the command (stderr and
+# stdout are MERGED for convenience.
+# Throw ibackup::Exception::RuntimeError exception if the exit status is not 0;
+###
+sub execute_and_get_output(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
+    print::debug('[' . (caller(0))[3] . "] @_\n");
+    my @res;
+    if ($config::SIMULATION_MODE) {
+        print format::color_msg('bold', "@_\n");
+    } else {
+        @res = qx(@_ 2>&1);
+        my $exit_status = $?;
+        if ($exit_status != 0) {
+            ibackup::Exception::RuntimeError->throw(error =>
+                                                    "The command '@_' FAILED with exit status $exit_status");
+        }
+        chomp(@res);
+    }
+    return @res;
+}
 
 #####
 # execute a local command that expect something on stdin fed with the value of
@@ -945,6 +1000,8 @@ sub mount_encfs($$) {
                 ibackup::Exception::RuntimeError->throw(error =>
                                                         "Could not create the EncFS directory $mountpoint");
             }
+            print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully created",
+                                "OK_$config::icon");
             print::info(format::color_msg('bold', 'Important note:'), "$note_on_passfile");
             push(@{ $system::MOUNTED_VOLUMES{'encfs'} }, $sync::BACKUP_CMD_INFO{'dst'});
             return;
@@ -1003,8 +1060,6 @@ sub mount_encfs($$) {
         ibackup::Exception::RuntimeError->throw(error =>
                                                 "Could not mount the EncFS volume $mountpoint");
     }
-    print::notification('$config::command',
-                        "Encfs Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully mounted");
     sleep 1;
     push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
          ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
@@ -1080,6 +1135,9 @@ our %BACKUP_CMD_INFO = (
 our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
 lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
 
+# Current backup profile
+our $current_profile = undef;
+
 ####
 # Analyse the target url (stored in $config::SETTINGS{'target_url'} normally)
 # that specify the backup destination.
@@ -1102,10 +1160,14 @@ sub parse_target_url() {
     print::debug("volname : $volname\n") if ($volname);
 
     unless ($proto && $target) {
-        ibackup::Exception::ConfigFileFormat->throw(error => "Malformed target url $config::SETTINGS{'target_url'}");
+        ibackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "Malformed target url $config::SETTINGS{'target_url'}");
     }
     $BACKUP_CMD_INFO{'proto'}  = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
+
+    config::set_icon("$proto"); # Change the icon layout to match the protocol
+                                # used in this profile
 
     my $set_to_msg="=> set the backup destination to";
 
@@ -1136,6 +1198,7 @@ sub parse_target_url() {
 ##
 sub set_backup_target_to_drive($) {
     my $path = shift;
+
     $BACKUP_CMD_INFO{'dst'} = format::interpret_cmd($path);
     # Ensure the target drive starts with a '/'
     if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
@@ -1158,6 +1221,9 @@ sub set_backup_target_to_drive($) {
 ##
 sub set_backup_target_to_ssh_server($$$) {
     my ($user, $server, $port) = @_;
+
+    config::set_icon('SSH');    # Change the icon layout
+
     # Check the SSH connectivity
     system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
         ibackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
@@ -1189,9 +1255,10 @@ sub run_cmd() {
                    "!!!") if ($config::RETRIEVE_MODE);
     print::really_continue() unless ($config::QUIET);
     print::notification('Starting ' .
-                        ($config::RETRIEVE_MODE ? 'restoration' : 'backup'),
+                        ($config::RETRIEVE_MODE ? "restoration\n" : "backup\n") .
                         "From: $BACKUP_CMD_INFO{$config::RETRIEVE_MODE ? 'dst' : 'src'}\n" .
-                        "To: $BACKUP_CMD_INFO{  $config::RETRIEVE_MODE ? 'src' : 'dst'}");
+                        "To: $BACKUP_CMD_INFO{  $config::RETRIEVE_MODE ? 'src' : 'dst'}",
+                        "$config::icon");
     my $has_failed = 0;
     # First proceed the subdirectories
     my @dirs_to_sync =
@@ -1246,12 +1313,16 @@ sub set_cmd() {
     # volume) characterized by the presence of the directive 'encfs_rawdir' in
     # the configuration file
     if (defined $config::SETTINGS{'encfs_rawdir'}) {
+        config::set_icon("$BACKUP_CMD_INFO{'proto'}Encrypted"); # Change the
+                                                                # icon layout
         system::mount_encfs($config::SETTINGS{'encfs_rawdir'},
                             ($BACKUP_CMD_INFO{'proto'} ne 'ssh') ? "$BACKUP_CMD_INFO{'dst'}" : "$dst_rootdir");
     }
 
     # Setup directories to backup/restore i.e set $BACKUP_CMD_INFO{'tosync'}
     # TODO: better handle restore mode i.e. list element on the target!
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
+
     print::verbose("=> select the elements - file(s)/directorie(s) - to synchronize");
     sync::select_elements();
     print::verbose("\t found in $config::SETTINGS{'src_rootdir'}: @{$BACKUP_CMD_INFO{'tosync'}}");
@@ -1267,13 +1338,14 @@ sub set_cmd() {
 
 ####
 # Select the elements (files or folders) to synchronize (i.e to backup or to
-# restore) i.e. set $BACKUP_CMD_INFO{'tosync'},
-# $BACKUP_CMD_INFO{'opt'} using the informations given in the configuration file
-# i.e the directives 'sync_include', 'sync_exclude' and
+# restore) i.e. set $BACKUP_CMD_INFO{'tosync'} using the informations given in
+# the configuration file i.e the directives 'sync_include', 'sync_exclude' and
 # 'sync_exclude_exception'.  Note that these directives specialize the treatment
-# of the elements directly UNDER $config::SETTINGS{'src_rootdir'} in the FS
-# hierarchy. Finally,the use of the wildcards * in all 'sync_' directives is
-# supported.
+# of the elements directly UNDER the root directory in the FS hierarchy
+# i.e. $config::SETTINGS{'src_rootdir'} in case of backup and
+# $sync::BACKUP_CMD_INFO{'dst'} in case of restoration.
+#
+# Finally,the use of the wildcards * in all 'sync_' directives is supported.
 # For instance '*' select all subdirectories (including the hidden
 # one) of src_rootdir.  You may use more complicated pattern mixing ^, * and $
 # special characters such as
@@ -1281,7 +1353,7 @@ sub set_cmd() {
 #        *ES$ : all directories that ends with ES
 #        ^.* : all hidden directories (the one that start by '.')
 #
-# Usage: sync::select_elements
+# Usage: sync::select_elements()
 ##
 sub select_elements() {
     # Construct list of the sub-directories of $config::SETTINGS{'src_rootdir'}
@@ -1307,6 +1379,28 @@ sub select_elements() {
                                                        $config::SETTINGS{'src_rootdir'});
         @sync_include = array::get_difference(\@sync_include, \@additionnal_exclude);
     }
+
+    # Now @sync_include contains the exact list of directories/files directly
+    # under $BACKUP_CMD_INFO{'src'} that should be considered for the backup: Do
+    # the same operation relative to $BACKUP_CMD_INFO{'dst'} in the case of
+    # restoration
+    if ($config::RETRIEVE_MODE) {
+
+
+
+        print::debug("=> do the same on dst");
+        my $dst_rootdir = ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh') ?
+          $config::SETTINGS{'dst_rootdir'} : $sync::BACKUP_CMD_INFO{'dst'};
+        my @ssh_args;
+        @ssh_args = ($sync::BACKUP_CMD_INFO{'target'}, $sync::BACKUP_CMD_INFO{'port'})
+          if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
+        my @dst_sync_include = format::listdir_from($config::SETTINGS{'sync_include'},
+                                                    $dst_rootdir, @ssh_args);
+        print::debug("Found on dst $sync::BACKUP_CMD_INFO{'dst'} : @dst_sync_include");
+
+
+    }
+
 
     # populate final receipt for the directories to backup
     $BACKUP_CMD_INFO{'tosync'} = dclone \@sync_include;
@@ -1340,6 +1434,18 @@ sub set_cmd_options() {
     $BACKUP_CMD_INFO{'opt'} .= " $config::SYNC_MODE";
 }
 
+####
+# Specialize the command-line for a restoration i.e. invert src and dst.
+# Usage: sync::set_restoration_mode()
+##
+sub set_restoration_mode() {
+
+
+    #    ($BACKUP_CMD_INFO{'src'}, $BACKUP_CMD_INFO{'dst'}) = ($BACKUP_CMD_INFO{'dst'}, $BACKUP_CMD_INFO{'src'});
+}
+
+
+
 
 ##############################################################################
 # PACKAGE config
@@ -1357,10 +1463,10 @@ use Data::Dumper;
 
 # Generic variables
 #our $prefix  = "@prefix@";  # Installation prefix (inherited from the autotools)
-our $prefix  = "/usr/local/stow/ibackup-1.0"; 
-our $VERSION = '@VERSION@'; # Script version
-our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@'; # Package summary
-our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@'; # Package website
+our $prefix  = "/usr/local/stow/ibackup-1.0"; # ******** TODO: update ********
+our $VERSION = '@VERSION@';                   # Script version
+our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@';   # Package summary
+our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@';   # Package website
 our $VERBOSE = 0;            # option variable for verbose mode (default: false)
 our $DEBUG   = 0;            # option variable for debug mode with default
 # value (false)
@@ -1369,9 +1475,22 @@ our $numargs = scalar(@ARGV);   # Number of arguments
 our $command = `basename $0`;   # base command
 chomp($command);
 
+# Icons settings
 # TODO: remove comment!!!!!!
-#our $iconsdir = "@datarootdir@/icons/$command"; # icons folder (as in Makefile.am)
-our $iconsdir = "/usr/local/stow/ibackup-1.0/share/icons/ibackup"; # icons folder (as in Makefile.am)
+our $iconsdir = "$config::prefix/share/icons/ibackup"; # icons folder (as in
+                                                       # Makefile.am)
+# The different type of available icons
+our @icon_types = ('default', 'defaultEncrypted',
+                   'AFP',     'AFPEncrypted',
+                   'Drive',   'DriveEncrypted',
+                   'File',    'FileEncrypted',
+                   'SSH',     'SSHEncrypted',
+                   'SparseBundle');
+
+# Current icon and icon type
+our $icon = undef;
+our $icon_type = 'default';
+
 
 # Specific variables
 our $SIMULATION_MODE   = 0;     # By default, don't simulate
@@ -1450,6 +1569,39 @@ our %CONFIG_FILE_CONTENT;      # Hash table constructed from the analysis of the
 sub reset_settings() {
     %config::SETTINGS      = %config::DEFAULT_SETTINGS;
     %sync::BACKUP_CMD_INFO = %sync::DEFAULT_BACKUP_CMD_INFO;
+    config::set_icon();         # reset icon layout
+}
+
+####
+# Set the current icon filename (located in $config::iconsdir) to be used in
+# the print::notification() function.
+# All icons filename are prefixed by 'ibackup' and suffixed by 'Icon.png'
+# Usage: config::icon_filename([type])
+#
+# For each icon, you can The presence of an exit status value return the icon
+# with the status logo on the top left icon.
+##
+sub set_icon(@) {
+    my $type   = shift;
+    $type      = 'default' unless defined($type);
+    my $res = "ibackup_$type" . "_Icon.png";
+    system::check_has_file("$config::iconsdir/$res",
+                           "$config::iconsdir/OK_$res",
+                           "$config::iconsdir/KO_$res");
+    $config::icon_type = "$type";
+    $config::icon      = "$res";
+}
+
+sub test_icons() {
+    my $msg   = 'Test Message';
+
+    for my $type (@config::icon_types) {
+        config::set_icon($type);
+        print::notification("msg");
+        print::notification("msg", "OK_$config::icon");
+        print::notification("msg", "KO_$config::icon");
+        sleep 1;
+    }
 }
 
 ####
@@ -1483,6 +1635,7 @@ sub set_profile($) {
             print::error_and_exit(1, "The directive $key is not recognized");
         }
     }
+    $sync::current_profile = "$profile";
 }
 
 ####
@@ -1623,6 +1776,9 @@ use Term::ANSIColor;
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
 
+# Initialize the icon
+config::set_icon();
+
 # Initialize the logs
 log::initialize();
 
@@ -1630,14 +1786,6 @@ log::initialize();
 my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
 print::error_and_exit(1, "Please check the format of the command-line. ",
                       "Use '$config::command --help' for more details") unless ($getoptRes);
-
-print::notification('title', 'msg');
-print::notification('title', 'msg', 0, 'OK');
-print::notification('title', 'msg', 0, 'Warning');
-exit 1;
-
-
-
 
 # Ensure the notification command exists (if used)
 if ($config::NOTIFICATION) {
@@ -1735,6 +1883,8 @@ foreach my $sec (@config::backup_sections) {
             $err->isa('ibackup::Exception::FileNotFound')      ||
             $err->isa('ibackup::Exception::PasswordNotFound')) {
             print::error($err->error);
+            print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . " Failed:\n$err",
+                                "KO_$config::icon");
         } else {
             # not recoverable
             print::warn "Unrecoverable error: $err \n";
@@ -1745,6 +1895,11 @@ foreach my $sec (@config::backup_sections) {
         print "\n";
         next;
     }
+    print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . ' succeeded!',
+                        "OK_$config::icon");
+    print::verbose('=> ', ($config::RETRIEVE_MODE ? 'restoration' : 'backup'),
+                   " for the profile '$sync::current_profile' ended successfully");
+
 }
 # re-clean eventually
 #print::hash_content(\%MOUNTED_VOLUMES, 'system::MOUNTED_VOLUMES');

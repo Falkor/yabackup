@@ -26,9 +26,41 @@ EXTRA_DIST = AUTHORS \
     etc        \
     $(icons_DATA)
 
-icons_DATA = $(srcdir)/icons/ibackupApplicationIcon.png \
-	$(srcdir)/icons/ibackupOKIcon.png          \
-	$(srcdir)/icons/ibackupWarningIcon.png
+icons_DATA = \
+	$(srcdir)/icons/ibackup_afpEncrypted_Icon.png        \
+	$(srcdir)/icons/ibackup_afp_Icon.png                 \
+	$(srcdir)/icons/ibackup_defaultEncrypted_Icon.png    \
+	$(srcdir)/icons/ibackup_default_Icon.png             \
+	$(srcdir)/icons/ibackup_driveEncrypted_Icon.png      \
+	$(srcdir)/icons/ibackup_drive_Icon.png               \
+	$(srcdir)/icons/ibackup_fileEncrypted_Icon.png       \
+	$(srcdir)/icons/ibackup_file_Icon.png                \
+	$(srcdir)/icons/ibackup_sparsebundle_Icon.png        \
+	$(srcdir)/icons/ibackup_sshEncrypted_Icon.png        \
+	$(srcdir)/icons/ibackup_ssh_Icon.png                 \
+	$(srcdir)/icons/OK_ibackup_afpEncrypted_Icon.png     \
+	$(srcdir)/icons/OK_ibackup_afp_Icon.png              \
+	$(srcdir)/icons/OK_ibackup_defaultEncrypted_Icon.png \
+	$(srcdir)/icons/OK_ibackup_default_Icon.png          \
+	$(srcdir)/icons/OK_ibackup_driveEncrypted_Icon.png   \
+	$(srcdir)/icons/OK_ibackup_drive_Icon.png            \
+	$(srcdir)/icons/OK_ibackup_fileEncrypted_Icon.png    \
+	$(srcdir)/icons/OK_ibackup_file_Icon.png             \
+	$(srcdir)/icons/OK_ibackup_sparsebundle_Icon.png     \
+	$(srcdir)/icons/OK_ibackup_sshEncrypted_Icon.png     \
+	$(srcdir)/icons/OK_ibackup_ssh_Icon.png              \
+	$(srcdir)/icons/KO_ibackup_afpEncrypted_Icon.png     \
+	$(srcdir)/icons/KO_ibackup_afp_Icon.png              \
+	$(srcdir)/icons/KO_ibackup_defaultEncrypted_Icon.png \
+	$(srcdir)/icons/KO_ibackup_default_Icon.png          \
+	$(srcdir)/icons/KO_ibackup_driveEncrypted_Icon.png   \
+	$(srcdir)/icons/KO_ibackup_drive_Icon.png            \
+	$(srcdir)/icons/KO_ibackup_fileEncrypted_Icon.png    \
+	$(srcdir)/icons/KO_ibackup_file_Icon.png             \
+	$(srcdir)/icons/KO_ibackup_sparsebundle_Icon.png     \
+	$(srcdir)/icons/KO_ibackup_sshEncrypted_Icon.png     \
+	$(srcdir)/icons/KO_ibackup_ssh_Icon.png
+
 iconsdir   = $(datarootdir)/icons/ibackup
 
 install-icons:
