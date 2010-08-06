@@ -289,7 +289,11 @@ sub interpret_cmd($) {
 # more complicated expansion based on ^ and $ characters (to match beginning and
 # end of name).
 #
-# Usage: @res = format::listdir_from("pattern list", "rootdir" [, "user@host" [, port]])
+# Usage:
+#    $hash_ref = format::listdir_from("pattern list", "rootdir" [, "user@host" [, port]])
+#    Now:
+#         $hash_ref->{'dirs'}  contains the explicit dir names  (in rootdir)
+#         $hash_ref->{'files'} contains the explicit file names (in rootdir)
 #
 # Example: format::listdir_from('*', '/home/login') return the complete list of
 # files/directories contained in the folder /home/login (i.e. most probably the
@@ -301,15 +305,16 @@ sub interpret_cmd($) {
 # (files or directories) IS NOT CHECKED: this should be tested latter!
 ##
 sub listdir_from($$@) {
-#    print::debug('[' . (caller(0))[3] . "] @_\n");
+    #    print::debug('[' . (caller(0))[3] . "] @_\n");
     my $patternlist = shift;
     my @patterns = split(/\s+/, $patternlist);
-    return @patterns if ($patternlist !~ /\*/);
-
     my $rootdir = shift;
     my $host = shift;
     my $port = (@_ ? shift : 22);
-    my @res = ();
+    my %results = (
+                   dirs     => undef,
+                   files    => undef,
+                  );
 
     if (defined($host) and ($rootdir !~ /^\//)) {
         # SSH expand and rootdir is relative to the user homedir that should be
@@ -318,45 +323,58 @@ sub listdir_from($$@) {
         my @remote_homedir = system::execute_and_get_output("ssh -p $port $host -- echo '\$HOME'");
         $rootdir = $remote_homedir[0] . "/$rootdir";
     }
-    #    for my $index (0 .. scalar(@patterns)-1) {
-    for my $index (0 .. @patterns-1) {
-        my $pattern = $patterns[$index];
-        if ($pattern !~  /\*|\^|\$/) {
-            push(@res, $pattern);
-            next;
-        } else {
-            my $tmp_pattern = $pattern;
-            $tmp_pattern =~ s/\./\\\./g; # proceed with the '.' characters
-            $tmp_pattern =~ s/\*/\.\*/g; # proceed with the '*' characters
-            if (defined($host)) {
-                # Expand the pattern over SSH
-#                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
-                if ($tmp_pattern =~ /\^/) {
-                    $tmp_pattern =~ s/\^/\^\.\//;
-                } else {
-                    $tmp_pattern = "\.\/$tmp_pattern";
-                }
-#                $tmp_pattern = "\.\/$tmp_pattern";
-                my $find_cmd = "ssh -p $port $host \"cd $rootdir && find . -maxdepth 1 -regex '$tmp_pattern'\"";
-                my @find_res = system::execute_and_get_output($find_cmd);
-                push(@res, @find_res);
+
+    foreach my $pattern (@patterns) {
+        my $tmp_pattern = $pattern;
+        $tmp_pattern =~ s/\/$//; # proceed with the trailing '/' characters
+        $tmp_pattern = '^' . $tmp_pattern . '$' if ($tmp_pattern !~  /\*|\^|\$/);
+        $tmp_pattern =~ s/\./\\\./g; # proceed with the '.' characters
+        $tmp_pattern =~ s/\*/\.\*/g; # proceed with the '*' characters
+
+        my @dir_list;
+        my @file_list;
+
+        if (defined($host)) {
+            # Expand the pattern over SSH
+            #                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
+            if ($tmp_pattern =~ /\^/) {
+                $tmp_pattern =~ s/\^/\^\.\//;
             } else {
-                # Expand the pattern on the local system and rely on opendir
-                # (far more efficient)
-                opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
-                my @element_list = map { $_->[0] } # extract subdir name
-                  #              grep { -d $_->[1] }              # check absolute path is a dir
+                $tmp_pattern = "\.\/$tmp_pattern";
+            }
+            #                $tmp_pattern = "\.\/$tmp_pattern";
+            my $find_cmd = "cd $rootdir && find . -maxdepth 1 -regex '$tmp_pattern'";
+            @dir_list  = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type d\"");
+            @file_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type f\"");
+        } else {
+            # Expand the pattern on the local system and rely on opendir
+            # (far more efficient)
+            opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
+            my @filenames = readdir(DIR);
+            @dir_list =
+              map { $_->[0] }                    # extract subdir name
+                grep { -d $_->[1] }              # check absolute path is a dir
                   map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
                     grep { !/^\.\.$/}            # filter out .. entry
                       grep { !/^\.$/}            # filter out . entry
                         grep { /$tmp_pattern/ }  # apply pattern filter
-                          readdir(DIR);
-                closedir(DIR);
-                push(@res, @element_list);
-            }
+                          @filenames;
+            @file_list =
+              map { $_->[0] }                    # extract subdir name
+                grep { -f $_->[1] }              # check absolute path is a dir
+                  map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
+                    grep { !/^\.\.$/}            # filter out .. entry
+                      grep { !/^\.$/}            # filter out . entry
+                        grep { /$tmp_pattern/ }  # apply pattern filter
+                          @filenames;
+            closedir(DIR);
         }
+#        print::debug("dir_list  = @dir_list");
+#        print::debug("file_list = @file_list");
+        push(@{$results{'dirs'}},  @dir_list);
+        push(@{$results{'files'}}, @file_list);
     }
-    return @res;
+    return \%results;
 }
 
 ##############################################################################
@@ -616,7 +634,7 @@ sub check_binary(@) {
     foreach my $app (@_) {
         print::verbose("=> check availability of the command '$app' on the local system.");
         system::execute("which $app 1>/dev/null") &&
-            print::error_and_exit(1, "$app: command not found in PATH=$ENV{'PATH'}");
+            print::error_and_exit(1, "'$app': command not found in PATH=$ENV{'PATH'}");
     }
 }
 
@@ -629,12 +647,11 @@ sub check_remote_binary_over_ssh($$@) {
     my ($host, $port, @apps) = @_;
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing remote binary list') unless (@apps);
     foreach my $app (@apps) {
+        print::verbose("=> check availability of the command '$app' on the remote system $host (SSH access via port $port).");
         system::remote_execute_over_ssh($host, $port, "which $app") &&
-            print::error_and_exit(1, "$app: remote command not found for $host (SSH access via port $port)");
+            print::error_and_exit(1, "'$app': command not found for $host (SSH access via port $port)");
     }
 }
-
-
 
 ####
 # check if the IP associated with an interface match another subnet.
@@ -1064,6 +1081,8 @@ sub mount_encfs($$) {
         ibackup::Exception::RuntimeError->throw(error =>
                                                 "Could not mount the EncFS volume $mountpoint");
     }
+    print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully mounted",
+                        "$config::icon") if ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh');
     sleep 1;
     push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
          ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
@@ -1108,6 +1127,9 @@ sub umount_mounted_volumes() {
                                                             "Unable to unmount $vol (using the command '$umount_cmd': $!");
                 }
                 pop @{$MOUNTED_VOLUMES{$proto}};
+                print::notification("EncFS Volume '$vol' on $sync::BACKUP_CMD_INFO{'target'} successfully unmounted",
+                                    "$config::icon")
+                    if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
             }
         }
     }
@@ -1124,6 +1146,7 @@ package sync;
 use Storable qw(dclone);        # for recursive copy of nested hash
 use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
 use Cwd;                        # for realpath
+use Data::Dumper;
 
 # Store information on the synchronization command to be issued
 our %BACKUP_CMD_INFO = (
@@ -1239,6 +1262,10 @@ sub set_backup_target_to_ssh_server($$$) {
         unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
     $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
     $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:";
+    # Ensure 'rsync' (or whatever basecmd such as rsiff-backup is available remotely
+    system::check_remote_binary_over_ssh($BACKUP_CMD_INFO{'target'},
+                                         $BACKUP_CMD_INFO{'port'},
+                                         $BACKUP_CMD_INFO{'basecmd'});
 }
 
 ####
@@ -1248,19 +1275,18 @@ sub run_cmd() {
     # Warn the user
     print::info("=> about to",
                 ($config::RETRIEVE_MODE) ? format::color_msg('bold red', "RESTORE") : 'backup',
-                "the following elements: '@{$BACKUP_CMD_INFO{'tosync'}}'",
-                "\n\t   from: ",
-                format::color_msg('bold', "'$BACKUP_CMD_INFO{'src'}'"), 
-                "\n\t   to:   ",
-                format::color_msg('bold', "'$BACKUP_CMD_INFO{'dst'}'"));
+                "the following elements: ",
+                "@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} @{$BACKUP_CMD_INFO{'tosync'}->{'files'}}",
+                "\n\t   from: ", format::color_msg('bold', "'$BACKUP_CMD_INFO{'src'}'"),
+                "\n\t   to:   ", format::color_msg('bold', "'$BACKUP_CMD_INFO{'dst'}'"));
     print::warning("This will most probably ",
                    format::color_msg('bold red',
                                      uc("overwrite files on your local system")),
                    "!!!") if ($config::RETRIEVE_MODE);
-    print::warning("This will lead to the", 
+    print::warning("This will lead to the",
                    format::color_msg('bold red',
-                                     uc("deletion of files/directories in")), 
-                   format::color_msg('bold',"$BACKUP_CMD_INFO{'src'}}"))
+                                     uc("deletion of files/directories in")),
+                   format::color_msg('bold',"$BACKUP_CMD_INFO{'src'}"))
         if ($config::SYNC_MODE eq '--delete');
     print::really_continue() unless ($config::QUIET);
     print::notification('Starting ' .
@@ -1269,20 +1295,49 @@ sub run_cmd() {
                         "To:   $BACKUP_CMD_INFO{'dst'}",
                         "$config::icon");
     my $has_failed = 0;
-    # First proceed the subdirectories
-    my @dirs_to_sync =
-      map { $_->[0] }           # extract subdir name
-        grep { -d $_->[1] }     # filter over directories
-          map  { [ $_, "$BACKUP_CMD_INFO{'src'}/$_" ] } # create name, absolute path
-            @{$BACKUP_CMD_INFO{'tosync'}};
-    # The rest is supposed to be files: Am I wrong? 
+    # Let's go!
+    my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
+    my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}";
 
-
-    foreach my $dir (@dirs_to_sync) {
+    # First proceed the subdirectories (NOTE: sync::select_elements() ensure the elements exists)
+    foreach my $dir (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}}) {
         print::info('=> proceeding directory ', format::color_msg('bold', "$dir"));
+        my ($src_dir, $dst_dir) = ($dir, $dir);
+        # Manage special treatment of the directory
+        if (defined($config::SETTINGS{'Directory'})) {
+            ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                          "Special Directory treatement ignored in restoration mode")
+                if ($config::RETRIEVE_MODE);
 
+            if (exists($config::SETTINGS{'Directory'}->{$dir})) {
 
+                # First interpret included commands
+                foreach my $directive (keys %{$config::SETTINGS{'Directory'}->{$dir}}) {
+                    $config::SETTINGS{'Directory'}->{$dir}->{$directive} =
+                      format::interpret_cmd("$config::SETTINGS{'Directory'}->{$dir}->{$directive}");
+                }
+                print::verbose("   using special settings : ");
+                #                print::verbose(Data::Dumper $config::SETTINGS{'Directory'}->{$dir});
+                print::verbose("TO BE CONTINUED");
+            }
+        }
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
+        #my $save_symmode = $config::SIMULATION_MODE;
+        #$config::SIMULATION_MODE = 1;
+        $has_failed += system::execute("$cmd");
+        #$config::SIMULATION_MODE = $save_symmode;
     }
+
+    # Now proceed with the files
+    foreach my $file (@{$BACKUP_CMD_INFO{'tosync'}->{'files'}}) {
+        print::info('=> proceeding file ', format::color_msg('bold', "$file"));
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$file $dst_basedir/$file";
+        $has_failed += system::execute("$cmd");
+    }
+    ibackup::Exception::RuntimeError->throw(error =>
+                                            "Synchronization finished yet with errors in the executed commands")
+        if ($has_failed);
+
 }
 
 ####
@@ -1307,7 +1362,7 @@ sub set_cmd() {
     my $dst_rootdir = format::interpret_cmd($config::SETTINGS{'dst_rootdir'});
     $BACKUP_CMD_INFO{'dst'} .= '/'
       unless (($BACKUP_CMD_INFO{'proto'} eq 'ssh') or ($dst_rootdir =~ /^\//));
-    $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir";
+    $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir" unless ($dst_rootdir eq '/');
 
     # Ensure the destination directory exists (or propose its creation if not in
     # QUIET mode
@@ -1330,19 +1385,19 @@ sub set_cmd() {
     }
 
     # Setup directories to backup/restore i.e set $BACKUP_CMD_INFO{'tosync'}
-    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
-
     print::verbose("=> select the elements - file(s)/directorie(s) - to synchronize");
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO before sync::select_elements()');
     sync::select_elements();
-    print::verbose("\t found in '$sync::BACKUP_CMD_INFO{'src'}': @{$BACKUP_CMD_INFO{'tosync'}}");
+    print::verbose("\t found in '$sync::BACKUP_CMD_INFO{'src'}': ",
+                   "@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} @{$BACKUP_CMD_INFO{'tosync'}->{'files'}}");
     ibackup::Exception::RuntimeError->throw(error =>
                                             "No element found to synchronize in '$BACKUP_CMD_INFO{'src'}'!")
-        unless (@{$BACKUP_CMD_INFO{'tosync'}});
+        unless (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} or @{$BACKUP_CMD_INFO{'tosync'}->{'files'}});
 
     # Set the command-line options i.e populate $BACKUP_CMD_INFO{'opt'}
     sync::set_cmd_options();
 
-    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO');
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO final');
 }
 
 ####
@@ -1376,30 +1431,50 @@ sub select_elements() {
           if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
     }
 
-    # Construct list of the sub-directories of $rootdir
+    # Construct list of the sub-directories and subfiles of $rootdir
     # to include in the synchronization
-    my @sync_include = format::listdir_from($config::SETTINGS{'sync_include'},
-                                            $rootdir, @optional_ssh_args);
-    # Eventually exclude some directories from this list
-    if (defined($config::SETTINGS{'sync_exclude'})) {
-        my @sync_exclude = format::listdir_from($config::SETTINGS{'sync_exclude'},
-                                                $rootdir, @optional_ssh_args);
-        if (defined($config::SETTINGS{'sync_exclude_exception'})) {
-            my @sync_exclude_exception = format::listdir_from($config::SETTINGS{'sync_exclude_exception'},
-                                                              $rootdir, @optional_ssh_args);
-            @sync_exclude = array::get_difference(\@sync_exclude, \@sync_exclude_exception);
-        }
-        @sync_include = array::get_difference(\@sync_include, \@sync_exclude);
-    }
+    my $sync_include_href = format::listdir_from($config::SETTINGS{'sync_include'},
+                                                 $rootdir, @optional_ssh_args);
+    # Reminder: $sync_include_href->{'dirs'} contains the list of subdirs   in $rootdir,
+    #           $sync_include_href->{'files'} contains the list of subfiles in $rootdir,
+    #print::hash_content($sync_include_href, 'sync_include_href'); # *******************
 
+    if (defined($config::SETTINGS{'sync_exclude'})) {
+        my $sync_exclude_href = format::listdir_from($config::SETTINGS{'sync_exclude'},
+                                                     $rootdir, @optional_ssh_args);
+        #print::hash_content($sync_exclude_href, 'sync_exclude_href'); # *******************
+        if (defined($config::SETTINGS{'sync_exclude_exception'})) {
+            my $sync_exclude_exception_href = format::listdir_from($config::SETTINGS{'sync_exclude_exception'},
+                                                                   $rootdir, @optional_ssh_args);
+            #print::hash_content($sync_exclude_exception_href, 'sync_exclude_exception_href'); # *******************
+            foreach my $type ('dirs', 'files') {
+                my @diff = array::get_difference(\@{$sync_exclude_href->{$type}},
+                                                 \@{$sync_exclude_exception_href->{$type}});
+                $sync_exclude_href->{$type} = dclone \@diff;
+            }
+            #print::hash_content($sync_exclude_href, 'NEW sync_exclude_href'); # *******************
+        }
+        foreach my $type ('dirs', 'files') {
+            my @diff = array::get_difference(\@{$sync_include_href->{$type}},
+                                             \@{$sync_exclude_href->{$type}});
+            $sync_include_href->{$type} = dclone \@diff;
+        }
+        #print::hash_content($sync_include_href, 'NEW sync_include_href'); # *******************
+    }
     # Eventually apply the patterns listed in 'exclude_pattern'
     if (defined($config::SETTINGS{'exclude_pattern'})) {
-        my @additionnal_exclude = format::listdir_from($config::SETTINGS{'exclude_pattern'},
-                                                       $rootdir, @optional_ssh_args);
-        @sync_include = array::get_difference(\@sync_include, \@additionnal_exclude);
+        my $additionnal_exclude_href = format::listdir_from($config::SETTINGS{'exclude_pattern'},
+                                                            $rootdir, @optional_ssh_args);
+        #print::hash_content($additionnal_exclude_href, 'additionnal_exclude_href'); # *******************
+        foreach my $type ('dirs', 'files') {
+            my @diff = array::get_difference(\@{$sync_include_href->{$type}},
+                                             \@{$additionnal_exclude_href->{$type}});
+            $sync_include_href->{$type} = dclone \@diff;
+        }
+        #print::hash_content($sync_include_href, 'NEW NEW sync_include_href'); # *******************
     }
 
-    # Now @sync_include contains the exact list of directories/files directly
+    # Now $sync_include_href contains the exact list of directories/files directly
     # under $rootdir that should be considered for the backup/restoration
 
     # Invert $BACKUP_CMD_INFO{'src'} and $BACKUP_CMD_INFO{'dst'} when on
@@ -1409,7 +1484,7 @@ sub select_elements() {
     sync::set_restoration_mode() if ($config::RETRIEVE_MODE);
 
     # populate final receipt for the directories to backup
-    $BACKUP_CMD_INFO{'tosync'} = dclone \@sync_include;
+    $BACKUP_CMD_INFO{'tosync'} = dclone $sync_include_href;
 }
 
 ####
