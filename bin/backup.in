@@ -1335,14 +1335,15 @@ sub umount_mounted_volumes() {
             $umount_cmd = "umount "       if ($proto =~ "drive|afp|encfs");
             $umount_cmd = "fusermount -u" if (($proto =~ "encfs") and ($config::OS[0] =~ "Linux"));
             # TODO: remote umount for ssh+encfs : check remote OS (for umount or fusermount)
-            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u"
+            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u '"
               if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
             $umount_cmd = "hdiutil detach -quiet " if ($proto eq 'sparsebundle');
             print::error_and_exit(1, "No unmount command set!") unless (defined $umount_cmd);
 
             foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
                 print::info("Unmounting the volume $vol (mounted via $proto)\n");
-                system::execute("$umount_cmd '$vol'");
+                $vol = "$vol'" if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
+                system::execute("$umount_cmd $vol");
                 if ($? != 0) {
                     ibackup::Exception::RuntimeError->throw(error =>
                                                             "Unable to unmount $vol (using the command '$umount_cmd': $!");
