@@ -58,6 +58,8 @@ sub sync::run_cmd();
 sub sync::select_elements();
 sub sync::set_backup_target_to_drive($);
 sub sync::set_backup_target_to_ssh_server($$$);
+sub sync::set_backup_target_to_afp_server($$$$@);
+sub sync::set_backup_target_to_sparsebundle($);
 sub sync::set_cmd();
 sub sync::set_cmd_options();
 sub sync::set_restoration_mode();
@@ -92,7 +94,9 @@ sub system::execute_and_get_output(@);
 sub system::execute_and_set_stdin($$);
 sub system::getIPs();
 sub system::getIPFromInterface(@);
-sub system::mount_encfs($$);
+sub system::mount_afp($$$$$@);
+sub system::mount_encfs($$@);
+sub system::mount_sparsebundle($);
 sub system::remote_execute_over_ssh($$@);
 sub system::umount_mounted_volumes();
 
@@ -247,6 +251,28 @@ use strict;
 use warnings;
 use Term::ANSIColor; # To send the ANSI color-change sequences to the user's terminal
 
+####
+# Sanitize paths (to remove ../ etc.
+# I tried Cwd::realpath but it does not work against unexisting path
+# Code from http://www.webmasterkb.com/Uwe/Forum.aspx/perl/5535/Cleanup-file-path
+##
+sub trimpath {
+    local $_ = shift;
+
+    require File::Spec::Functions;
+    $_ = File::Spec::Functions::canonpath($_);
+
+    # /foo/bar/../baz -> /foo/baz
+    1 while s{/(?!\.\.?/)[^/]+/\.\.(/|$)}{$1}gx;
+
+    # /../../foo -> /foo
+    s|^/(\.\./)+|/|;
+
+    return $_;
+}
+
+
+
 #####
 # return a colored message (coloration only appens in the terminal typically)
 ###
@@ -305,7 +331,6 @@ sub interpret_cmd($) {
 # (files or directories) IS NOT CHECKED: this should be tested latter!
 ##
 sub listdir_from($$@) {
-    #    print::debug('[' . (caller(0))[3] . "] @_\n");
     my $patternlist = shift;
     my @patterns = split(/\s+/, $patternlist);
     my $rootdir = shift;
@@ -321,6 +346,7 @@ sub listdir_from($$@) {
         # retrieved to use absolute path in find
         print::debug("Retrieve \$HOME for $host");
         my @remote_homedir = system::execute_and_get_output("ssh -p $port $host -- echo '\$HOME'");
+        chomp(@remote_homedir);
         $rootdir = $remote_homedir[0] . "/$rootdir";
     }
 
@@ -345,10 +371,17 @@ sub listdir_from($$@) {
             #                $tmp_pattern = "\.\/$tmp_pattern";
             my $find_cmd = "cd $rootdir && find . -maxdepth 1 -regex '$tmp_pattern'";
             @dir_list  = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type d\"");
-            @file_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type f\"");
+            @file_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type f \"");
+            chomp(@dir_list);
+            chomp(@file_list);
+            # Add links
+            my @link_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type l \"");
+            chomp(@link_list);
+            push(@file_list, @link_list);
         } else {
             # Expand the pattern on the local system and rely on opendir
             # (far more efficient)
+            $rootdir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
             opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
             my @filenames = readdir(DIR);
             @dir_list =
@@ -369,8 +402,8 @@ sub listdir_from($$@) {
                           @filenames;
             closedir(DIR);
         }
-#        print::debug("dir_list  = @dir_list");
-#        print::debug("file_list = @file_list");
+        #        print::debug("dir_list  = @dir_list");
+        #        print::debug("file_list = @file_list");
         push(@{$results{'dirs'}},  @dir_list);
         push(@{$results{'files'}}, @file_list);
     }
@@ -615,6 +648,12 @@ use Data::Dumper;
 use Term::ReadKey;
 use Exception::Class::TryCatch;
 use Expect;
+use Mac::PropertyList qw(parse_plist); # To parse plist files obtained
+                                       # under Mac OS X. I should take
+                                       # care of the current OS to avoid
+                                       # the use of this module under Linux.
+
+
 
 # List of mounted volume through the backup process, per mount type
 our %MOUNTED_VOLUMES = (
@@ -677,9 +716,11 @@ sub check_subnet($@) {
 sub check_has_directory(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory argument') unless (@_);
     foreach my $dir (@_) {
-        unless ( -d $dir ) {
+        my $tmp_dir = $dir;
+        $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+        unless ( -d "$tmp_dir" ) {
             ibackup::Exception::DirectoryNotFound->throw(error =>
-                                                         "The directory $dir cannot be found")
+                                                         "The directory '$dir' cannot be found")
           }
     }
 }
@@ -700,7 +741,7 @@ sub check_has_file(@) {
             unless (@files);
     }
     foreach my $file (@files) {
-        unless ( -f $file ) {
+        unless ( -f "$file" ) {
             ibackup::Exception::FileNotFound->throw(error =>
                                                     "The file $file cannot be found")
           }
@@ -716,6 +757,8 @@ sub check_remote_has_directory_over_ssh($$@) {
     my ($host, $port, @dirs) = @_;
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory list') unless (@dirs);
     foreach my $dir (@dirs) {
+        #        my $tmp_dir = $dir;
+        #        $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
         system::remote_execute_over_ssh($host, $port, "test -d '$dir'");
         if ($? != 0) {
             my $error_msg = 'The directory ' .
@@ -775,7 +818,9 @@ sub check_has_directory_or_create(@) {
                 print::warning($err->error);
                 print::warning("=> about to create the directory $dir");
                 print::really_continue();
-                system::execute("mkdir -p $dir");
+                my $tmp_dir = $dir;
+                $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+                system::execute("mkdir -p '$tmp_dir'");
                 if ($? != 0) {
                     print::error_and_exit(1, "Unable to create the directory $dir");
                 }
@@ -787,7 +832,7 @@ sub check_has_directory_or_create(@) {
 }
 
 ####
-# check the existence of a set of local directories. Propose the creation of
+# check the existence of a set of remote directories. Propose the creation of
 # them if they do not exists (or raise the exception
 # ibackup::Exception::DirectoryNotFound if in QUIET mode).
 # Usage: check_has_directory_or_create_over_ssh("user@host", port, dir1 [, dir2 ...])
@@ -797,7 +842,7 @@ sub check_remote_has_directory_or_create_over_ssh($$@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory list') unless (@dirs);
     foreach my $dir (@dirs) {
         eval {
-            system::check_remote_has_directory_over_ssh($host, $port, $dir);
+            system::check_remote_has_directory_over_ssh($host, $port, "$dir");
         };
         if ( catch my $err ) {
             if ($err->isa('ibackup::Exception::DirectoryNotFound') and
@@ -807,7 +852,9 @@ sub check_remote_has_directory_or_create_over_ssh($$@) {
                 print::warning("=> about to create the remote directory ",
                                ($dir =~ /^\//) ? "$dir" : "\$HOME/$dir" );
                 print::really_continue();
-                system::remote_execute_over_ssh($host, $port, "mkdir -p $dir");
+                #                my $tmp_dir = $dir;
+                #                $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problem
+                system::remote_execute_over_ssh($host, $port, "mkdir -p '$dir'");
                 if ($? != 0) {
                     print::error_and_exit(1, "Unable to create the remote directory ",
                                           ($dir =~ /^\//) ? "$dir" : "\$HOME/$dir",
@@ -852,7 +899,7 @@ sub execute_and_get_output(@) {
             ibackup::Exception::RuntimeError->throw(error =>
                                                     "The command '@_' FAILED with exit status $exit_status");
         }
-        chomp(@res);
+        #        chomp(@res);
     }
     return @res;
 }
@@ -923,6 +970,121 @@ sub getIPFromInterface(@) {
 }
 
 ####
+# Mount an AFP volume.  Currently only available if your local machine run Mac
+# OS X - I need to investigate the 'Netatalk' interface on Linux to make the
+# equivalent under Linux.
+#
+# Note: use 'guest' as username if you want a guest mount. Additionnaly, the
+# default port for afp servers is 548 and the fullvolumename can contain not
+# only the volumename but also a complement path towards a sparse-bundle image
+# or a sub directory where the backup should operate
+#
+# If not given, the password for username is searched into the password_file (is
+# defined) or asked on stdin to the user. This does not apply to the 'guest'
+# that is always assumed to refer to an anonymous connection where the password
+# is not required.
+#
+# Usage: system::mount_afp(username, server, port, volumename, mount_point [, password])
+#
+# Example: system::mount_afp('guest', server, 548, 'shared')
+
+###
+sub mount_afp($$$$$@) {
+    my $username    = shift;
+    my $server      = shift;
+    my $port        = shift;
+    my $volname     = shift;
+    my $mount_point = shift;
+    my $password    = (@_) ? shift : undef;
+
+    # Ensure the 'mount_afp' command is available
+    system::check_binary('mount_afp');
+
+    # Various format checks (really mandatory?)
+    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a server name")
+        unless defined($server);
+    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a volume name")
+        unless defined($volname);
+    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a username (use 'guest' eventually in the target_url for anonymous access)")
+        unless defined($username);
+
+    # Let's go now
+    ibackup::Exception::RuntimeError->throw(error => "Bad mount point $mount_point")
+        if ($mount_point eq '/');
+
+    if (-d "$mount_point") {
+        print::warning("$mount_point is already mounted");
+    } else {
+        # Otherwise, perform the mount
+        my $passfile_entry = "afp://$username\@$server/$volname";
+
+        #        my $afp_url = "$passfile_entry";
+        my $afp_url = "afp://";
+
+        # All users except 'guest' should have a password
+        if ($username ne 'guest') {
+            #_url .= ";AUTH=No%20User%20Authent";
+            $afp_url .= "$username";
+            # Eventually retrieve the password of the encfs mount that can be either
+            # present in the password file (i.e. in $config::SETTINGS{'password_file'})
+            # or prompted to the user (which is not possible in quiet mode)
+            unless (defined $password) {
+                eval {
+                    $password = config::getPasswordForEntry("$passfile_entry");
+                };
+                # catch
+                if ( catch my $err ) {
+                    if ($err->isa('ibackup::Exception::PasswordNotFound')) {
+                        # if in quiet mode (i.e. typically executed in the
+                        # framework of a cronjobs), rethrow the error
+                        $err->rethrow if ($config::QUIET);
+                        print::warning($err->error);
+                    } elsif ($err->isa('ibackup::Exception::ConfigFileFormat')) {
+                        $err->rethrow if (defined $config::SETTINGS{'password_file'});
+                    }
+                }
+            }
+            # If password still undefined (and this point reached), ask the user to fill
+            # it (or raise exception if in QUIET mode)
+            unless (defined $password) {
+                ibackup::Exception::PasswordNotFound->throw(error =>
+                                                            "Cannot retrieve the passphrase for the AFP mount (impossible in quiet mode)")
+                    if ($config::QUIET);
+                # prompt for the pass-phrase
+                print "Enter the AFP password for '$username\@$server' : ";
+                ReadMode 'noecho';
+                $password = ReadLine 0;
+                chomp $password;
+                ReadMode 'normal';
+                print "\n";
+            }
+            # Finally raise exception if you still don't have a password
+            ibackup::Exception::PasswordNotFound->throw(error => "Empty AFP password for '$username\@$server'")
+                if ($password eq "");
+            $afp_url .= ":$password\@";
+        }
+        $afp_url .= "$server:$port/$volname";
+        print::verbose("=> creating AFP mount point '$mount_point'");
+        system::execute("mkdir -p $mount_point") &&
+            ibackup::Exception::RuntimeError->throw(error =>
+                                                    "Unable to create the AFP mount directory $mount_point");
+        # Now execute the mount
+        system::execute("mount_afp $afp_url $mount_point");
+        if ($? != 0) {
+            print::info("AFP mount failed: removing the mount directory $mount_point");
+            system::execute("rm -rf $mount_point");
+            ibackup::Exception::RuntimeError->throw(error =>
+                                                    "Could not mount the AFP volume '$volname' for '$username\@$server'");
+        }
+        print::info("=> AFP volume '$volname' successfully mounted for '$username\@$server'");
+        push(@{ $system::MOUNTED_VOLUMES{'afp'} }, "$mount_point");
+    }
+    return 0;
+}
+
+
+
+####
 # Mount a local EncFS folder.  The rawdir (containing the EncFS raw data &
 # configs) is always given on the basis of the target url pre-parsed (see
 # sync::parse_target_url() ) in the following form:
@@ -936,7 +1098,7 @@ sub getIPFromInterface(@) {
 #
 #Usage: mount_encfs(rawdir_url, mountpoint [, password])
 ###
-sub mount_encfs($$) {
+sub mount_encfs($$@) {
     my $rawdir_url = shift;
     my $rawdir     = undef;
     my $mountpoint = shift;
@@ -958,7 +1120,7 @@ sub mount_encfs($$) {
 
     # Set the rawdir value (from rawdir_url)
     print::debug("EncFS rawdir url: '$rawdir_url'");
-    if ($rawdir_url =~ /^target_url:([\w\.\/]+)$/) {
+    if ($rawdir_url =~ /^target_url:(([\w\.\/]|\\\s)+)$/) {
         $rawdir_url = $1;
     } else {
         ibackup::Exception::ConfigFileFormat->throw(error =>
@@ -968,8 +1130,16 @@ sub mount_encfs($$) {
         # Absolute path
         $rawdir = "$rawdir_url";
     } else {
-        # Relative path to $mountpoint
-        $rawdir = Cwd::realpath("$mountpoint" . '/' . "$rawdir_url");
+        ibackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "You cannot use a relative path in the 'encfs_rawdir' directive when the target_url use the SSH protocol")
+            if ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh');
+        # Relative url against target_url
+        my $tmp_rawdir = "$mountpoint/$rawdir_url";
+        $tmp_rawdir =~ s/\\(\s)/$1/g;
+        $rawdir = Cwd::realpath("$tmp_rawdir");
+        ibackup::Exception::RuntimeError->throw(error => 
+                                                "Runtime error when determining the canonical path of encfs_rawdir") 
+            unless ($rawdir);
     }
     print::debug("EncFS rawdir : $rawdir");
     ibackup::Exception::RuntimeError->throw(error =>
@@ -1072,7 +1242,7 @@ sub mount_encfs($$) {
     my $encfs_cmd = "encfs --stdinpass --idle=1 $rawdir $mountpoint";
     $encfs_cmd =
       "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} " .
-        "$encfs_cmd" if ($proto eq 'ssh');
+        "\"$encfs_cmd\"" if ($proto eq 'ssh');
 
     system::execute_and_set_stdin("$encfs_cmd", "$password");
     # could have been (but this expose the password):
@@ -1086,8 +1256,58 @@ sub mount_encfs($$) {
     sleep 1;
     push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
          ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
-
 }
+
+####
+# Mount a sparsebundle image (only supported on Mac OS X) -- see
+# http://db.tidbits.com/article/9673 for instance for some details.  If it is an
+# encrypted sparse-bundle, the password SHOULD BE stored in your keychain so it
+# can be retrieved transparently when the script is invoked in a cronjob.
+#
+# Return the mount point where the sparsebundle is mounted (or throw an
+# exception if the mount failed)
+#
+# Usage: my $mountpoint = system::mount_sparsebundle('/path/to/image.sparsebundle')
+###
+sub mount_sparsebundle($) {
+    my $sparsebundle = shift;
+    ibackup::Exception::FileNotFound->throw(error =>
+                                            "The sparsebundle image '$sparsebundle' cannot be found")
+        unless (-e $sparsebundle);
+
+    # Ensure the 'hdiutil' command is available
+    system::check_binary('hdiutil');
+
+    # Let's go: mount the sparsebundle
+    my $attach_cmd = "hdiutil attach $sparsebundle -plist";
+    my @plist_out = system::execute_and_get_output("$attach_cmd");
+    return '/Volumes/Simulated_Backup_Drive' if ($config::SIMULATION_MODE);
+
+    # If real execution: extract from the plist the volume name
+    print::debug("plist infos from sparsebundle:\n@plist_out");
+    my $plist = Mac::PropertyList::parse_plist( "@plist_out" );
+    # Extract from it the mount point
+    my $mount_point = "";
+    foreach my $dict ($plist->{'system-entities'}->value()) {
+        next unless $dict->exists('mount-point');
+        $mount_point = $dict->{'mount-point'}->value();
+    }
+    ibackup::Exception::RuntimeError->throw(error =>
+                                            "The mount point associated to the sparsebundle '$sparsebundle' cannot be found")
+        unless ($mount_point);
+    ibackup::Exception::RuntimeError->throw(error =>
+                                            "The sparsebundle '$sparsebundle' cannot be mounted (in $mount_point)")
+        unless (-d "$mount_point");
+    print::debug("=> successfully mount the sparsebundle '$sparsebundle' in ",
+                 format::color_msg('bold', "'$mount_point'"));
+    if ($mount_point =~ /\s/) {
+        $mount_point =~ s/(\s)/\\$1/g; # Handle space
+        print::debug("New mount point (with escaped spaces): $mount_point");
+    }
+    push(@{$MOUNTED_VOLUMES{'sparsebundle'}}, "$mount_point");
+    return "$mount_point";
+}
+
 
 #####
 # execute a command on a remote server by ssh
@@ -1106,6 +1326,7 @@ sub remote_execute_over_ssh($$@) {
 # Usage: system::umount_mounted_volumes()
 ###
 sub umount_mounted_volumes() {
+    #    print::hash_content(\%system::MOUNTED_VOLUMES, '%system::MOUNTED_VOLUMES');
     sleep 1;
     # (bad) Hack to unmount first sparsebundle then afp ;)
     foreach my $proto (reverse sort keys %system::MOUNTED_VOLUMES) {
@@ -1121,7 +1342,7 @@ sub umount_mounted_volumes() {
 
             foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
                 print::info("Unmounting the volume $vol (mounted via $proto)\n");
-                system::execute("$umount_cmd $vol");
+                system::execute("$umount_cmd '$vol'");
                 if ($? != 0) {
                     ibackup::Exception::RuntimeError->throw(error =>
                                                             "Unable to unmount $vol (using the command '$umount_cmd': $!");
@@ -1176,8 +1397,8 @@ sub parse_target_url() {
     }
     $config::SETTINGS{'target_url'} = format::interpret_cmd("$config::SETTINGS{'target_url'}");
     # let the Perl magic operate here:
-    $config::SETTINGS{'target_url'} =~ /^\b(\w+):\/\/(([\.\w\/]+)(:([\w]+))?((\@([-\w\.]+))(:(\d+))?)?(\/([\.\w\/]+))?)/;
-    my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $8, $10, $12);
+    $config::SETTINGS{'target_url'} =~ /^\b(\w+):\/\/((([\.\w\/]|\\\s)+)(:([\w]+))?((\@([-\w\.]+))(:(\d+))?)?(\/(([\.\w\/]|\\\s)+))?)/;
+    my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $9, $11, $13);
     print::debug("Protocol: $proto\n")   if ($proto);
     print::debug("target  : $target\n")  if ($target);
     print::debug("user    : $user\n")    if ($user);
@@ -1200,19 +1421,37 @@ sub parse_target_url() {
 
     # Handle each protocol
     if (($proto eq 'drive') or ($proto eq 'file')) {
+        # ---- Drive / File ----
         print::verbose("$set_to_msg the ",
                        ($proto eq 'drive') ? 'external drive' : 'local directory',
                        " '$target'\n");
         set_backup_target_to_drive($target);
+
     } elsif ($proto eq 'ssh') {
+        # ---- SSH ----
         unless ($user && $server) {
             ibackup::Exception::ConfigFileFormat->throw(error =>
-                                                        "Configuration file format error: Malformed ssh target $target");
+                                                        "Configuration file format error: Malformed SSH target '$target'");
         }
         $port = 22 unless ($port);
-        print::verbose("$set_to_msg the remote server '$server' ",
-                       "(access by SSH on port $port for the user '$user')");
+        print::verbose("$set_to_msg the remote server '$server' ");
+        print::verbose("    (access by SSH on port $port for the user '$user')");
         set_backup_target_to_ssh_server($user, $server, $port);
+    } elsif ($proto eq 'sparsebundle') {
+        # ---- Sparse-bundle ----
+        print::verbose("$set_to_msg the sparsebundle image '$target'");
+        set_backup_target_to_sparsebundle($target);
+    } elsif ($proto eq 'afp') {
+        # ---- AFP ----
+        unless ($user && $server) {
+            ibackup::Exception::ConfigFileFormat->throw(error =>
+                                                        "Configuration file format error: Malformed AFP target '$target'");
+        }
+        $port = 548 unless ($port);
+        print::verbose("$set_to_msg the remote server '$server' ");
+        print::verbose("    (access by Apple Filing Protocol (AFP) on port $port for the user '$user')");
+        set_backup_target_to_afp_server($user, $server, $port, $volname, $passwd);
+
     } else {
         ibackup::Exception::UnsupportedFeature->throw(error =>
                                                       "Unsupported protocol $proto");
@@ -1249,8 +1488,6 @@ sub set_backup_target_to_drive($) {
 sub set_backup_target_to_ssh_server($$$) {
     my ($user, $server, $port) = @_;
 
-    config::set_icon('SSH');    # Change the icon layout
-
     # Check the SSH connectivity
     system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
         ibackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
@@ -1261,12 +1498,70 @@ sub set_backup_target_to_ssh_server($$$) {
                                                   "The use of duplicity (or anything different than rsync) is not yet supported")
         unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
     $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
-    $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:";
-    # Ensure 'rsync' (or whatever basecmd such as rsiff-backup is available remotely
+    $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:'";
+    # Ensure 'rsync' (or whatever basecmd such as rdiff-backup is available remotely
     system::check_remote_binary_over_ssh($BACKUP_CMD_INFO{'target'},
                                          $BACKUP_CMD_INFO{'port'},
                                          $BACKUP_CMD_INFO{'basecmd'});
 }
+
+###
+# setup the target of the backup command on a sparsebundle image
+# usage: sync::set_backup_target_to_sparsebundle('path/to/image.sparsebundle')
+##
+sub set_backup_target_to_sparsebundle($) {
+    my $path_to_sparsebundle = shift;
+    my $explicit_path = format::interpret_cmd($path_to_sparsebundle);
+    ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "The use of sparsebundle images is only supported under Mac OS X")
+        unless ($config::OS[0] =~ "Darwin");
+    my $mount_point = system::mount_sparsebundle($explicit_path);
+    # If this point is reached, the mount is successfull
+    $sync::BACKUP_CMD_INFO{'dst'} = "$mount_point";
+}
+
+###
+# setup the target of the backup command to a remote server reachable by AFP
+# usage: set_backup_target_to_afp_server(user, server, port, fullvolumename [, password])
+##
+sub set_backup_target_to_afp_server($$$$@) {
+    my $user        = shift;
+    my $server      = shift;
+    my $port        = shift;
+    my $fullvolname = shift;
+    my $password    = (@_) ? shift : undef;
+
+    # Currently operate only on Mac OS X
+    ibackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "Apple Filing Protocol (AFP) are only supported under Mac OS X for the moment")
+        unless ($config::OS[0] =~ "Darwin");
+    $fullvolname =~ /(\w+)(\/([\/\w\.]|\\\s)*)/;
+    my ($volname, $complementpath) = ($1 , $2);
+    print::debug("Volume name : $volname\n");
+    print::debug("Complement path : $complementpath\n") if ($complementpath);
+    my $mount_point = "/Volumes/$volname"; # Default Mac OS mount point:
+                                           # important to be coherent to detect
+                                           # already mounted volume
+    system::mount_afp($user, $server, $port, $volname, $mount_point, $password);
+    # If this point is reached, the mount is successfull
+    $sync::BACKUP_CMD_INFO{'dst'} = "$mount_point";
+
+    # Now handle complement paths
+    if ($complementpath) {
+        print::info("=> found complement path $complementpath");
+        if ($complementpath =~ /\.sparsebundle\/?\s*$/) {
+            print::info("   Reference to a sparsebundle image found");
+            set_backup_target_to_sparsebundle("$mount_point/$complementpath");
+        } else {
+            ibackup::Exception::ConfigFileFormat->throw(error =>
+                                                        "Malformed AFP target_url for the complement path '$complementpath' that don't have a leading '/'")
+                unless ($complementpath =~ /^\//);
+            system::check_has_directory_or_create("$mount_point/$complementpath");
+            $BACKUP_CMD_INFO{'dst'} .=  "$complementpath";
+        }
+    }
+}
+
 
 ####
 # run the synchronization command
@@ -1299,6 +1594,14 @@ sub run_cmd() {
     my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
     my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}";
 
+    if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+        # Remove trailing \' (handling spaces in filename over SSH is just a
+        # nightmare: I select the use of single quotes -- see
+        # http://www.samba.org/rsync/FAQ.html#9 )
+        $dst_basedir =~ s/'$// unless ($config::RETRIEVE_MODE);
+        $src_basedir =~ s/'$// if     ($config::RETRIEVE_MODE);
+    }
+
     # First proceed the subdirectories (NOTE: sync::select_elements() ensure the elements exists)
     foreach my $dir (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}}) {
         print::info('=> proceeding directory ', format::color_msg('bold', "$dir"));
@@ -1321,23 +1624,38 @@ sub run_cmd() {
                 print::verbose("TO BE CONTINUED");
             }
         }
-        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$src_dir/ $dst_basedir/$dst_dir";
-        #my $save_symmode = $config::SIMULATION_MODE;
-        #$config::SIMULATION_MODE = 1;
+        my $src = "$src_basedir/$src_dir/";
+        my $dst = "$dst_basedir/$dst_dir" ;
+        if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+            $dst .= "'" unless ($config::RETRIEVE_MODE);
+            $src .= "'" if     ($config::RETRIEVE_MODE);
+        }
+
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src $dst";
+        #        my $save_symmode = $config::SIMULATION_MODE;
+        #        $config::SIMULATION_MODE = 1;
         $has_failed += system::execute("$cmd");
-        #$config::SIMULATION_MODE = $save_symmode;
+        #        $config::SIMULATION_MODE = $save_symmode;
     }
 
     # Now proceed with the files
     foreach my $file (@{$BACKUP_CMD_INFO{'tosync'}->{'files'}}) {
         print::info('=> proceeding file ', format::color_msg('bold', "$file"));
-        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src_basedir/$file $dst_basedir/$file";
+        my $src = "$src_basedir/$file";
+        my $dst = "$dst_basedir/$file";
+        if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+            $dst .= "'" unless ($config::RETRIEVE_MODE);
+            $src .= "'" if     ($config::RETRIEVE_MODE);
+        }
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src $dst";
+        #       my $save_symmode = $config::SIMULATION_MODE;
+        #       $config::SIMULATION_MODE = 1;
         $has_failed += system::execute("$cmd");
+        #       $config::SIMULATION_MODE = $save_symmode;
     }
     ibackup::Exception::RuntimeError->throw(error =>
                                             "Synchronization finished yet with errors in the executed commands")
         if ($has_failed);
-
 }
 
 ####
@@ -1363,15 +1681,24 @@ sub set_cmd() {
     $BACKUP_CMD_INFO{'dst'} .= '/'
       unless (($BACKUP_CMD_INFO{'proto'} eq 'ssh') or ($dst_rootdir =~ /^\//));
     $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir" unless ($dst_rootdir eq '/');
+    $BACKUP_CMD_INFO{'dst'} .= "'" if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
+
+    print::debug("\$BACKUP_CMD_INFO{'dst'} = $BACKUP_CMD_INFO{'dst'}");
 
     # Ensure the destination directory exists (or propose its creation if not in
     # QUIET mode
-    if ($BACKUP_CMD_INFO{'proto'} ne 'ssh') {
-        system::check_has_directory_or_create($BACKUP_CMD_INFO{'dst'});
+    print::verbose("=> ensure the destination directory exists");
+    if ($config::RETRIEVE_MODE) {
+        system::check_has_directory_or_create("$BACKUP_CMD_INFO{'src'}");
     } else {
-        system::check_remote_has_directory_or_create_over_ssh($BACKUP_CMD_INFO{'target'},
-                                                              $BACKUP_CMD_INFO{'port'},
-                                                              "$dst_rootdir");
+        # Normal mode
+        if ($BACKUP_CMD_INFO{'proto'} ne 'ssh') {
+            system::check_has_directory_or_create("$BACKUP_CMD_INFO{'dst'}");
+        } else {
+            system::check_remote_has_directory_or_create_over_ssh($BACKUP_CMD_INFO{'target'},
+                                                                  $BACKUP_CMD_INFO{'port'},
+                                                                  "$dst_rootdir");
+        }
     }
 
     # Now handle an eventual EncFS folder encryption on the target (folder or
@@ -1507,7 +1834,10 @@ sub set_cmd_options() {
         }
     }
     # Add classical options
+    #    $BACKUP_CMD_INFO{'opt'} .= ""
     $BACKUP_CMD_INFO{'opt'} .= " -avz";
+    #    $BACKUP_CMD_INFO{'opt'} .= " -E"
+
     $BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change"
       if ($config::MAC_FORK and ($BACKUP_CMD_INFO{'proto'} ne 'ssh'));
     #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $config::VERBOSE;
@@ -1873,6 +2203,19 @@ if ($config::NOTIFICATION) {
     system::check_binary('notify-send') if ($config::OS[0] =~ "Linux"); # Linux: check notify-send
 }
 
+# Ensure the rsync command is present
+system::check_binary('rsync');
+my @rsync_version = system::execute_and_get_output("rsync --version | head -n 1 | cut -d ' ' -f 4");
+chomp(@rsync_version);
+print::debug("Rsync version : @rsync_version");
+if ($config::MAC_FORK and ("@rsync_version" !~ '^3.')) {
+    print::warning("Using Mac OS resource fork for backup requires rsync version >= 3.0 ",
+                   "while you are running version @rsync_version");
+    print::warning("=> disabling mac-fork");
+    $config::MAC_FORK = 0;
+}
+
+
 # Disable quiet mode on retrieval of data
 if ($config::QUIET && $config::RETRIEVE_MODE) {
     $config::QUIET = 0;
@@ -1979,7 +2322,7 @@ foreach my $sec (@config::backup_sections) {
                         "OK_$config::icon");
     print::verbose('=> ', ($config::RETRIEVE_MODE ? 'restoration' : 'backup'),
                    " for the profile '$sync::current_profile' ended successfully");
-
+    #    sleep 1;
 }
 # re-clean eventually
 #print::hash_content(\%MOUNTED_VOLUMES, 'system::MOUNTED_VOLUMES');
@@ -1988,113 +2331,3 @@ system::umount_mounted_volumes();
 # TODO: execute post-script if available
 
 
-
-#################### Initial POD documentation ######################
-=pod
-
-=head1 NAME
-
-I<backup>, @PACKAGE_SUMMARY@
-
-I<backup> relies for that on B<rsync> (see L<http://samba.anu.edu.au/rsync/>) and
-(in a future release) B<duplicity> (see L<http://duplicity.nongnu.org/>) together with a
-configuration file.
-
-=head1 SYNOPSIS
-
-      backup [options]
-
-=head1 DESCRIPTION
-
-I<backup> rely on a configuration file to describe the characteristics of the
-backup job to be performed (files to include/exclude, target url etc. -- see
-L<CONFIGURATION FILE FORMAT> for more details).
-The main idea is to have the possibility to define several backup profile.
-Here is a illustrative examples:
-
-    # Configuration file example
-    #
-    #### Mandatory global settings ####
-    <global>
-         src_rootdir = $HOME     # Root directory on the (local) source
-         sync_include = *         # backup all sub-directories (relative to src_rootdir)
-    </global>
-
-    #### Mandatory default backup definition ####
-    <default>
-         target_url = drive:///Volumes/Backup  # backup on an external drive 'Backup'
-    </default>
-
-    # Definition of the backup on a local [encrypted] sparse bundle (Mac OS X)
-    <sbimage>
-         target_url  = sparsebundle:///path/to/image.sparsebundle
-         dst_rootdir = myBackup         # Specialized root directory for this backup
-    </sbimage>
-
-    # Definition of the backup on the machine 'toto' (via SSH access)
-    <toto>
-         target_url  = ssh://mylogin@toto.example.org  # backup through ssh
-         dst_rootdir = /backup/`whoami`@`hostname`     # Specialized root directory on target server
-         restrict_on_subnet = 10.7.14                  # backup only when you're working
-    </toto>
-
-    # Definition of the backup on the company NAS (via AFP access)
-    <nas>
-          # backup through AFP (eventually put the password in a separate file and use the directive 'password_file')
-  target_url  = afp://mylogin:mypassword@nas.company.com/volname
-  dst_rootdir = myBackup               # Root directory for the backup
-  restrict_on_subnet = 10.7.14         # backup only when you're working
-  </nas>
-
-  # Definition of the backup on a remote [encrypted] sparse bundle on the company NAS
-  <nassbimage>
-  target_url  = afp://mylogin:mypassword@nas.company.com/volname/path/to/image.sparsebundle
-  dst_rootdir = myBackup               # Root directory for the backup
-  restrict_on_subnet = 10.7.14         # backup only when you're working
-  </nassbimage>
-
-  So appart from the 'global' section, each backup is defined in a named block that helps
-  to complete and/or overwrite the global settings.
-To run the backup configured by default, just run:
-
-    ./backup -f /path/to/config_file
-
-  To run the backup configured by the 'toto' section, just run:
-
-./backup -f /path/to/config_file -s=toto
-
-  If a configuration file is not passed command-line through the C<-f> option, I<backup>
-  use by default $HOME/.backup.conf and then /etc/backup.conf.
-
-  To restore data from the backup 'toto', run :
-
-  ./backup -f /path/to/config_file -s=toto -r
-
-  Note that I<backup> try to use the configuration files C</etc/backup.conf> or C<~/.backup.conf>
-  so that the C<-f> option can be avoided.
-
-  =head1 OPTIONS
-
-  The following options are available:
-
-
-
-=cut
-
-
-  # POD documentation to be done:
-  #Suggested by Damian Conway in Perl Best Practices.
-  #Name
-  #Usage
-  #Description
-  #Required arguments
-  #Options
-  #Exit status
-  #Diagnostics
-  #Configuration
-  #Dependencies
-  #Incompatibilities
-  #Bugs and limitations
-  #Author
-  #License and copyright
-  #Disclaimer of warranty
