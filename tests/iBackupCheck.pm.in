@@ -1,0 +1,114 @@
+#!@PERL@ -w
+
+##############################################################################
+# File: iBackupCheck.pm
+#
+# Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+#               http://varrette.gforge.uni.lu
+# $Id$
+##############################################################################
+package iBackupCheck;
+
+use strict;
+use warnings;
+
+=head1 NAME
+
+iBackupCheck - utilities for checking ibackup configuration
+
+=cut
+
+BEGIN {
+    use Exporter   ();
+    our ($VERSION, @ISA, %EXPORT_TAGS, @EXPORT, @EXPORT_OK);
+    # Module version
+    $VERSION = 1.0;
+
+    # Module export list
+    @ISA         = qw(Exporter);
+
+    %EXPORT_TAGS = ( 'all' => [ qw( $SRCDIR $TOP_SRCDIR $TESTDIR $SCRIPT ) ] );
+
+    @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+    @EXPORT = qw();
+}
+
+=head1 SYNOPSIS
+
+    use iBackupCheck qw('all');
+
+=head1 DESCRIPTION
+
+Miscellaneous utilities for checking the ibackup program.
+
+=over
+
+=item C<$SRCDIR>, C<$TOP_SRCDIR>
+
+The corresponding variables inherited from the configuration of I<ibackup>.
+
+=item C<$TESTDIR>
+
+The path to the C<tests> directory of the I<ibackup> package.
+
+=item C<$SCRIPT>
+
+The script produced by the configuration and installation of I<ibackup> that
+should be checked against the regression tests present in the C<$TESTDIR/t/>
+directory and invoked via 'make check'
+
+=item C<$TMPDIR>
+
+The path to a temporary directory that wan be used for read/write operation
+throughout the check procedure
+
+=back
+
+=cut
+#use Test::More;
+use File::Path;
+
+our $SRCDIR     = "@srcdir@";
+our $TOP_SRCDIR = "@top_srcdir@";
+our $TESTDIR    = "@top_srcdir@/tests";
+our $SCRIPT     = "$TOP_SRCDIR/bin/backup";
+our $TMPDIR     = "/tmp/__ibackup_test__";
+
+# run this just before the script actually executes
+INIT {
+    mkpath($TMPDIR);
+}
+
+####
+# print global variables
+##
+sub print_variables() {
+    print "SRCDIR     = $SRCDIR\n";
+    print "TOP_SRCDIR = $TOP_SRCDIR\n";
+    print "TESTDIR    = $TESTDIR\n";
+    print "SCRIPT     = $SCRIPT\n";
+    print "TMPDIR     = $TMPDIR\n";
+}
+
+####
+# print a test header message
+##
+sub print_header($) {
+    my $title = shift;
+    printf("========== %-30s ==========\n", $title);
+}
+
+=head1 AUTHOR
+
+Sebastien Varrette C<< <Sebastien.Varrette@uni.lu> >>
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright (c) 2010 Sebastien Varrette, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=cut
+
+1;                              # End of the module iBackupCheck

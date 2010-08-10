@@ -7,11 +7,15 @@
 ## This is the Makefile.am file for backup
 ## ----------------------------------------------------------------
 
-ACLOCAL_AMFLAGS = -I config/m4
+ACLOCAL_AMFLAGS = -I config/m4 
+
+include $(top_srcdir)/config/vars.am
+
 #AUTOMAKE_OPTIONS = dist-shar
 man_MANS = backup.3
 
-EXTRA_DIST = AUTHORS \
+EXTRA_DIST += \
+    AUTHORS \
     ChangeLog  \
     COPYING    \
     bootstrap  \
@@ -22,6 +26,7 @@ EXTRA_DIST = AUTHORS \
     README     \
     TODO       \
     config/m4  \
+    config/vars.am \
     www        \
     etc        \
     $(icons_DATA)
@@ -75,9 +80,9 @@ if generate_WEBSITE
 WEBSITEDIR=www
 endif
 
-CLEANFILES=*~ bin/backup backup.3 backup.html
+CLEANFILES += *~ bin/backup backup.3 backup.html
 
-SUBDIRS = bin $(WEBSITEDIR)
+SUBDIRS = bin tests $(WEBSITEDIR)
 
 if use_SVN2CL
 CLEANFILES += .authors.xml

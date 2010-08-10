@@ -78,21 +78,26 @@ AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
-AC_CHECK_CPAN_MODULES(
-    Switch 
-    Storable 
-    Hash::Util
-    List::Util 
-    POSIX 
-    Getopt::Long 
-    Config::General 
-    Term::ANSIColor 
-    Mac::PropertyList
-    Data::Dumper 
-    Pod::Usage
-    Log::Handler
-    Exception::Class
-)
+# Generate this list by: 
+# cat ./bin/backup.in | grep -e "^use " | sed -e 's/[;(].*$//' | sed -e 's/^use //' | sed -e 's/ qw.*//' | sort | uniq
+# You can also look/launch 'perl tests/t/modules.t'
+
+dnl AC_CHECK_CPAN_MODULES(
+dnl Data::Dumper
+dnl File::Basename
+dnl Data::Dumper
+dnl Term::ReadKey
+dnl Exception::Class::TryCatch
+dnl Expect
+dnl Data::Dumper
+dnl Getopt::Long
+dnl Data::Dumper
+dnl Exception::Class
+dnl Exception::Class::TryCatch
+dnl Pod::Usage
+dnl Data::Dumper
+dnl Term::ANSIColor
+dnl )
 
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
@@ -102,6 +107,8 @@ AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
 	bin/backup
+        tests/Makefile
+        tests/iBackupCheck.pm
 	www/include/wmlrc.default
 	www/Makefile
 ])
