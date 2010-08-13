@@ -12,6 +12,8 @@ package iBackupCheck;
 use strict;
 use warnings;
 
+use Carp;
+
 =head1 NAME
 
 iBackupCheck - utilities for checking ibackup configuration
@@ -27,7 +29,7 @@ BEGIN {
     # Module export list
     @ISA         = qw(Exporter);
 
-    %EXPORT_TAGS = ( 'all' => [ qw( $SRCDIR $TOP_SRCDIR $TESTDIR $SCRIPT ) ] );
+    %EXPORT_TAGS = ( 'all' => [ qw( $SRCDIR $TOP_SRCDIR $TESTDIR $SCRIPT %ExitCodes ) ] );
 
     @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
     @EXPORT = qw();
@@ -66,17 +68,36 @@ throughout the check procedure
 
 =cut
 #use Test::More;
-use File::Path;
+use File::Path qw(mkpath rmtree);
 
 our $SRCDIR     = "@srcdir@";
 our $TOP_SRCDIR = "@top_srcdir@";
 our $TESTDIR    = "@top_srcdir@/tests";
 our $SCRIPT     = "$TOP_SRCDIR/bin/backup";
 our $TMPDIR     = "/tmp/__ibackup_test__";
+# cf backup.in -> this won't be required once I'll refactore the code as a separate module.
+our %ExitCodes = (
+                  'ok' => 0,
+                  'ko' => 1,
+                  'ibackup::Exception'                      => 256,
+                  'ibackup::Exception::RuntimeError'        => 2,
+                  'ibackup::Exception::CommandLineFormat'   => 3,
+                  'ibackup::Exception::ConfigFileFormat'    => 4,
+                  'ibackup::Exception::UnsupportedFeature'  => 5,
+                  'ibackup::Exception::DirectoryNotFound'   => 6,
+                  'ibackup::Exception::FileNotFound'        => 7,
+                  'ibackup::Exception::Network'             => 8,
+                  'ibackup::Exception::PasswordNotFound'    => 9,
+                 );
+
+
+
 
 # run this just before the script actually executes
 INIT {
-    mkpath($TMPDIR);
+    carp "The script $SCRIPT is missing and cannot be checked" unless (-f $SCRIPT);
+    carp "The temporary directory $TMPDIR already exists" if (-d $TMPDIR);
+    mkpath($TMPDIR) if ($TMPDIR =~ /^\/tmp/);
 }
 
 ####
@@ -110,5 +131,9 @@ This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 =cut
-
+END {
+    #     if ($TMPDIR =~ /^\/tmp/) {
+    #         rmtree($TMPDIR) || carp "Unable to remove the temporary directory $TMPDIR";
+    #     }
+}
 1;                              # End of the module iBackupCheck

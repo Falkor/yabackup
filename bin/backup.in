@@ -251,6 +251,7 @@ use strict;
 use warnings;
 use Term::ANSIColor; # To send the ANSI color-change sequences to the user's terminal
 
+
 ####
 # Sanitize paths (to remove ../ etc.
 # I tried Cwd::realpath but it does not work against unexisting path
@@ -1137,8 +1138,8 @@ sub mount_encfs($$@) {
         my $tmp_rawdir = "$mountpoint/$rawdir_url";
         $tmp_rawdir =~ s/\\(\s)/$1/g;
         $rawdir = Cwd::realpath("$tmp_rawdir");
-        ibackup::Exception::RuntimeError->throw(error => 
-                                                "Runtime error when determining the canonical path of encfs_rawdir") 
+        ibackup::Exception::RuntimeError->throw(error =>
+                                                "Runtime error when determining the canonical path of encfs_rawdir")
             unless ($rawdir);
     }
     print::debug("EncFS rawdir : $rawdir");
@@ -1415,9 +1416,10 @@ sub parse_target_url() {
     $BACKUP_CMD_INFO{'proto'}  = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
 
-    config::set_icon("$proto"); # Change the icon layout to match the protocol
-                                # used in this profile
-
+    if ($proto =~ /(file|drive|afp|sparsebundle)/) {
+        config::set_icon("$proto"); # Change the icon layout to match the
+                                    # protocol used in this profile
+    }
     my $set_to_msg="=> set the backup destination to";
 
     # Handle each protocol
@@ -2043,7 +2045,8 @@ sub set_profile($) {
         if (exists($SETTINGS{$key})) {
             $SETTINGS{$key} = $val;
         } else {
-            print::error_and_exit(1, "The directive $key is not recognized");
+            print::error_and_exit($main::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+                                  "The directive $key is not recognized");
         }
     }
     $sync::current_profile = "$profile";
@@ -2144,6 +2147,11 @@ use Exception::Class (
                        description => 'Exception related to network errors (bad subnet etc.)',
                        alias       => 'network_error',
                       },
+                      'ibackup::Exception::CommandFileFormat' =>
+                      {
+                       isa         => 'ibackup::Exception',
+                       description => 'Error in the options set on the command-line',
+                      },
                       'ibackup::Exception::ConfigFileFormat' =>
                       {
                        isa         => 'ibackup::Exception',
@@ -2166,7 +2174,6 @@ use Exception::Class (
                       },
                      );
 
-
 ##############################################################################
 #     PACKAGE MAIN
 ##############################################################################
@@ -2183,6 +2190,21 @@ use Pod::Usage;
 use Data::Dumper;
 use Term::ANSIColor;
 
+# This provide correspondences between exceptions and exit code (facilitate testings)
+our %ExitCodes = (
+                  'ok' => 0,
+                  'ko' => 1,
+                  'ibackup::Exception'                      => 256,
+                  'ibackup::Exception::RuntimeError'        => 2,
+                  'ibackup::Exception::CommandLineFormat'   => 3,
+                  'ibackup::Exception::ConfigFileFormat'    => 4,
+                  'ibackup::Exception::UnsupportedFeature'  => 5,
+                  'ibackup::Exception::DirectoryNotFound'   => 6,
+                  'ibackup::Exception::FileNotFound'        => 7,
+                  'ibackup::Exception::Network'             => 8,
+                  'ibackup::Exception::PasswordNotFound'    => 9,
+                 );
+my $exit_code = 0;
 
 # PATH (/sbin required for mount_afp)
 $ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
@@ -2195,7 +2217,8 @@ log::initialize();
 
 # Process command line
 my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
-print::error_and_exit(1, "Please check the format of the command-line. ",
+print::error_and_exit($ExitCodes{'ibackup::Exception::CommandLineFormat'},
+                      "Please check the format of the command-line. ",
                       "Use '$config::command --help' for more details") unless ($getoptRes);
 
 # Ensure the notification command exists (if used)
@@ -2246,10 +2269,14 @@ unless ($config::file) {
 }
 print::verbose("=> configuration file : $config::file");
 
+print::error_and_exit($ExitCodes{'ibackup::Exception::CommandLineFormat'},
+                      "Non-existing configuration file $config::file")
+  unless (-f "$config::file");
+
 # Now put the content of the configuration file into an hash table
 %config::CONFIG_FILE_CONTENT = Config::General::ParseConfig(-ConfigFile => $config::file,
                                                             -InterPolateEnv => 1);
-print::error_and_exit(1,
+print::error_and_exit($ExitCodes{'ibackup::Exception::ConfigFileFormat'},
                       "Empty backup configuration:",
                       "ensure that the content of $config::file is correct!")
   unless (%config::CONFIG_FILE_CONTENT);
@@ -2265,7 +2292,8 @@ print::debug("Backup section(s) to consider in the configuration file :",
 # one for each backup profile considered
 unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
                        'global', @config::backup_sections)) {
-    print::error_and_exit(1, "Missing profile section in $config::file");
+    print::error_and_exit($ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+                          "The required backup profiles are missing in $config::file");
 }
 # TODO: execute pre-script if available
 
@@ -2299,13 +2327,15 @@ foreach my $sec (@config::backup_sections) {
     };
     # catch
     if ( catch my $err ) {
-        if ($err->isa('ibackup::Exception::RuntimeError')      ||
-            $err->isa('ibackup::Exception::UnsupportedFeature')||
-            $err->isa('ibackup::Exception::Network')           ||
-            $err->isa('ibackup::Exception::ConfigFileFormat')  ||
-            $err->isa('ibackup::Exception::DirectoryNotFound') ||
-            $err->isa('ibackup::Exception::FileNotFound')      ||
+        if ($err->isa('ibackup::Exception::RuntimeError')       ||
+            $err->isa('ibackup::Exception::UnsupportedFeature') ||
+            $err->isa('ibackup::Exception::Network')            ||
+            $err->isa('ibackup::Exception::CommandLineFormat')  ||
+            $err->isa('ibackup::Exception::ConfigFileFormat')   ||
+            $err->isa('ibackup::Exception::DirectoryNotFound')  ||
+            $err->isa('ibackup::Exception::FileNotFound')       ||
             $err->isa('ibackup::Exception::PasswordNotFound')) {
+            $exit_code = $ExitCodes{ref($err)};
             print::error($err->error);
             print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . " Failed:\n$err",
                                 "KO_$config::icon");
@@ -2331,4 +2361,8 @@ system::umount_mounted_volumes();
 
 # TODO: execute post-script if available
 
+
+# That's all folks!
+print::verbose("Exit code: $exit_code");
+exit($exit_code);
 

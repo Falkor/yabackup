@@ -1,0 +1,63 @@
+-*- mode: text; mode: auto-fill; fill-column: 80 -*-
+================================================================================
+ File : README 
+
+ Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+               http://varrette.gforge.uni.lu
+================================================================================
+
+Directory: data/src-normal
+
+This is supposed to contain all kind of things you find in a user homedir:
+directories with various properties (permission, case), files, links, temporary
+files created by emacs/vim, binaries (gzip, mp3 etc.) 
+
+Directory content: 
+
+          ./#another_file#
+          ./#README#
+          ./.#README
+          ./.#tmp-file#
+          ./.hidden_directory
+          ./.hidden_directory/current.src
+          ./.hidden_file
+          ./.ssh
+          ./.ssh/id_dsa
+          ./.ssh/id_dsa.pub
+          ./another_file
+          ./bin
+          ./bin/script.sh
+          ./Desktop
+          ./Desktop/main.tex
+          ./Desktop/my document.doc
+          ./Desktop/my document.stderr
+          ./Desktop/subdir2.1
+          ./Desktop/subdir2.2
+          ./Desktop/subdir2.2/TAGS
+          ./Desktop/subdir2.3
+          ./file.txt
+          ./file.txt~
+          ./gzip.txt.gz
+          ./link.txt
+          ./Music
+          ./Music/iTunes
+          ./Music/iTunes/iTunes Music
+          ./Music/iTunes/iTunes Music/doublekill.mp3
+          ./Music/iTunes/iTunes Music/headshot.mp3
+          ./Music/iTunes/iTunes Music/monsterkill.mp3
+          ./Music/iTunes/iTunes Music/multikill.mp3
+          ./Music/to_simulate_itunes
+          ./my-ssh-pubkey
+          ./private
+          ./private/read_only_file
+          ./README
+          ./tobefiltered
+          ./tobefiltered/emptyfile
+          ./UC_DIR
+          ./UC_DIR/.obj
+          ./UC_DIR/main.cpp
+          ./UC_DIR/Makefile
+          ./UC_DIR/README
+
+
+================================================================================

@@ -1,0 +1,35 @@
+-*- mode: text; mode: auto-fill; fill-column: 80 -*-
+================================================================================
+ File : README 
+
+ Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+               http://varrette.gforge.uni.lu
+================================================================================
+
+Directory: data/src-easy
+
+This is supposed to contain the basic types of files/directory that could be
+synchronized:
+- classic directories with subdirs
+- hidden directories (starting by a point)
+- regular files
+- symbolic links
+- elements with different access right (cf .hiddendirectory, .hiddendirectory/secret)
+
+Note that none of the filenames contains strange characters 
+
+Directory content: 
+
+          ./.hiddendirectory
+          ./.hiddendirectory/secret
+          ./dir
+          ./dir/script.sh
+          ./dir/subdir
+          ./dir/subdir/subfile.txt
+          ./file.txt
+          ./link.txt
+          ./README
+
+
+
+================================================================================

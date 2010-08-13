@@ -18,13 +18,18 @@ use strict;
 use warnings;
 use Test::More qw( no_plan );
 
-iBackupCheck::print_header('Test global variables');
+diag('Test global variables');
 iBackupCheck::print_variables();
 
-iBackupCheck::print_header('Test common test configuration');
+diag('Test common test configuration');
 ok( (-f "$iBackupCheck::SCRIPT"),"The script '$iBackupCheck::SCRIPT' is present" );
 
-
+# No longer needed as I lauch it via perl
+# # Now that the script is present, make it executable for further test (this is
+# # done on 'make install' but not here where we test the generated script prior
+# # to the installation
+# my $res = chmod 0755, "$iBackupCheck::SCRIPT";
+# ok( $res == 1, "make the script '$iBackupCheck::SCRIPT' executable for future tests");
 
 
 

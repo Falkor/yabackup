@@ -22,7 +22,7 @@ use Test::More qw( no_plan );
 use File::Basename;
 use Data::Dumper;
 
-iBackupCheck::print_header('Test used modules');
+diag('Test used modules');
 open FILE, "$iBackupCheck::SCRIPT" || die "$!\n";
 # remember: read the filter from bottom to top
 my @module_list =
@@ -33,8 +33,8 @@ my @module_list =
   <FILE>;
 close FILE;
 
-print "List of the used packages:\n"; # , Dumper \@module_list;
-foreach (@module_list) { print "   $_\n"; }
+# print "List of the used packages:\n"; # , Dumper \@module_list;
+# foreach (@module_list) { print "   $_\n"; }
 
 foreach my $module (@module_list) {
     use_ok( "$module" );

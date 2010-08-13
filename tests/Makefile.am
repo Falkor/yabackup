@@ -26,8 +26,10 @@ test_utils = \
 EXTRA_DIST += $(test_utils)
 
 SOURCETESTS = \
-	t/init.t \
-    	t/modules.t
+	t/00-use.t \
+	t/01-init.t \
+	t/02-modules.t \
+	t/10-configfile.t
 
 IBACKUP_TESTS = ${SOURCETESTS:%=${srcdir}/%}
 
