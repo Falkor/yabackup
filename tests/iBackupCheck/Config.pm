@@ -1,8 +1,9 @@
 ##############################################################################
-# File : Config.pm
+# File : iBackupCheck/Config.pm
 #
 # Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
 #               http://varrette.gforge.uni.lu
+#
 # $Id$
 ##############################################################################
 package iBackupCheck::Config;
@@ -204,4 +205,4 @@ under the same terms as Perl itself.
 
 =cut
 
-1;                              # End of the module Config
+1;                              # End of the module iBackupCheck::Config
