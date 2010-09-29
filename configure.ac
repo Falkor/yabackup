@@ -38,38 +38,40 @@ PROG_RSYNC
 # ----------------------------------------------------------------
 AC_MSG_CHECKING([for website generation using pod2html and Website Meta Langage] )
 AC_ARG_ENABLE(
-    www, 
-    [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
-    [case "${enableval}" in
-    	  yes) AC_MSG_RESULT([on])
-	       PROG_POD2HTML
-	       PROG_WMK
-	       PROG_WML
-	       generate_website=true ;;
-  	  no)  AC_MSG_RESULT([off])
-	       generate_website=false ;;
-  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-www) ;;
-     esac],
-     [AC_MSG_RESULT([off])
-      generate_website=false]
+        www, 
+        [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
+        [case "${enableval}" in
+    	      yes) AC_MSG_RESULT([on])
+	           PROG_POD2HTML
+	           PROG_WMK
+	           PROG_WML
+	           generate_website=true ;;
+  	      no)  AC_MSG_RESULT([off])
+	           generate_website=false ;;
+  	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-www) ;;
+         esac
+        ],
+        [AC_MSG_RESULT([off])
+        generate_website=false]
 )
 AM_CONDITIONAL(generate_WEBSITE, test x$generate_website = xtrue)
 
 
 AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
 AC_ARG_ENABLE(
-    svn2cl, 
-    [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
-    [case "${enableval}" in
-    	  yes) AC_MSG_RESULT([on])
-	       PROG_SVN2CL
-	       use_svn2cl=true ;;
-  	  no)  AC_MSG_RESULT([off])
-	       use_svn2cl=false ;;
-  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
-     esac],
-     [AC_MSG_RESULT([off])
-      use_svn2cl=false]
+        svn2cl, 
+        [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
+        [case "${enableval}" in
+    	      yes) AC_MSG_RESULT([on])
+	           PROG_SVN2CL
+	           use_svn2cl=true ;;
+  	      no)  AC_MSG_RESULT([off])
+	           use_svn2cl=false ;;
+  	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
+         esac
+        ],
+        [AC_MSG_RESULT([off])
+         use_svn2cl=false]
 )
 AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 
@@ -79,25 +81,27 @@ AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 # Checks for libraries.
 # ----------------------------------------------------------------
 # Generate this list by: 
-# cat ./bin/backup.in | grep -e "^use " | sed -e 's/[;(].*$//' | sed -e 's/^use //' | sed -e 's/ qw.*//' | sort | uniq
+# ./bootstrap -e
 # You can also look/launch 'perl tests/t/modules.t'
 
-dnl AC_CHECK_CPAN_MODULES(
-dnl Data::Dumper
-dnl File::Basename
-dnl Data::Dumper
-dnl Term::ReadKey
-dnl Exception::Class::TryCatch
-dnl Expect
-dnl Data::Dumper
-dnl Getopt::Long
-dnl Data::Dumper
-dnl Exception::Class
-dnl Exception::Class::TryCatch
-dnl Pod::Usage
-dnl Data::Dumper
-dnl Term::ANSIColor
-dnl )
+AC_CHECK_CPAN_MODULES(
+        Config::General
+        Cwd
+        Data::Dumper
+        Exception::Class
+        Exception::Class::TryCatch
+        Expect
+        File::Basename
+        Getopt::Long
+        Hash::Util
+        List::Util
+        Log::Handler
+        Mac::PropertyList
+        Pod::Usage
+        Storable
+        Term::ANSIColor
+        Term::ReadKey
+)
 
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
