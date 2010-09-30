@@ -1832,11 +1832,11 @@ sub select_elements() {
 # Usage: sync::set_cmd_options()
 ##
 sub set_cmd_options() {
-    if (defined $config::SETTINGS{'exclude_pattern_file'}) {
-        if (-f "$config::SETTINGS{'exclude_pattern_file'}") {
-            $BACKUP_CMD_INFO{'opt'} .= " --exclude-from=$config::SETTINGS{'exclude_pattern_file'}";
+    if (defined $config::SETTINGS{'exclude_pattern_from'}) {
+        if (-f "$config::SETTINGS{'exclude_pattern_from'}") {
+            $BACKUP_CMD_INFO{'opt'} .= " --exclude-from=$config::SETTINGS{'exclude_pattern_from'}";
         } else {
-            print::warning("The pattern file for exclusion $config::SETTINGS{'exclude_pattern_file'}",
+            print::warning("The pattern file for exclusion $config::SETTINGS{'exclude_pattern_from'}",
                            'does not exists and will be ignored');
         }
     }
@@ -1937,13 +1937,14 @@ our %SETTINGS = (
                  'use_duplicity'          => 'no',
                  'password_file'          => undef,
                  'restrict_on_subnet'     => undef,
+                 'ssh_auth_sock'          => undef,
                  'src_rootdir'            => '/',
                  'dst_rootdir'            => '/',
                  'sync_include'           => '*',
                  'sync_exclude'           => undef,
                  'sync_exclude_exception' => undef,
                  'exclude_pattern'        => undef,
-                 'exclude_pattern_file'   => undef,
+                 'exclude_pattern_from'   => undef,
                  'Directory'              => undef,
                  'target_url'             => undef,
                  'logdir'                 => undef,
@@ -2042,6 +2043,7 @@ sub set_profile($) {
             $ENV{SSH_AUTH_SOCK} = format::interpret_cmd($subsection{'ssh_auth_sock'});
             print::debug('Setting the environment variable SSH_AUTH_SOCK ',
                          "to $ENV{SSH_AUTH_SOCK}");
+            $SETTING{'ssh_auth_sock'} = $ENV{SSH_AUTH_SOCK};
             next;
         }
         if (($key eq 'Directory') && defined($SETTINGS{$key})) {
@@ -2687,6 +2689,49 @@ Default: C</>
 Specify an email address where all errors/warnings can be sent upon I<backup>
 execution. 
 
+=item B<exclude_pattern = PATTERN>
+
+Specify the file patterns to be excluded from the synchronization process (see
+also the C<--exclude> option in L<rsync(1)>).
+This is useful to avoid the backup of temporary files etc. 
+
+Example:
+
+        exclude_pattern = .DS_Store   *~  #*#   .#*
+
+=item B<exclude_pattern_from = FILE>
+
+This directive is related to the C<exclude_pattern> directive, but it specifies
+a FILE that contains exclude patterns (one per line).
+Blank lines in the file and lines starting with C<;> or C<#> are ignored.  
+
+=item B<logdir = DIR>
+
+Set the directory that will contain the log files. 
+Ensure you set the correct write rights to this directory. 
+
+Example: 
+
+         logdir=/var/log/backup
+
+The following level are defined: debug (7), info (6), notice (5), warning(4),
+error(3), critical(2), alert(1) and emergency(0).
+
+I<backup> will create two log file:
+
+=over
+
+=item 1.
+
+C<DIR/common.log> that contains common logs (i.e. from level 5 until level 7)
+
+=item 2.
+
+C<DIR/error.log> that contains error logs you should pay attention (i.e. from
+level 0 until level 4). 
+
+=back
+
 =item B<password_file = FILE>
 
 Set FILE as the password file for I<backup>. 
@@ -2732,6 +2777,36 @@ C<(en0, en1)> on FreeBSD, OpenBSD and Darwin systems (which include Mac OS X)
 
 =back
 
+=item B<ssh_auth_sock = /path/to/ssh-agent.socket>
+
+Set the C<$SSH_AUTH_SOCK> environment variable for the synchronization process.
+
+To automate the connection to an SSH server (via public key authentication)
+despite the presence of a pass-phrase for your SSH key pair (which is more then
+advised), you probably use an SSH agent (see L<ssh-agent(1)>) to manage your
+pass-phrase via a local socket C</path/to/ssh-agent.socket> (i.e. the
+C<$SSH_AUTH_SOCK> environment variable).
+
+This directive is useful for running I<backup> in a cronjob (as B<cron>
+typically don't have access to the C<$SSH_AUTH_SOCK> environment variable). 
+
+Example: 
+
+         # static socket path 
+         ssh_auth_sock = /tmp/502/SSHKeychain.socket    
+
+         # ssh-agent socket on Mac OS X (> 10.5)
+         ssh_auth_sock = `/usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'`
+
+I<Note for Linux users>: by default, B<ssh-agent> binds the agent to a
+unix-domain socket with a dynamic path name
+(C</tmp/ssh-XXXXXXXXXX/agent.<ppid>>) which render this directive useless. 
+Hopefully, you can use the C<-a> option to set the path to the socket statically
+(see L<ssh-agent(1)>) so you probably want to run the SSH agent as follows: 
+
+         ssh-agent -a /path/to/ssh-agent.socket
+
+
 =item B<src_rootdir = ROOTDIR>
 
 Root directory on the (local) machine from where the data to be backup should be
@@ -2764,15 +2839,100 @@ homedir).
 Add exceptions to the pattern precised in the B<sync_exclude> directive.
 You may use the pattern symbols C<*>, C<^> and C<$> for each element of the list. 
 
-This is particularly useful if you use wildcards in both B<sync_include> and B<sync_exclude>
+This is particularly useful if you use wildcards in both B<sync_include> and
+B<sync_exclude>.  
 
 Typical example of usage:
  
-         sync_include = *                               # backup everything ...
-         sync_exclude = ^.*                             # ... except all hidden files and directories ... 
+         sync_include = *    # backup everything ...
+         sync_exclude = ^.*  # ... except all hidden files and directories ... 
          sync_exclude_exception = .ssh .gnupg .emacs.d  # ... yet this does not apply to these directories 
 
+=item B<target_url = URL>
+
+Define the target url of the backup (see L</"TARGET URL FORMAT">).
+
 =back
+
+=head1 TARGET URL FORMAT
+
+I<backup> tries to maintain a standard URL format for backup targets.  
+The generic format for a target URL is:
+
+              protocol://path|user[@host[:port]][/complementpath]
+
+I<backup> don't support the exposure of cleartext passwords on purpose for
+obvious security reasons. 
+When it is required (as for instance for AFP connections or EncFS directories),
+you have to use a separate password file (see the C<password_file> directive)
+where you put the correct access rights (600 typically). 
+
+Current supported protocols include: 
+
+=over 
+
+=item * C<drive> : an external drive 
+
+Example:  
+
+      drive:///Volumes/MyDrive         (under Mac OS X)
+      drive:///mnt/mydrive             (under Linux) 
+
+=item * C<file>  : a local folder
+
+Example: 
+
+      file:///path/to/local/folder
+
+=item * C<sparsebundle> :  a Mac OS X [encrypted] sparse bundle image
+
+(Only relevant under Mac OS X)
+
+Example: 
+
+      sparsebundle:///path/to/image.[dmg|sparsebundle]
+
+With the previous line, the sparse bundle image
+C</path/to/image.[dmg|sparsebundle]> will be mounted (let's say in
+C</Volumes/ImageName>) such that the backup process will use the target
+C</Volumes/ImageName/<dst_rootdir>>. 
+
+To create such an image, simply run the C<Disk Utility> application, select the
+C<New Image> and fill the form (pay attention to select the Image format as
+C<sparse bundle disk image> and C<No partition map>).
+If you want to create an encrypted sparse bundle image (which is strongly
+advised as it transparently secure the backup container), select a 256-bits AES
+encryption scheme and store the password (generate a random strong password)
+into your B<Keychain> such that the synchronization can interviene in a
+cronjob. 
+
+=item * C<ssh>   : SSH access to a remote server, with public key authentication 
+
+Example: 
+
+      ssh://mylogin@server1
+      ssh://mylogin@server1.example.org
+      ssh://mylogin@server2.example.org:8022
+
+Even if public key authentication is not required, it is strongly recommended and 
+mandatory if I<backup> it to be launched in a crontab for instance. 
+
+To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
+
+=item * C<afp> :  AFP (Apple Filing Protocol) access to a remote server (a NAS typically). 
+
+Example: 
+
+      afp://[user[:password]@]host[:port]/volumename/path/to/backupdir
+      afp://[user[:password]@]host[:port]/volumename/path/to/image.sparsebundle
+
+This is only available on Mac OS X (and may work on other systems if the I<mount_afp> command 
+is available). Whereas you can precise the password directly in the target_url, it is strongly 
+unadvised. Prefer the 'pass_file' directive even if exposing clear password is far from a good 
+solution. See the notes on this subject in the 'pass_file' directive. 
+
+=back
+
 
 =head1 EXIT STATUS
 
@@ -2791,6 +2951,12 @@ The I<backup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
  
 A documented example of the configuration file is proposed in the file
 C<@prefix@/share/doc/backup/examples/backup.conf.example>.
+
+=item C<<logdir>/common.log>
+
+=item C<<logdir>/error.log>
+
+I<backup> log files (assuming you set the C<logdir> directive)
 
 =back
 
