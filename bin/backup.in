@@ -171,7 +171,7 @@ sub notification($@) {
         $icon = "$config::icon" unless defined($icon);
         unless (defined($title)) {
             $title = "$config::command";
-            $title .= "  (profile: $sync::current_profile)" if defined($sync::current_profile);
+            $title .= "  ($sync::current_profile profile)" if defined($sync::current_profile);
         }
         my $priority = 0;
 
@@ -1277,6 +1277,7 @@ sub mount_sparsebundle($) {
     ibackup::Exception::FileNotFound->throw(error =>
                                             "The sparsebundle image '$sparsebundle' cannot be found")
         unless (-e $tmp_sparsebundle);
+    # TODO: eventually create the sparsebundle!
 
     # Ensure the 'hdiutil' command is available
     system::check_binary('hdiutil');
@@ -2373,4 +2374,432 @@ system::umount_mounted_volumes();
 # That's all folks!
 print::verbose("Exit code: $exit_code");
 exit($exit_code);
+
+######################## POD documentation ########################
+=pod
+
+=head1 NAME
+
+I<backup> - Yet Another Backup script
+
+A highly flexible script utility for the B<fast backup> of
+directories and/or files from your local system on various targets. 
+
+=head1 SYNOPSIS
+
+      backup [options]
+      backup -f /path/to/configfile -s sectionname 
+      backup --restore
+
+=head1 DESCRIPTION
+
+I<backup> is designed to facilitate the configuration of backups over multiple
+type of targets such as a local folder or an external drive, an [encrypted]
+sparsebundle or a remote server with SSH/AFP access. 
+In general, the target backup folder may be encrypted using EncFS.
+
+Being based on B<rsync> (L<http://samba.anu.edu.au/rsync/>), I<backup>
+implements a traditional [incremental] backup scheme, i.e. the target contains
+all information (full backup) of the source (typically your local
+homedir). Later on, when invoking the script, only the changed information is
+transferred. 
+
+So to summarize, I<backup> claims the following functionalities:
+
+=over 
+
+=item * B<Flexible and Easy to use>
+
+Although I<backup> is a command-line utility, the semantics of the configuration
+file is relatively simple and permit to setup many backup profiles 
+
+=item * B<Bandwidth and space efficient>
+
+I<backup> uses the B<rsync> algorithm so only the changed parts of files are
+sent to the target when doing an incremental backup.
+
+=item * B<Support various backup targets>
+
+Currently, I<backup> implements the following target schemes: 
+
+=over 
+
+=item *
+
+"local" drive (i.e a hard disk connected by USB or Firewire to your system) or
+"local" folder. 
+
+=item *
+
+"local" [encrypted] sparsebundle images (available only on Mac OS X)
+
+=item *
+
+"remote" folder on a server with SSH access
+
+=item *
+
+"remote" folder on a NAS with AFP access (available only on Mac OS X)
+
+=item *
+
+remote [encrypted] sparsebundle images on a NAS with AFP access
+
+=back
+
+=item * B<Secure>
+
+The target backup folder may be encrypted using EncFS (see
+L<http://www.arg0.net/encfs>) except when dealing with sparsebundle
+images. 
+In the later case, you can setup an encrypted sparsebundle that already secure
+your backup destination.
+
+=back
+
+I<backup> rely on a configuration file (using a format similar to Apache config
+files) to describe the characteristics of a backup to be performed (files to
+include/exclude, target url etc. -- see L</"CONFIGURATION FILE FORMAT"> for more
+details). These characteristics are aggregated into I<backup profiles>, each of
+them corresponding to a given section in the configuration file.
+
+Here is a illustrative examples: 
+
+    # Configuration file example
+    #
+    ### Mandatory global settings ### 
+    <global>
+         src_rootdir  = $HOME     # Root directory on the (local) source
+         sync_include = *         # backup everything (relative to src_rootdir)
+    </global>
+
+    ### Mandatory default backup profile: backup on your external drive ###
+    <default>
+        target_url = drive:///Volumes/MyBackupDrive
+    </default>
+
+    ### Now put as many profiles as you want
+
+    # Profile for my home backups (on an encrypted sparsebundle of a NAS accessed via AFP)
+    <home>
+        target_url = afp://mylogin@myhomenas/volname/path/to/image.sparsebundle
+        restrict_on_subnet = 192.168.0               # backup only when you're at home
+    </home>
+
+    # profile for work backup (on my desktop machine reachable by SSH)
+    <work>
+        target_url = ssh://mylogin@toto.company.org  # backup through ssh
+        dst_rootdir = /backup/`whoami`@`hostname`    # Specialized root directory on target server
+        restrict_on_subnet = 10.100                  # backup only when you're working
+    </work> 
+
+So appart from the 'global' section, each backup is defined in a named block
+(aka profile) that complete and/or overwrite the global settings.
+
+To start the backup configured by default, simply run::
+ 
+    backup -f /path/to/configfile
+
+To start the backup configured under the C<home> profile, just run:
+
+    backup -f /path/to/configfile -s home
+
+To restore data from the backup operated via the C<home> profile, run the
+following command: 
+
+    backup -f /path/to/configfile -s home --restore
+
+Note that I<backup> tries by default to use the configuration files
+C</etc/backup.conf> and C<~/.backup.conf> so that the C<-f> option can be
+avoided. 
+
+=head1 COMMAND-LINE OPTIONS
+
+I<backup> supports the following options:
+
+=over
+
+=item B<--config-file=FILE  -f FILE>
+
+Set FILE as the I<backup> configuration file to be used.  Note that such
+a configuration file is mandatory (see L</"CONFIGURATION FILE FORMAT">)
+
+By default, I<backup> search for the following files: C</etc/backup.conf> and
+C<~/.backup.conf>
+
+=item B<--debug>
+
+Debug mode. Display debugging information probably only relevant to me ;)
+
+=item B<--dry-run   -n>
+
+Simulates the operations to show what would have been done and/or transferred but do 
+not perform any actions.
+
+=item B<--exact-sync  --delete   -e>
+
+Exact synchronization mode.
+Causes I<backup> to delete files on the target if absent in the source directory.
+This ensure an exact replica but you may loose files so use this option with caution.
+
+=item B<--help  -h>
+
+Display a help screen and quit.
+
+=item B<--list-profiles -l>
+
+(Not yet implemented) List the available backup profiles in the I<backup>
+configuration file.  A more detailed view is proposed when used in combination
+with the C<-v> option.
+
+=item B<--mac-fork  -m>
+
+Use Mac OS resource fork for backup.  This is only relevant on Mac OS X and
+requires you to use at least the version 3.0 of B<rsync> (installed via the
+macports typically - see L<http://www.macports.org>)
+
+Causes I<backup> to use the Mac OS resource forks when calling the rsync
+function.  This will preserve Mac OS extended attributes.  If you are running
+Mac OS X, you REALLY want this. Simply pay attention not to use the default
+B<rsync> binary (2.6.9 in Snow Leopard).
+
+=item B<--notification>
+
+Activates user notification of I<backup> status, typically via B<Growl> (see
+L<http://growl.info/>) under Mac OS X or B<notify-send> under Linux (C<apt-get
+install libnotify-bin> on Debian/Ubuntu for instance).
+
+Under Mac OS X, you will have to install the B<growlnotify> command-line utility
+in your application path (see L<http://growl.info/extras.php>)
+
+=item B<--post-script=SCRIPT>
+
+(Not yet implemented) Execute the script C<SCRIPT> (use absolute path) AFTER the
+backup operation.
+
+=item B<--pre-script=SCRIPT>
+
+(Not yet implemented) Execute the script C<SCRIPT> (use absolute path) BEFORE
+the backup operation.  If the execution of this script fails, the backup will
+not continue.
+
+=item B<--push -p>
+
+Push mode: push data on the backup target. This is the default behaviour of
+I<backup>.
+
+=item B<--quiet>
+
+Quiet mode: minimize the number of printed messages and don't ask questions. 
+Very useful for invoking this script in a crontab yet USE WITH CAUTION has all 
+operations will be performed without your interaction.
+
+Note that this option cannot be used in conjunction with the C<--restore> option
+(that automatically disable this mode).
+
+=item B<--restore  --retrieve  -r>
+
+Retrieve mode: restore data from the backup. 
+USE WITH CAUTION as this will probably overwrite files on your local machine!
+
+=item B<--section=SECTION[, SECTION2 ...]>
+
+=item B<-s SECTION[, SECTION2 ...]>
+
+Specify the successive sections (i.e. backup profiles) to use for the backup
+configuration (relative to the used configuration file -- 
+see L</"CONFIGURATION FILE FORMAT">) 
+If this option is not set, I<backup> will use the B<default> profile.
+
+You can specify several successive sections that will generate as many backup
+attempts. 
+
+=item B<--verbose  -v>
+
+Verbose mode. Display more information
+
+=item B<--version>
+
+Display the I<backup> version number then quit. 
+
+=back
+
+=head1 CONFIGURATION FILE FORMAT
+
+The configuration file for I<backup> is divided into sections defined as blocks.
+A block looks much like a block in the wellknown apache config format. 
+It starts with C<< <blockname> >> and ends with C<< </blockname> >>
+Later on, C<blockname> can be referred to as the backup profile name you want to
+use for a given backup operation. 
+
+Two sections are mandatory: C<global> (which define global settings for the backup) and 
+C<default> (which refer to the default backup profile). 
+Each additionnal section is considered as a separate profile and can be 
+referred to using the command-line option C<-s> (see L</"DESCRIPTION">).
+
+Note that when defining directory or files patterns, you can invoke external
+commands using backquotes (C<`hostname -f`> for instance), use the environment
+variable C<$HOME> or integrate the following
+pattern symbols : the wildcard C<*>, the symbol C<^> to specify the begining
+of a name and the symbol C<$> to refer to its end.
+For instance, you can use the following patterns: 
+
+=over
+
+=item * 
+
+C<*> : all sub-directories (including the hidden one that starts with '.')
+
+=item * 
+
+C<^AR*> : all elements whose name starts by AR
+
+=item * 
+
+C<*ES$> : all elements whose name ends by ES
+
+=item * 
+
+C<^.*>  : all hidden directories/files (the one that starts by '.')
+
+=back
+
+
+For a given section, the following directives are recognized: 
+
+=over 
+
+=item B<< <Directory DIR> ... </Directory> >>
+
+(Not yet implemented) 
+This directive makes it possible to specialize the behaviour of I<backup> for the 
+directory DIR. 
+
+=item B<dst_rootdir = ROOTDIR>
+
+Root directory on the backup target (specialized by the C<target_url> directive)
+where the data should be synchronized. 
+
+Default: C</>
+
+=item B<email = EMAIL>
+
+Specify an email address where all errors/warnings can be sent upon I<backup>
+execution. 
+
+=item B<password_file = FILE>
+
+Set FILE as the password file for I<backup>. 
+Each line of the password file corresponds to a password entry with the following format:
+ 
+   target_url   password
+
+Example: 
+
+    afp://user@server/volumename                        mypasword     
+    ssh+encfs://user@server:/path/to/SecureBackup	encfspassword
+
+
+For the moment, this option is only relevant for EncFS volumes and AFP
+connections. 
+Indeed, it seemed impossible to rely on other (more secure) mechanisms such as
+keychain (used for encrypted sparse bundle mounts for instance), or agents (used
+for SSH -- see the 'auth_auth_sock' directive).  I simply thought it's a better
+alternative than putting the password in I<backup> configuration file.
+
+By the way, it's B<NEVER> a good idea to put clear password in a text file. 
+At minimum, ensure correct rights on this file ('chmod 600 /path/to/passwordfile') and don't 
+put a personnal password in it. 
+Prefer a random (unique) one generated by openSSL (run C<openssl rand 16 -base64>
+for instance). 
+
+=item B<restrict_on_subnet = SUBNET> 
+
+Operate the synchronization only when your machine (i.e the network interface)
+belongs to the subnet SUBNET. 
+The successive network interface checked for an IP to be compared with SUBNET
+are as follows: 
+
+=over 4
+
+=item * 
+
+C<(eth0, eth1)> on Linux system (obtained by the B<uname> command)
+
+=item * 
+
+C<(en0, en1)> on FreeBSD, OpenBSD and Darwin systems (which include Mac OS X)
+
+=back
+
+=item B<src_rootdir = ROOTDIR>
+
+Root directory on the (local) machine from where the data to be backup should be
+considered. 
+
+Default: C</>
+
+=item B<sync_include = PATTERNLIST>
+
+Space separated list of directories/files pattern to include from
+synchronization (each of them relative to B<src_rootdir>).
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the
+list.
+
+Default: C<*>
+
+=item B<sync_exclude = PATTERNLIST>
+
+Space separated list of directories/files patterns to exclude from
+synchronization (each of them relative to B<src_rootdir>).
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the
+list.
+
+This is particularly useful when you want to backup all but a few directories in
+C<src_rootdir> (let's say the C<Library> and C<Applications> directories in your
+homedir).  
+
+=item B<sync_exclude_exception = PATTERNLIST>
+
+Add exceptions to the pattern precised in the B<sync_exclude> directive.
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the list. 
+
+This is particularly useful if you use wildcards in both B<sync_include> and B<sync_exclude>
+
+Typical example of usage:
+ 
+         sync_include = *                               # backup everything ...
+         sync_exclude = ^.*                             # ... except all hidden files and directories ... 
+         sync_exclude_exception = .ssh .gnupg .emacs.d  # ... yet this does not apply to these directories 
+
+=back
+
+=head1 EXIT STATUS
+
+
+
+
+=head1 FILES
+
+=over 
+
+=item C</etc/backup.conf>
+
+=item C<~/.backup.conf>
+
+The I<backup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
+ 
+A documented example of the configuration file is proposed in the file
+C<@prefix@/share/doc/backup/examples/backup.conf.example>.
+
+=back
+
+=head1 COPYRIGHT
+
+I<backup> is released under GNU GPL Licence v3.
+
+This  is a free software. There is NO warranty; not even for
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+=cut
 
