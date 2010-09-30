@@ -31,7 +31,6 @@
 # MA  02110-1301, USA.
 #
 # Sebastien Varrette     <Sebastien.Varrette@uni.lu>\n
-# Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu> \n
 # University of Luxembourg                          \n
 # 6, rue Richard Coudenhove-Kalergi                 \n
 # L-1359 Luxembourg                                 \n
@@ -463,7 +462,6 @@ sub has_keys($@) {
     }
     return $res;
 }
-
 
 
 ##############################################################################
@@ -1268,13 +1266,17 @@ sub mount_encfs($$@) {
 # Return the mount point where the sparsebundle is mounted (or throw an
 # exception if the mount failed)
 #
-# Usage: my $mountpoint = system::mount_sparsebundle('/path/to/image.sparsebundle')
+# Usage: my $mountpoint = system::mount_sparsebundle('/path/to/image.[sparsebundle|dmg]')
 ###
 sub mount_sparsebundle($) {
     my $sparsebundle = shift;
+    # sanitize the path (change '\ ' to ' '), mandatory to effectively check the
+    # existence of the file via the -e test
+    my $tmp_sparsebundle = $sparsebundle;
+    $tmp_sparsebundle =~ s/\\(\s)/$1/g;
     ibackup::Exception::FileNotFound->throw(error =>
                                             "The sparsebundle image '$sparsebundle' cannot be found")
-        unless (-e $sparsebundle);
+        unless (-e $tmp_sparsebundle);
 
     # Ensure the 'hdiutil' command is available
     system::check_binary('hdiutil');
@@ -1674,7 +1676,13 @@ sub set_cmd() {
     # backup, ensuring this directory exists
     my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
     system::check_has_directory( $src_rootdir );
-    $BACKUP_CMD_INFO{'src'} = Cwd::realpath($src_rootdir);
+#     my $tmp_src_rootdir = $src_rootdir;
+#     $tmp_src_rootdir =~ s/\\(\s)/$1/g;
+#     $BACKUP_CMD_INFO{'src'} = Cwd::realpath($tmp_src_rootdir);
+    $BACKUP_CMD_INFO{'src'} = $src_rootdir;
+    ibackup::Exception::RuntimeError->throw(error =>
+                                            "Empty analysed source rootdir (from $src_rootdir)")
+        unless ($BACKUP_CMD_INFO{'src'});
 
     # Set the backup destination by analysing the target_url
     sync::parse_target_url();
