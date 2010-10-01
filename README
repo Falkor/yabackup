@@ -1,11 +1,14 @@
 
-	backup - Backup, a script utility to backup your system
+	yaBackup - Yet Another Backup script 
 	
-  Homepage: http://ibackup.gforge.uni.lu
+        Homepage: http://github.com/Falkor/yabackup
 
-  Copyright (c) 2009 Sebastien Varrette, Guillaume-Jean Herbiet
+  Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
-  backup is free software; you can redistribute it and/or modify
+  Code contribution before the complete code rewrite by 
+  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
+
+  yaBackup is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 3 of the License, or
   (at your option) any later version.
@@ -21,10 +24,9 @@
 
 
 Comments are welcome. 
-Please report bugs using informations provided at the page 
-		http://ibackup.gforge.uni.lu/bugs.html
+Please report bugs on <http://github.com/Falkor/yabackup/issues>
 
-Support: ibackup-support@lists.gforge.uni.lu
+Support: yabackup-support@lists.uni.lu
 
 Finally, if the 'configure' script is missing (or modify any configuration 
 file of the autotools - configure.ac or Makefile.am), just run the 
@@ -34,4 +36,3 @@ It supposes the availability on your system of the following software:
 - automake v1.9.6 or later
 
 	Sebastien Varrette 	<Sebastien.Varrette@uni.lu>
-	Guillaume-Jean Herbiet 	<Guillaume.Herbiet@uni.lu>
