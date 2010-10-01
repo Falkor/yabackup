@@ -2040,10 +2040,10 @@ sub set_profile($) {
     while (my ($key, $val) = each(%subsection)) {
         # Special treatment for the SSH agent
         if ($key eq 'ssh_auth_sock') {
-            $ENV{SSH_AUTH_SOCK} = format::interpret_cmd($subsection{'ssh_auth_sock'});
+            $SETTINGS{'ssh_auth_sock'} = format::interpret_cmd($subsection{'ssh_auth_sock'});
             print::debug('Setting the environment variable SSH_AUTH_SOCK ',
-                         "to $ENV{SSH_AUTH_SOCK}");
-            $SETTING{'ssh_auth_sock'} = $ENV{SSH_AUTH_SOCK};
+                         "to $SETTINGS{'ssh_auth_sock'}");
+            $ENV{SSH_AUTH_SOCK} = $SETTINGS{'ssh_auth_sock'};
             next;
         }
         if (($key eq 'Directory') && defined($SETTINGS{$key})) {
@@ -2384,8 +2384,8 @@ exit($exit_code);
 
 I<backup> - Yet Another Backup script
 
-A highly flexible script utility for the B<fast backup> of
-directories and/or files from your local system on various targets. 
+A highly flexible Perl script for the B<fast backup> of
+directories and/or files from your local system on various targets.
 
 =head1 SYNOPSIS
 
@@ -2396,9 +2396,11 @@ directories and/or files from your local system on various targets.
 =head1 DESCRIPTION
 
 I<backup> is designed to facilitate the configuration of backups over multiple
-type of targets such as a local folder or an external drive, an [encrypted]
-sparsebundle or a remote server with SSH/AFP access. 
-In general, the target backup folder may be encrypted using EncFS.
+type of targets such as local folders, external drive, [encrypted] sparsebundle
+images, a remote machine with SSH access or a NAS with AFP access.  Except for
+the case of sparsebundle images (that can be inherently encrypted), the target
+backup folder may be encrypted using EncFS such that you don't have to worry
+about the security of your backups.
 
 Being based on B<rsync> (L<http://samba.anu.edu.au/rsync/>), I<backup>
 implements a traditional [incremental] backup scheme, i.e. the target contains
@@ -2689,6 +2691,108 @@ Default: C</>
 Specify an email address where all errors/warnings can be sent upon I<backup>
 execution. 
 
+=item B<encfs_rawdir = DIR>
+
+Specifies the path to the directory (generally named C<.secure/> or C<.crypt/> so
+as to be hidden) that will contain the EncFS raw data and configuration. 
+Note that the usage of this directive is sufficient to indicate to I<backup> the
+will to encrypt the target backup folder (with EncFS), even in the case of a
+backup profile on a remote server (accessed by SSH or AFP).    
+
+This path is always given on the basis of the target url defining the backup
+target such that the general format of the value for this directive is as
+follows:  
+
+         encfs_rawdir = target_url:[/]path/to/encfs/rawdir<path>
+
+It is important to understand that whereas the EncFS mountpoint will correspond
+to the target backup folder (globally, C<target_url>/C<dst_rootdir>), the EncFS
+raw dir CANNOT be a subdirectory of this target folder. 
+In most cases, the EncFS raw directory is chosen at the same level (in the file
+system tree) than the mountpoint. 
+
+Example: 
+
+         EncFS mountpoint:    /mnt/MyBackup/backup
+         EncFS raw directory: /mnt/MyBackup/.secure
+
+Consequently, the specification of DIR can appear in two modes:
+
+=over 
+
+=item 1. 
+
+as a relative path to the mountpoint. To come back to the previous example, it
+can lead to the following I<backup> profile configuration: 
+
+        target_url   = drive:///mnt/MyBackup/backup
+        encfs_rawdir = target_url:../.secure
+
+=item 2. 
+
+as an absolute path. This mode is mandatory for backup profile relying on the
+SSH protocol. Again, on the basis of the previous example, we can have the
+following backup profile: 
+
+        target_url   = ssh://login@server
+        dst_rootdir  = /mnt/MyBackup/backup
+        encfs_rawdir = target_url:/mnt/MyBackup/.secure
+
+=back
+
+Note that except for a profile using the SSH protocol (see L</"TARGET URL
+FORMAT">), if EncFS is not yet configured, I<backup> will proceed to the
+configuration for you. Simply follow the instructions given on the screen.
+
+I<backup> tries several ways to recover the EncFS pass-phrase of the target
+backup folder
+
+=over
+
+=item 1.
+
+If the C<password_file> directive is precised, I<backup> attempts to extract the
+password from the appropriate entry in the password file.
+
+=item 2.
+
+Ask the user the fill the password (except with the C<--quiet> command-line
+option -- see L</"COMMAND-LINE OPTIONS">)
+
+=back
+
+If you want to automate the synchronization process in a cronjob, you will be
+obliged to rely on a password file.
+
+I<Note for Debian users>: the B<encfs> package in Lenny (v.1.4.2) contains a bug
+for the creation of EncFS mounts with the default AES encryption scheme.  When
+creating the EncFS folder, I<backup> use the C<--standard> option of encfs (see
+L<encfs(1)>) that precisely use this encryption scheme.  In this case, the mount
+will fail.  The solution is to manually create the mount by running : 
+
+       encfs /path/to/rawdir  /path/to/mountpoint
+
+and selecting the C<expert configuration mode> so as to choose the B<Blowfish>
+cypher scheme (recommended configuration: 256 bits key size and Block filename
+encoding).
+
+B<Restrictions>: 
+
+=over
+
+=item *
+
+in SSH mode, I<backup> currently assumes the remote server to run a Linux OS
+such that the remote EncFS backup target will be unmounted using the command
+C<fusermount -u> (whereas C<umount> should be used under Mac OS X).
+
+=item *
+
+EncFS is currently not supported in sparsebundle mode (this also applies to
+sparsebundle over AFP shares).
+
+=back
+
 =item B<exclude_pattern = PATTERN>
 
 Specify the file patterns to be excluded from the synchronization process (see
@@ -2705,7 +2809,7 @@ This directive is related to the C<exclude_pattern> directive, but it specifies
 a FILE that contains exclude patterns (one per line).
 Blank lines in the file and lines starting with C<;> or C<#> are ignored.  
 
-=item B<logdir = DIR>
+=item B<logdir = LOGDIR>
 
 Set the directory that will contain the log files. 
 Ensure you set the correct write rights to this directory. 
@@ -2892,11 +2996,24 @@ Example:
 
       sparsebundle:///path/to/image.[dmg|sparsebundle]
 
+      # See below with the afp protocol
+      afp://user@nas/volumename/path/to/image.[dmg|sparsebundle]
+
 With the previous line, the sparse bundle image
 C</path/to/image.[dmg|sparsebundle]> will be mounted (let's say in
 C</Volumes/ImageName>) such that the backup process will use the target
 C</Volumes/ImageName/<dst_rootdir>>. 
 
+Note that the mount point is automatically retrieved by I<backup> so you don't
+have to worry about that. 
+
+Note that in this mode, you cannot encrypt the target backup folder using
+EncFS. This is not considered as a serious security issue as B<encrypted>
+sparse-bundle images are supported (and provide a far more efficient data access
+than EncFS).
+
+For the moment, I<backup> do not permit the automatic creation of the
+sparsebundle image (if not found). 
 To create such an image, simply run the C<Disk Utility> application, select the
 C<New Image> and fill the form (pay attention to select the Image format as
 C<sparse bundle disk image> and C<No partition map>).
@@ -2914,30 +3031,148 @@ Example:
       ssh://mylogin@server1.example.org
       ssh://mylogin@server2.example.org:8022
 
-Even if public key authentication is not required, it is strongly recommended and 
-mandatory if I<backup> it to be launched in a crontab for instance. 
+Even if public key authentication is not strictly required, it is strongly
+recommended and mandatory if I<backup> it to be launched in a crontab for
+instance. 
+Additionally, if not set, you will be prompted for your login password on every
+synchronization step (i.e. once per source directory/file) so you will quickly
+want to automate the authentication.  
 
-To setup public key authentication, please refer to L<http://sial.org/howto/openssh/publickey-auth/> 
+To setup public key authentication, please refer to
+L<http://sial.org/howto/openssh/publickey-auth/>
 
-=item * C<afp> :  AFP (Apple Filing Protocol) access to a remote server (a NAS typically). 
+Moreover, you are more than encouraged to associate with your SSH key pair a
+strong pass-phrase such that even if the secret key is stolen (let's say because
+the external drive where you backup your homedir has been stolen), the pair
+cannot be used to impersonate you. 
 
-Example: 
+You may argue that in this case, you will be prompted for your pass-phrase on
+every authentication operation (therefore with no benefit compared to a regular
+password-based authentication), hopefully an SSH agent (see L<ssh-agent(1)>) can
+take care of your pass-phrase for a given period of time (the day typically).
+To make the SSH agent interact with I<backup>, please refer to the
+C<ssh_auth_sock> directive.  
 
-      afp://[user[:password]@]host[:port]/volumename/path/to/backupdir
-      afp://[user[:password]@]host[:port]/volumename/path/to/image.sparsebundle
+=item * C<afp> :  AFP (Apple Filing Protocol) access (to a NAS typically). 
 
-This is only available on Mac OS X (and may work on other systems if the I<mount_afp> command 
-is available). Whereas you can precise the password directly in the target_url, it is strongly 
-unadvised. Prefer the 'pass_file' directive even if exposing clear password is far from a good 
-solution. See the notes on this subject in the 'pass_file' directive. 
+(Only relevant under Mac OS X)
+
+The general url format in this case is as follows (see also L<mount_afp(8)>):
+
+        afp://[user[:password]@]host[:port]/volumename[/complement/path]
+
+The optional complement path permits to precise a root directory in the mounted
+AFP volume where the synchronization process should operate. It can also be a
+path to an [encrypted] sparsebundle image located in the mounted AFP volume. 
+
+Example:
+
+        # Anonymous access to the shared volume                
+        afp://guest@compagnynas.org/shared
+
+        # Access to the personnal volume of an authorized user
+        afp://login:secretpasword@compagnynas.org/loginhomedir
+        afp://login@compagnynas.org/loginhomedir  # (better): assumes you put the 
+                                                  # password in a password file
+
+        # As above and backup in /Volumes/volumename/backup
+        afp://login@compagnynas.org/loginhomedir/backup
+
+        # As above and backup in the sparsebundle image /Volumes/volumename/backup/image.sparsebundle
+        afp://login@compagnynas.org/loginhomedir/backup/image.sparsebundle
+
+Except for anonymous access (characterized by the C<guest> username), a password
+is mandatory. 
+I<backup> tries several ways to recover this password
+
+=over
+
+=item 1.
+
+directly from the target url if provided. 
+
+=item 2. 
+
+if the C<password_file> directive is precised, I<backup> attempts to extract the
+password from the appropriate entry in the password file.
+
+=item 3.
+
+ask the user the fill the password (except with the C<--quiet> command-line
+option -- see L</"COMMAND-LINE OPTIONS">)
+
+=back
+
+Whereas you can precise the password directly in cleartext in the target_url, it
+is strongly unadvised.
+If the synchronization process is meant to be automated (in a cronjob
+typically), prefer relying on a separate password file (see the C<password_file>
+directive for details about the format required in this file). 
+
+Finally, once the AFP volume is mounted (let's say in C</Volumes/volumename>)
+and if the afp url is complemented by a path towards an [encrypted]
+sparsebundle image, I<backup> handle the image as if following target url would
+have been applied:  
+
+         sparsebundle:///Volumes/volumename/path/to/image.[dmg|sparsebundle]
+
+i.e. the treatment inherent to the above C<sparsebundle> protocol is applied. 
 
 =back
 
 
 =head1 EXIT STATUS
 
+I<backup> has the following return codes:
 
+=over
 
+=item 0
+
+success
+
+=item 1
+
+generic error
+
+=item 2
+
+runtime error
+
+=item 3
+
+command-line format error
+
+=item 4
+
+configuration file format error
+
+=item 5
+
+unsupported feature
+
+=item 6
+
+a required directory cannot be found
+
+=item 7
+
+a required file cannot be found
+
+=item 8
+
+network error (SSH/AFP connection failure, restriction imposed by the
+C<restrict_on_subnet> directive etc.) 
+
+=item 9
+
+a mandatory password/pass-phrase cannot be retrieved (EncFS mount, AFP access etc.)
+
+=item 256
+
+generic exception
+
+=back
 
 =head1 FILES
 
@@ -2948,17 +3183,23 @@ solution. See the notes on this subject in the 'pass_file' directive.
 =item C<~/.backup.conf>
 
 The I<backup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
- 
+
 A documented example of the configuration file is proposed in the file
 C<@prefix@/share/doc/backup/examples/backup.conf.example>.
 
-=item C<<logdir>/common.log>
+=item C<LOGDIR/common.log>
 
-=item C<<logdir>/error.log>
+=item C<LOGDIR/error.log>
 
 I<backup> log files (assuming you set the C<logdir> directive)
 
 =back
+
+=head1 BUGS
+
+Please report bugs using informations provided at the page L<http://ibackup.gforge.uni.lu/bugs.html>
+
+
 
 =head1 COPYRIGHT
 
