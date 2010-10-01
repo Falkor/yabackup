@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2008 -- see the copyright file
 #
-# A set of m4 macros for ibackup
+# A set of useful m4 macros for yaBackup (in addition to the one placed in config/m4/)
 #  
 ############################################################################################
 

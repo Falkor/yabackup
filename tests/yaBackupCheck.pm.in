@@ -1,13 +1,13 @@
 #!@PERL@ -w
 
 ##############################################################################
-# File: iBackupCheck.pm
+# File: yaBackupCheck.pm
 #
 # Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
 #               http://varrette.gforge.uni.lu
 # $Id$
 ##############################################################################
-package iBackupCheck;
+package yaBackupCheck;
 
 use strict;
 use warnings;
@@ -16,7 +16,7 @@ use Carp;
 
 =head1 NAME
 
-iBackupCheck - utilities for checking ibackup configuration
+yaBackupCheck - utilities for checking yaBackup configuration
 
 =cut
 
@@ -37,25 +37,25 @@ BEGIN {
 
 =head1 SYNOPSIS
 
-    use iBackupCheck qw('all');
+    use yaBackupCheck qw('all');
 
 =head1 DESCRIPTION
 
-Miscellaneous utilities for checking the ibackup program.
+Miscellaneous utilities for checking the yaBackup program.
 
 =over
 
 =item C<$SRCDIR>, C<$TOP_SRCDIR>
 
-The corresponding variables inherited from the configuration of I<ibackup>.
+The corresponding variables inherited from the configuration of I<yaBackup>.
 
 =item C<$TESTDIR>
 
-The path to the C<tests> directory of the I<ibackup> package.
+The path to the C<tests> directory of the I<yaBackup> package.
 
 =item C<$SCRIPT>
 
-The script produced by the configuration and installation of I<ibackup> that
+The script produced by the configuration and installation of I<yaBackup> that
 should be checked against the regression tests present in the C<$TESTDIR/t/>
 directory and invoked via 'make check'
 
@@ -74,20 +74,20 @@ our $SRCDIR     = "@srcdir@";
 our $TOP_SRCDIR = "@top_srcdir@";
 our $TESTDIR    = "@top_srcdir@/tests";
 our $SCRIPT     = "$TOP_SRCDIR/bin/backup";
-our $TMPDIR     = "/tmp/__ibackup_test__";
-# cf backup.in -> this won't be required once I'll refactore the code as a separate module.
+our $TMPDIR     = "/tmp/__yaBackup_test__";
+# cf bin/yabackup.in -> this won't be required once I'll refactore the code as a separate module.
 our %ExitCodes = (
                   'ok' => 0,
                   'ko' => 1,
-                  'ibackup::Exception'                      => 256,
-                  'ibackup::Exception::RuntimeError'        => 2,
-                  'ibackup::Exception::CommandLineFormat'   => 3,
-                  'ibackup::Exception::ConfigFileFormat'    => 4,
-                  'ibackup::Exception::UnsupportedFeature'  => 5,
-                  'ibackup::Exception::DirectoryNotFound'   => 6,
-                  'ibackup::Exception::FileNotFound'        => 7,
-                  'ibackup::Exception::Network'             => 8,
-                  'ibackup::Exception::PasswordNotFound'    => 9,
+                  'yaBackup::Exception'                      => 256,
+                  'yaBackup::Exception::RuntimeError'        => 2,
+                  'yaBackup::Exception::CommandLineFormat'   => 3,
+                  'yaBackup::Exception::ConfigFileFormat'    => 4,
+                  'yaBackup::Exception::UnsupportedFeature'  => 5,
+                  'yaBackup::Exception::DirectoryNotFound'   => 6,
+                  'yaBackup::Exception::FileNotFound'        => 7,
+                  'yaBackup::Exception::Network'             => 8,
+                  'yaBackup::Exception::PasswordNotFound'    => 9,
                  );
 
 
@@ -136,4 +136,4 @@ END {
     #         rmtree($TMPDIR) || carp "Unable to remove the temporary directory $TMPDIR";
     #     }
 }
-1;                              # End of the module iBackupCheck
+1;                              # End of the module yaBackupCheck

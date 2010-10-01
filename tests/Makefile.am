@@ -7,7 +7,8 @@
 ##               http://varrette.gforge.uni.lu
 ## $Id$ 
 ##
-## This is the Makefile.am file for test part of ibackup 
+## This is the Makefile.am file for testing part of yaBackup (typically 
+## invoked by 'make check') 
 ## ----------------------------------------------------------------------------
 
 # For more info, see http://www.gnu.org/software/hello/manual/automake/Simple-Tests.html
@@ -20,8 +21,8 @@ include $(top_srcdir)/config/vars.am
 # require configure-variable substitution) here:
 test_utils = \
 	check_dep.pl \
-	iBackupCheck.pm \
-	iBackupCheck/Config.pm
+	yaBackupCheck.pm \
+	yaBackupCheck/Config.pm
 
 EXTRA_DIST += $(test_utils)
 
@@ -31,7 +32,7 @@ SOURCETESTS = \
 	t/02-modules.t \
 	t/10-configfile.t
 
-IBACKUP_TESTS = ${SOURCETESTS:%=${srcdir}/%}
+YABACKUP_TESTS = ${SOURCETESTS:%=${srcdir}/%}
 
 # Perl extra flags typically to complement @INC via -I options
 PERL_EXTRA_FLAGS = -I$(top_srcdir)/tests
@@ -39,11 +40,11 @@ PERL_EXTRA_FLAGS = -I$(top_srcdir)/tests
 TESTS_ENVIRONMENT = $(PERL) -Mstrict  -w $(PERL_EXTRA_FLAGS)
 
 # Run the check test based 
-check-local: ${IBACKUP_TESTS}
+check-local: ${YABACKUP_TESTS}
 	$(PERL) $(top_srcdir)/tests/check_dep.pl Test::Harness
 	$(PERL) $(top_srcdir)/tests/check_dep.pl Test::More
 	$(PERL) $(top_srcdir)/tests/check_dep.pl Test::Cmd
-	$(TESTS_ENVIRONMENT) -MTest::Harness -e '$$Test::Harness::verbose=1; runtests @ARGV;' ${IBACKUP_TESTS}
+	$(TESTS_ENVIRONMENT) -MTest::Harness -e '$$Test::Harness::verbose=1; runtests @ARGV;' ${YABACKUP_TESTS}
 
 
 #### From https://gforge.inria.fr/scm/viewvc.php/DyALog/trunk/Tests/Makefile.am?view=markup&root=dyalog

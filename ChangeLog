@@ -1,3 +1,6 @@
+NOTE: since the project moved to github (and changed name), I didn't take to the time to find the equivalent of svn2cl.sh which explain why this ChangeLog is out-of-date. 
+	
+
 2009-11-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
 
 	* [r59] ChangeLog, Makefile.am,

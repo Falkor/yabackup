@@ -8,12 +8,12 @@
 #               http://varrette.gforge.uni.lu
 # $Id$ 
 #
-# Description : Part of the test suite of ibackup
+# Description : Part of the test suite of yaBackup
 #               Check the used modules
 #
 #               'perldoc Test::More' for more details
 ##############################################################################
-use iBackupCheck qw( :all );
+use yaBackupCheck qw( :all );
 
 use strict;
 use warnings;
@@ -23,7 +23,7 @@ use File::Basename;
 use Data::Dumper;
 
 diag('Test used modules');
-open FILE, "$iBackupCheck::SCRIPT" || die "$!\n";
+open FILE, "$yaBackupCheck::SCRIPT" || die "$!\n";
 # remember: read the filter from bottom to top
 my @module_list =
   grep { !/(warnings|strict)/ } # remove these common modules

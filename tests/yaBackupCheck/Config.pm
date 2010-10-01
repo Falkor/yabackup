@@ -1,30 +1,30 @@
 ##############################################################################
-# File : iBackupCheck/Config.pm
+# File : yaBackupCheck/Config.pm
 #
 # Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
 #               http://varrette.gforge.uni.lu
 #
 # $Id$
 ##############################################################################
-package iBackupCheck::Config;
+package yaBackupCheck::Config;
 
-use iBackupCheck;
+use yaBackupCheck;
 
 =head1 NAME
 
-iBackupCheck::Config - set up I<ibackup> configurations for installcheck testing.
+yaBackupCheck::Config - set up I<yaBackup> configurations for installcheck testing.
 
 =head1 SYNOPSIS
 
-    use iBackupCheck::Config;
+    use yaBackupCheck::Config;
 
-    my $testconf = iBackupCheck::Config->new()
+    my $testconf = yaBackupCheck::Config->new()
     # ... build a configuration file ...
     $testconf->add_param(...)
     $testconf->write()
 
 The resulting configuration is always named backup-config.conf and stored in the
-directory $iBackupCheck::TMPDIR/.
+directory $yaBackupCheck::TMPDIR/.
 The basic configuration contains only a few parameters that are
 necessary just to run I<backup> in the test environment.
 
@@ -48,7 +48,7 @@ Create a new configuration object
 
 sub new {
     my $class = shift;
-    # Reuse the definition of %config::SETTINGS in $iBackupCheck::SCRIPT
+    # Reuse the definition of %config::SETTINGS in $yaBackupCheck::SCRIPT
     my $self = {'filename' => undef,
                 'verbose'  => 0,
                 'config'   => undef,
@@ -66,7 +66,7 @@ sub new {
 
 sub initialize {
     my $self = shift;
-    $self->{'filename'} = "$iBackupCheck::TMPDIR/backup-config.conf";
+    $self->{'filename'} = "$yaBackupCheck::TMPDIR/backup-config.conf";
     $self->{'config'} = {
                          # Global section
                          'global' => {
@@ -168,7 +168,7 @@ sub print() {
 
 =item C<write()>
 
-Write out the accumulated configuration file in $iBackupCheck::TMPDIR/backup-config.conf
+Write out the accumulated configuration file in $yaBackupCheck::TMPDIR/backup-config.conf
 
 =back
 
@@ -205,4 +205,4 @@ under the same terms as Perl itself.
 
 =cut
 
-1;                              # End of the module iBackupCheck::Config
+1;                              # End of the module yaBackupCheck::Config

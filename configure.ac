@@ -2,21 +2,20 @@
 #                                                -*- Autoconf -*-
 # Copyright (c) 2009 -- see the copyright file
 # Author: Sebastien Varrette <Sebastien.Varrette@uni.lu> 
-# $Id$
 #
 # This is the configure.ac file for backup.
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[1.0],[ibackup-support@lists.gforge.uni.lu])
+AC_INIT([yabackup],[1.0],[yabackup-support@lists.uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
 
-PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, EncFS volume etc.)"
+PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, NAS with AFP access, EncFS volume etc.)"
 AC_SUBST(PACKAGE_SUMMARY)
-PACKAGE_WEBSITE="http://ibackup.gforge.uni.lu"
+PACKAGE_WEBSITE="http://falkor.github.com/yabackup"
 AC_SUBST(PACKAGE_WEBSITE)
 
 # ----------------------------------------------------------------
@@ -57,25 +56,24 @@ AC_ARG_ENABLE(
 AM_CONDITIONAL(generate_WEBSITE, test x$generate_website = xtrue)
 
 
-AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
-AC_ARG_ENABLE(
-        svn2cl, 
-        [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
-        [case "${enableval}" in
-    	      yes) AC_MSG_RESULT([on])
-	           PROG_SVN2CL
-	           use_svn2cl=true ;;
-  	      no)  AC_MSG_RESULT([off])
-	           use_svn2cl=false ;;
-  	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
-         esac
-        ],
-        [AC_MSG_RESULT([off])
-         use_svn2cl=false]
-)
-AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
-
-
+# TODO: see equivalent tool now that I move everything to git
+dnl AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
+dnl AC_ARG_ENABLE(
+dnl         svn2cl, 
+dnl         [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
+dnl         [case "${enableval}" in
+dnl     	      yes) AC_MSG_RESULT([on])
+dnl 	           PROG_SVN2CL
+dnl 	           use_svn2cl=true ;;
+dnl   	      no)  AC_MSG_RESULT([off])
+dnl 	           use_svn2cl=false ;;
+dnl   	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
+dnl          esac
+dnl         ],
+dnl         [AC_MSG_RESULT([off])
+dnl          use_svn2cl=false]
+dnl )
+dnl AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 
 # ----------------------------------------------------------------
 # Checks for libraries.
@@ -110,9 +108,11 @@ AC_CONFIG_SRCDIR([bin/backup.in])
 AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
-	bin/backup
+	bin/yabackup
+        doc/Makefile
+        doc/yabackup.conf.example
         tests/Makefile
-        tests/iBackupCheck.pm
+        tests/yaBackupCheck.pm
 	www/include/wmlrc.default
 	www/Makefile
 ])

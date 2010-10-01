@@ -1,0 +1,246 @@
+###########################################################################
+#  yaBackup - yet another backup script                                   #
+#                                                                         #
+# Copyright (c) 2010 Sebastien Varrette (http://varrette.gforge.uni.lu/)  #
+#                                                                         #
+# Description: Example of yaBackup configuration file                     #
+#                                                                         #
+# For more info: yabackup(1), 'yabackup --help' and                       #
+#                @PACKAGE_WEBSITE@
+#                                                                         #
+# Please adapt it to reflect your own configuration.                      #
+###########################################################################
+
+######## Mandatory global settings ########
+# /!\ (again) : You SHOULD have a global section
+<global>
+    # General info for logging aspect
+    logdir = /var/log/yabackup  # directory where to store the log files
+    email  = Firstname.Name@compagny.org # email where to send backup warnings errors
+
+    # Filtering aspect
+    exclude_pattern_from = $HOME/.rsync_exclude  # the file containing file patterns that
+    #                                              should NOT be synchronized (one per line)
+    # SSH agent settings
+    #ssh_auth_sock = /tmp/502/SSHKeychain.socket  # here with SSHKeychain (Mac OS X <= 10.5) or
+    #                                               ssh-agent -a /tmp/502/SSHKeychain.socket (Linux)
+    #ssh_auth_sock = `/usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'` # (Mac OS X > 10.5)
+
+    # Default backup configuration
+    src_rootdir = $HOME   # Root directory on the (local) source
+    dst_rootdir = /       # Root directory on destination
+
+    # Space separated list of files/directories (relative to src_rootdir) to include/exclude
+    # from synchronization.
+    # The use of the wildcards * is supported (for instance '*' select all sub-elements
+    # (including the hidden one) of src_rootdir).
+    # You may use more complicated pattern mixing ^, * and $ special characters such as
+    #     ^AR* : all files/directories that start with AR
+    #     *ES$ : all files/directories that ends with  ES
+    #     ^.*  : all hidden directories (the one that start by '.')
+    # Typical example (aka my own config) :
+
+    # backup everything ...
+    sync_include = *
+    # ... except hidden files and the following folders ...
+    sync_exclude = ^.* Library Application
+    # ... yet this does not apply to these files/directories (normally excluded by sync_exclude)
+    sync_exclude_exception = .ssh .gnupg .emacs.d .bashrc .profile .gitconfig .yabackup*
+
+    # Password file
+    password_file = $HOME/.yabackup_password.conf
+
+    # Not yet implemented: special treatment for the .ssh directory
+    #     <Directory .ssh>
+    #         src_in_subfolder = `hostname`
+    #     </Directory>
+</global>
+
+#########################################################################
+########## Now list your backup profile (one per section) that ##########
+########## complement or overwrite the global settings above   ##########
+#########################################################################
+# Note: the section name can be later referred to using the --section
+#       option of yabackup (see yabackup(1))
+
+#########################################################################
+# You SHOULD have a default backup definition (here on an external 
+# harddrive) invoked by 'yabackup'
+#
+# Backup profile information in --push mode (default):
+#  - Root source: $HOME (see 'src_rootdir')
+#  - Root destination: /Volumes/MyBackupDrive/Backup/$HOME
+<default>
+    target_url = drive:///Volumes/MyBackupDrive/Backup
+</default>
+
+# Now put as many backup profile as you want, each of them configured in a 
+# given section (use any name except of course 'global' and 'default')
+# <sectionname>
+#     ...
+# </sectionname>
+# such that you can later invoke this profile in yabackup using the command
+#         yabackup -s sectionname  
+#
+
+#########################################################################
+# Example of backup on a local folder
+#########################################################################
+
+#
+# Backup profile information in --push mode (default):
+#  - Root source: $HOME (see 'src_rootdir')
+#  - Root destination: /data/backup/$HOME
+<testfile>
+    target_url = file:///data/backup
+</testfile>
+
+# As above, yet the destination rootdir is encrypted using EncFS
+#  - EncFS mountpoint: /data/backup
+#  - EncFS rawdir:     /data/.secure 
+<testfileencfs>
+    target_url   = file:///data/backup
+    encfs_rawdir = target_url:../.secure
+</testfileencfs>
+
+
+#########################################################################
+# Example of backup on an external drive
+#########################################################################
+
+#
+# Backup profile information in --push mode (default):
+#  - Root source: $HOME (see 'src_rootdir')
+#  - Root destination: /media/MyDrive/backup/$HOME
+<testdrive>
+    target_url = drive:///media/MyDrive/backup/
+</testdrive>
+
+# As above, yet the destination rootdir is encrypted using EncFS
+#  - EncFS mountpoint: /media/MyDrive/backup/
+#  - EncFS rawdir:     /media/MyDrive/.secure/
+<testdriveencfs>
+    target_url   = drive:///media/MyDrive/backup
+    encfs_rawdir = target_url:../.secure
+</testdriveencfs>
+
+#########################################################################
+# Example of backup on a remote machine you access by SSH
+#########################################################################
+
+#
+# Backup profile information in --push mode (default) assuming the local
+# execution of `whomai` returns 'mylocalgin' and `hostname -f` returns
+# 'mycomputer.compagny.org' : 
+#  - Backup launched only if current IP is in the form 10.91*  
+#  - Root source: $HOME (see 'src_rootdir')
+#  - Root destination: login@server:mybackup/mylocalgin\@mycomputer.compagny.org/
+#    (i.e. probably: login@server:/home/login/mybackup/mylocalgin\@mycomputer.compagny.org/)
+<testssh>
+    restrict_on_subnet = 10.91 
+    target_url  = ssh://login@server       # ssh connection on the default port (22)
+    #target_url = ssh://login@server:8022  # ssh connection on the port 8022
+
+    # You probably want to overwrite the 'dst_rootdir' directive here (default
+    # to '/') as there is little chance you will (1) have the rights to and (2)
+    # wants to write on '/' on the remote server. 
+    # Any path not starting by '/' is considered relative to the homedir of
+    # login@server.  
+    dst_rootdir = mybackup/`whoami`@`hostname -f`
+    # Not yet implemented: special treatment of your local "Music" directory
+    #     <Directory Music>
+    # 	      dst_rootdir = /multimedia # put it in /multimedia on the server  
+    #     </Directory>
+</testssh>
+
+# As above, yet the (remote) destination rootdir is encrypted using EncFS
+#  - (remote) EncFS mountpoint: login@server:mybackup/mylocalgin\@mycomputer.compagny.org
+#  - (remote) EncFS rawdir:     login@server:mybackup/.secure
+<testssh>
+    restrict_on_subnet = 10.91 
+    target_url  = ssh://login@server       # ssh connection on the default port (22)
+    #target_url = ssh://login@server:8022  # ssh connection on the port 8022
+    dst_rootdir = mybackup/`whoami`@`hostname -f`
+    # Not yet implemented: special treatment of your local "Music" directory
+    #     <Directory Music>
+    # 	      dst_rootdir = /multimedia # put it in /multimedia on the server  
+    #     </Directory>
+    encfs_rawdir = target_url:mybackup/.secure
+</testssh>
+
+
+#########################################################################
+# Example of backup on a [encrypted] sparsebundle image
+#########################################################################
+# /!\ this works only on Mac OS X 
+#
+# Backup profile information in --push mode (default), assuming the sparsebundle
+# image mounts into '/Volumes/Disk\ Name'  
+#  - Root source:      $HOME (see 'src_rootdir')
+#  - Root destination: /Volumes/Disk\ Name/Backup/$HOME
+#
+#  You should have created the sparsebundle prior to the launch of the backup
+# (using the 'Disk Utility' program)
+<testsparsebundle>
+    target_url  = sparsebundle://$HOME/path/to/image.dmg
+    dst_rootdir = Backup
+</testsparsebundle>
+
+# As above, yet with an encrypted sparsebundle (created before - see
+# http://www.applemacgeniusville.com/tag/encrypt/ for instance) 
+<testencryptsparsebundle>
+    target_url  = sparsebundle://$HOME/path/to/image.sparsebundle
+    dst_rootdir = Backup
+</testencryptsparsebundle>
+
+
+
+# ###################################################
+# # Example of backup in remote NAS (volume volname) you access by AFP with a username
+# # and a password (better placed in a separate file precised by the pass_file directive) 
+# # /!\ This works only on Mac OS X
+
+# # Example 1:
+# # This configuration will mount the NAS volume volname (in /Volumes/volname typically) 
+# # and synchronize in /Volumes/volname/myBackup/$HOME/ (as src_dir is configured to $HOME)
+# <testafp1>
+# 	target_url  = afp://user:password@server/volname
+# 	dst_rootdir = myBackup
+# </testafp1>
+
+# # Example 2: same as Ex1 but put the password in a separate file 
+# # Password file format per line:   entry_name     password
+# # Ex: 
+# #     afp://user@server/volname    password
+# #
+# # /!\ put the proper rights to this file (600) but avoid this approach if possible as it 
+# #     still expose your password. 
+# # NOTE: this approach appeared necessary for authenticated mounts because the command line 
+# # 'mount_afp' used internally no longer use the password stored in the keychain ;(
+# <testafp2>
+# 	target_url    = afp://user@server/volname
+# 	password_file = $HOME/path/to/backup_passwd_file
+# 	dst_rootdir   = myBackup
+# </testafp2>
+
+# # Example 3: add directly the path to the backup directory on the NAS
+# <testafp3>
+# 	target_url    = afp://user@server/volname/myBackup
+# 	password_file = $HOME/path/to/backup_passwd_file
+# </testafp3>
+
+# ############ (The most useful for me until now ;) ) ##################
+# # Example 4: put the path to an [encrypted] sparsebundle on the NAS ;)
+# # This configuration will mount the NAS volume volname (in /Volumes/volname typically) 
+# # then mount the sparsebundle image /Volumes/volname/path/to/image.sparsebundle 
+# # (in /Volumes/ImageName let's say) and finally synchronize in 
+# # /Volumes/ImageName/myBackup/$HOME/ (as src_dir is configured to $HOME)
+# <testafp4>
+# 	target_url  = afp://user@server/volname/path/to/image.sparsebundle
+# 	pass_file   = $HOME/path/to/backup_passwd_file # Eventually, put this directive in the global section
+# 	dst_rootdir = myBackup
+# </testafp4>
+
+# ###################################################
+# # Example of backup in a folder encrypted by EncFS
+# # 

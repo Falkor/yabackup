@@ -7,14 +7,14 @@
 #               http://varrette.gforge.uni.lu
 # $Id$ 
 #
-# Description : Part of the test suite of ibackup
+# Description : Part of the test suite of yaBackup
 #               Ensure everything is set correctly before the real tests begins
 #
 # 'perldoc Test::More' for more details
 ##############################################################################
 use Test::More tests => 1;
 
-BEGIN{ use_ok('iBackupCheck');  }
+BEGIN{ use_ok('yaBackupCheck');  }
 
 
 

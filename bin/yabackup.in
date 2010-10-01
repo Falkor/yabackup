@@ -1,19 +1,18 @@
-#!/usr/bin/perl -w
-###!@PERL@ -w
+#!@PERL@ -w
 
 ##############################################################################
-# File   : backup
-# Authors: Sebastien VARRETTE     <Sebastien.Varrette@uni.lu>
-#          with contributions by:
-#          Guillaume-Jean HERBIET <Guillaume.Herbiet@uni.lu>
-# $Id$
+# yaBackup - Yet Another Backup script
+#
+# Author: Sebastien VARRETTE     <Sebastien.Varrette@uni.lu>
+#
+# yet with contributions by:
+# - Guillaume-Jean HERBIET <Guillaume.Herbiet@uni.lu>
 #
 # Description : @PACKAGE_SUMMARY@
-#               For more information: see backup(3) or
+#               For more information: see yabackup(3) or
 #               @PACKAGE_WEBSITE@
 #
 # Copyright (c) 2009-2010 Sebastien Varrette (http://varrette.gforge.uni.lu/)
-# with contributions by Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu/)
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -622,7 +621,7 @@ sub initialize(@) {
                       sendmail => {
                                    from     => "${username}\@${hostname}",
                                    to       => "$email",
-                                   subject  => "(ibackup)",
+                                   subject  => "(yaBackup)",
                                    maxlevel => 4,
                                    minlevel => 0,
                                    message_pattern => '%L',
@@ -703,7 +702,7 @@ sub check_subnet($@) {
     my $pattern=$subnet;
     $pattern =~ s/\./\\\./g;    # proceed with the '.' characters
     if ($IP !~ /$pattern/) {
-        ibackup::Exception::Network->throw(error =>
+        yaBackup::Exception::Network->throw(error =>
                                            "Network error: the IP adress '$IP' does not belong to the subnet '$subnet'");
     }
 }
@@ -718,7 +717,7 @@ sub check_has_directory(@) {
         my $tmp_dir = $dir;
         $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
         unless ( -d "$tmp_dir" ) {
-            ibackup::Exception::DirectoryNotFound->throw(error =>
+            yaBackup::Exception::DirectoryNotFound->throw(error =>
                                                          "The directory '$dir' cannot be found")
           }
     }
@@ -735,13 +734,13 @@ sub check_has_file(@) {
     if ("@files" =~ /\*/) {
         @files = <@_>;
         # Necessity to glob
-        ibackup::Exception::FileNotFound->throw(error =>
+        yaBackup::Exception::FileNotFound->throw(error =>
                                                 "The file(s) @files cannot be found")
             unless (@files);
     }
     foreach my $file (@files) {
         unless ( -f "$file" ) {
-            ibackup::Exception::FileNotFound->throw(error =>
+            yaBackup::Exception::FileNotFound->throw(error =>
                                                     "The file $file cannot be found")
           }
     }
@@ -768,7 +767,7 @@ sub check_remote_has_directory_over_ssh($$@) {
                   "\n" . format::color_msg('bold', 'Note: ') .
                     "The \$HOME mentionned above corresponds to the user homedir ON THE REMOTE SERVER";
             }
-            ibackup::Exception::DirectoryNotFound->throw(error => "$error_msg");
+            yaBackup::Exception::DirectoryNotFound->throw(error => "$error_msg");
         }
     }
 }
@@ -792,7 +791,7 @@ sub check_remote_has_file_over_ssh($$@) {
                   "\n" . format::color_msg('bold', 'Note: ') .
                     "The \$HOME mentionned above corresponds to the user homedir ON THE REMOTE SERVER";
             }
-            ibackup::Exception::FileNotFound->throw(error => "$error_msg");
+            yaBackup::Exception::FileNotFound->throw(error => "$error_msg");
         }
     }
 }
@@ -801,7 +800,7 @@ sub check_remote_has_file_over_ssh($$@) {
 ####
 # check the existence of a set of local directories. Propose the creation of
 # them if they do not exists (or raise the exception
-# ibackup::Exception::DirectoryNotFound if in QUIET or RETRIEVE mode).
+# yaBackup::Exception::DirectoryNotFound if in QUIET or RETRIEVE mode).
 # Usage: check_has_directory_or_create(dir1 [, dir2 ...])
 ###
 sub check_has_directory_or_create(@) {
@@ -811,7 +810,7 @@ sub check_has_directory_or_create(@) {
             system::check_has_directory($dir);
         };
         if ( catch my $err ) {
-            if ($err->isa('ibackup::Exception::DirectoryNotFound') and
+            if ($err->isa('yaBackup::Exception::DirectoryNotFound') and
                 (not $config::QUIET) and (not $config::RETRIEVE_MODE)) {
                 # Propose the creation of the directory
                 print::warning($err->error);
@@ -833,7 +832,7 @@ sub check_has_directory_or_create(@) {
 ####
 # check the existence of a set of remote directories. Propose the creation of
 # them if they do not exists (or raise the exception
-# ibackup::Exception::DirectoryNotFound if in QUIET mode).
+# yaBackup::Exception::DirectoryNotFound if in QUIET mode).
 # Usage: check_has_directory_or_create_over_ssh("user@host", port, dir1 [, dir2 ...])
 ###
 sub check_remote_has_directory_or_create_over_ssh($$@) {
@@ -844,7 +843,7 @@ sub check_remote_has_directory_or_create_over_ssh($$@) {
             system::check_remote_has_directory_over_ssh($host, $port, "$dir");
         };
         if ( catch my $err ) {
-            if ($err->isa('ibackup::Exception::DirectoryNotFound') and
+            if ($err->isa('yaBackup::Exception::DirectoryNotFound') and
                 (not $config::QUIET) and (not $config::RETRIEVE_MODE)) {
                 # Propose the creation of the directory
                 print::warning($err->error);
@@ -883,7 +882,7 @@ sub execute(@) {
 ####
 # execute a local command and return the result of the command (stderr and
 # stdout are MERGED for convenience.
-# Throw ibackup::Exception::RuntimeError exception if the exit status is not 0;
+# Throw yaBackup::Exception::RuntimeError exception if the exit status is not 0;
 ###
 sub execute_and_get_output(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
@@ -895,7 +894,7 @@ sub execute_and_get_output(@) {
         @res = qx(@_ 2>&1);
         my $exit_status = $?;
         if ($exit_status != 0) {
-            ibackup::Exception::RuntimeError->throw(error =>
+            yaBackup::Exception::RuntimeError->throw(error =>
                                                     "The command '@_' FAILED with exit status $exit_status");
         }
         #        chomp(@res);
@@ -1000,15 +999,15 @@ sub mount_afp($$$$$@) {
     system::check_binary('mount_afp');
 
     # Various format checks (really mandatory?)
-    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a server name")
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a server name")
         unless defined($server);
-    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a volume name")
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a volume name")
         unless defined($volname);
-    ibackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a username (use 'guest' eventually in the target_url for anonymous access)")
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a username (use 'guest' eventually in the target_url for anonymous access)")
         unless defined($username);
 
     # Let's go now
-    ibackup::Exception::RuntimeError->throw(error => "Bad mount point $mount_point")
+    yaBackup::Exception::RuntimeError->throw(error => "Bad mount point $mount_point")
         if ($mount_point eq '/');
 
     if (-d "$mount_point") {
@@ -1033,12 +1032,12 @@ sub mount_afp($$$$$@) {
                 };
                 # catch
                 if ( catch my $err ) {
-                    if ($err->isa('ibackup::Exception::PasswordNotFound')) {
+                    if ($err->isa('yaBackup::Exception::PasswordNotFound')) {
                         # if in quiet mode (i.e. typically executed in the
                         # framework of a cronjobs), rethrow the error
                         $err->rethrow if ($config::QUIET);
                         print::warning($err->error);
-                    } elsif ($err->isa('ibackup::Exception::ConfigFileFormat')) {
+                    } elsif ($err->isa('yaBackup::Exception::ConfigFileFormat')) {
                         $err->rethrow if (defined $config::SETTINGS{'password_file'});
                     }
                 }
@@ -1046,7 +1045,7 @@ sub mount_afp($$$$$@) {
             # If password still undefined (and this point reached), ask the user to fill
             # it (or raise exception if in QUIET mode)
             unless (defined $password) {
-                ibackup::Exception::PasswordNotFound->throw(error =>
+                yaBackup::Exception::PasswordNotFound->throw(error =>
                                                             "Cannot retrieve the passphrase for the AFP mount (impossible in quiet mode)")
                     if ($config::QUIET);
                 # prompt for the pass-phrase
@@ -1058,21 +1057,21 @@ sub mount_afp($$$$$@) {
                 print "\n";
             }
             # Finally raise exception if you still don't have a password
-            ibackup::Exception::PasswordNotFound->throw(error => "Empty AFP password for '$username\@$server'")
+            yaBackup::Exception::PasswordNotFound->throw(error => "Empty AFP password for '$username\@$server'")
                 if ($password eq "");
             $afp_url .= ":$password\@";
         }
         $afp_url .= "$server:$port/$volname";
         print::verbose("=> creating AFP mount point '$mount_point'");
         system::execute("mkdir -p $mount_point") &&
-            ibackup::Exception::RuntimeError->throw(error =>
+            yaBackup::Exception::RuntimeError->throw(error =>
                                                     "Unable to create the AFP mount directory $mount_point");
         # Now execute the mount
         system::execute("mount_afp $afp_url $mount_point");
         if ($? != 0) {
             print::info("AFP mount failed: removing the mount directory $mount_point");
             system::execute("rm -rf $mount_point");
-            ibackup::Exception::RuntimeError->throw(error =>
+            yaBackup::Exception::RuntimeError->throw(error =>
                                                     "Could not mount the AFP volume '$volname' for '$username\@$server'");
         }
         print::info("=> AFP volume '$volname' successfully mounted for '$username\@$server'");
@@ -1122,26 +1121,26 @@ sub mount_encfs($$@) {
     if ($rawdir_url =~ /^target_url:(([\w\.\/]|\\\s)+)$/) {
         $rawdir_url = $1;
     } else {
-        ibackup::Exception::ConfigFileFormat->throw(error =>
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                     "Malformed 'encfs_rawdir' directive in the configuration file (should respect the format: 'target_url:[/]path/to/encfs/rawdir'");
     }
     if ($rawdir_url =~ /^\//) {
         # Absolute path
         $rawdir = "$rawdir_url";
     } else {
-        ibackup::Exception::ConfigFileFormat->throw(error =>
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                     "You cannot use a relative path in the 'encfs_rawdir' directive when the target_url use the SSH protocol")
             if ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh');
         # Relative url against target_url
         my $tmp_rawdir = "$mountpoint/$rawdir_url";
         $tmp_rawdir =~ s/\\(\s)/$1/g;
         $rawdir = Cwd::realpath("$tmp_rawdir");
-        ibackup::Exception::RuntimeError->throw(error =>
+        yaBackup::Exception::RuntimeError->throw(error =>
                                                 "Runtime error when determining the canonical path of encfs_rawdir")
             unless ($rawdir);
     }
     print::debug("EncFS rawdir : $rawdir");
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "The dirname of an EncFS rawdir cannot correspond to the mountpoint")
         if (dirname($rawdir) eq "$mountpoint");
 
@@ -1160,7 +1159,7 @@ sub mount_encfs($$@) {
                                                "$rawdir/.encfs*") if ($proto eq 'ssh');
     };
     if ( catch my $err ) {
-        if ($err->isa('ibackup::Exception::FileNotFound')) {
+        if ($err->isa('yaBackup::Exception::FileNotFound')) {
             # if in quiet mode (i.e. typically executed in the
             # framework of a cronjobs) or in restore mode, rethrow the error
             $err->rethrow if ($config::QUIET or $config::RETRIEVE_MODE);
@@ -1175,7 +1174,7 @@ sub mount_encfs($$@) {
                         "Of course, ensure the password file is readable only by you ".
                           "('chmod 600 /path/to/passfile')";
             print::warning("$rawdir' is not a valid EncFS raw directory");
-            ibackup::Exception::UnsupportedFeature->throw(error =>
+            yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                           "The creation of an encrypted virtual filesystem for the target directory '$sync::BACKUP_CMD_INFO{'dst'}' is not supported over SSH.\n" .
                                                           "You should create the EncFS volume manually, typically by issuing the following command ON THE SERVER:\n\n\t$encfs_cmd\n\n".
                                                           "$note_on_passfile")
@@ -1187,7 +1186,7 @@ sub mount_encfs($$@) {
             print::really_continue();
             system::execute("$encfs_cmd");
             if ($? != 0) {
-                ibackup::Exception::RuntimeError->throw(error =>
+                yaBackup::Exception::RuntimeError->throw(error =>
                                                         "Could not create the EncFS directory $mountpoint");
             }
             print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully created",
@@ -1209,12 +1208,12 @@ sub mount_encfs($$@) {
         };
         # catch
         if ( catch my $err ) {
-            if ($err->isa('ibackup::Exception::PasswordNotFound')) {
+            if ($err->isa('yaBackup::Exception::PasswordNotFound')) {
                 # if in quiet mode (i.e. typically executed in the
                 # framework of a cronjobs), rethrow the error
                 $err->rethrow if ($config::QUIET);
                 print::warning($err->error);
-            } elsif ($err->isa('ibackup::Exception::ConfigFileFormat')) {
+            } elsif ($err->isa('yaBackup::Exception::ConfigFileFormat')) {
                 $err->rethrow if (defined $config::SETTINGS{'password_file'});
             }
         }
@@ -1222,7 +1221,7 @@ sub mount_encfs($$@) {
     # If password still undefined (and this point reached), ask the user to fill
     # it (or raise exeption if in QUIET mode)
     unless (defined $password) {
-        ibackup::Exception::PasswordNotFound->throw(error =>
+        yaBackup::Exception::PasswordNotFound->throw(error =>
                                                     "Cannot retrieve the passphrase for the EncFS mount (impossible in quiet mode)")
             if ($config::QUIET);
         # prompt for the pass-phrase
@@ -1234,7 +1233,7 @@ sub mount_encfs($$@) {
         print "\n";
     }
     # Finally raise exception if you still don't have a password
-    ibackup::Exception::PasswordNotFound->throw(error => "Empty EncFS password")
+    yaBackup::Exception::PasswordNotFound->throw(error => "Empty EncFS password")
         if ($password eq "");
 
     # Now mount the EncFS volume and do not expose the password
@@ -1247,7 +1246,7 @@ sub mount_encfs($$@) {
     # could have been (but this expose the password):
     # system::execute("echo $password | $encfs_cmd");
     if ($? != 0) {
-        ibackup::Exception::RuntimeError->throw(error =>
+        yaBackup::Exception::RuntimeError->throw(error =>
                                                 "Could not mount the EncFS volume $mountpoint");
     }
     print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully mounted",
@@ -1274,7 +1273,7 @@ sub mount_sparsebundle($) {
     # existence of the file via the -e test
     my $tmp_sparsebundle = $sparsebundle;
     $tmp_sparsebundle =~ s/\\(\s)/$1/g;
-    ibackup::Exception::FileNotFound->throw(error =>
+    yaBackup::Exception::FileNotFound->throw(error =>
                                             "The sparsebundle image '$sparsebundle' cannot be found")
         unless (-e $tmp_sparsebundle);
     # TODO: eventually create the sparsebundle!
@@ -1296,10 +1295,10 @@ sub mount_sparsebundle($) {
         next unless $dict->exists('mount-point');
         $mount_point = $dict->{'mount-point'}->value();
     }
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "The mount point associated to the sparsebundle '$sparsebundle' cannot be found")
         unless ($mount_point);
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "The sparsebundle '$sparsebundle' cannot be mounted (in $mount_point)")
         unless (-d "$mount_point");
     print::debug("=> successfully mount the sparsebundle '$sparsebundle' in ",
@@ -1349,7 +1348,7 @@ sub umount_mounted_volumes() {
                 $vol = "$vol'" if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
                 system::execute("$umount_cmd $vol");
                 if ($? != 0) {
-                    ibackup::Exception::RuntimeError->throw(error =>
+                    yaBackup::Exception::RuntimeError->throw(error =>
                                                             "Unable to unmount $vol (using the command '$umount_cmd': $!");
                 }
                 pop @{$MOUNTED_VOLUMES{$proto}};
@@ -1397,7 +1396,7 @@ our $current_profile = undef;
 ##
 sub parse_target_url() {
     unless (defined($config::SETTINGS{'target_url'})) {
-        ibackup::Exception::ConfigFileFormat->throw(error =>
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                     "Undefined target_url for this profile");
     }
     $config::SETTINGS{'target_url'} = format::interpret_cmd("$config::SETTINGS{'target_url'}");
@@ -1413,7 +1412,7 @@ sub parse_target_url() {
     print::debug("volname : $volname\n") if ($volname);
 
     unless ($proto && $target) {
-        ibackup::Exception::ConfigFileFormat->throw(error =>
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                     "Malformed target url $config::SETTINGS{'target_url'}");
     }
     $BACKUP_CMD_INFO{'proto'}  = $proto;
@@ -1436,7 +1435,7 @@ sub parse_target_url() {
     } elsif ($proto eq 'ssh') {
         # ---- SSH ----
         unless ($user && $server) {
-            ibackup::Exception::ConfigFileFormat->throw(error =>
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                         "Configuration file format error: Malformed SSH target '$target'");
         }
         $port = 22 unless ($port);
@@ -1450,7 +1449,7 @@ sub parse_target_url() {
     } elsif ($proto eq 'afp') {
         # ---- AFP ----
         unless ($user && $server) {
-            ibackup::Exception::ConfigFileFormat->throw(error =>
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                         "Configuration file format error: Malformed AFP target '$target'");
         }
         $port = 548 unless ($port);
@@ -1459,7 +1458,7 @@ sub parse_target_url() {
         set_backup_target_to_afp_server($user, $server, $port, $volname, $passwd);
 
     } else {
-        ibackup::Exception::UnsupportedFeature->throw(error =>
+        yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                       "Unsupported protocol $proto");
     }
 }
@@ -1481,7 +1480,7 @@ sub set_backup_target_to_drive($) {
 
     # Ensure the drive is present
     if ($BACKUP_CMD_INFO{'proto'} eq 'drive') {
-        ibackup::Exception::DirectoryNotFound->throw(error => "The drive $BACKUP_CMD_INFO{'dst'} is not mounted")
+        yaBackup::Exception::DirectoryNotFound->throw(error => "The drive $BACKUP_CMD_INFO{'dst'} is not mounted")
             unless ( -d "$BACKUP_CMD_INFO{'dst'}");
         push(@{$system::MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
     }
@@ -1496,11 +1495,11 @@ sub set_backup_target_to_ssh_server($$$) {
 
     # Check the SSH connectivity
     system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
-        ibackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
+        yaBackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
 
     $BACKUP_CMD_INFO{'port'}   = $port;
     $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
-    ibackup::Exception::UnsupportedFeature->throw(error =>
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                   "The use of duplicity (or anything different than rsync) is not yet supported")
         unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
     $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
@@ -1518,7 +1517,7 @@ sub set_backup_target_to_ssh_server($$$) {
 sub set_backup_target_to_sparsebundle($) {
     my $path_to_sparsebundle = shift;
     my $explicit_path = format::interpret_cmd($path_to_sparsebundle);
-    ibackup::Exception::UnsupportedFeature->throw(error =>
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                   "The use of sparsebundle images is only supported under Mac OS X")
         unless ($config::OS[0] =~ "Darwin");
     my $mount_point = system::mount_sparsebundle($explicit_path);
@@ -1538,7 +1537,7 @@ sub set_backup_target_to_afp_server($$$$@) {
     my $password    = (@_) ? shift : undef;
 
     # Currently operate only on Mac OS X
-    ibackup::Exception::UnsupportedFeature->throw(error =>
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                   "Apple Filing Protocol (AFP) are only supported under Mac OS X for the moment")
         unless ($config::OS[0] =~ "Darwin");
     $fullvolname =~ /(\w+)(\/([\/\w\.]|\\\s)*)/;
@@ -1559,7 +1558,7 @@ sub set_backup_target_to_afp_server($$$$@) {
             print::info("   Reference to a sparsebundle image found");
             set_backup_target_to_sparsebundle("$mount_point/$complementpath");
         } else {
-            ibackup::Exception::ConfigFileFormat->throw(error =>
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
                                                         "Malformed AFP target_url for the complement path '$complementpath' that don't have a leading '/'")
                 unless ($complementpath =~ /^\//);
             system::check_has_directory_or_create("$mount_point/$complementpath");
@@ -1614,7 +1613,7 @@ sub run_cmd() {
         my ($src_dir, $dst_dir) = ($dir, $dir);
         # Manage special treatment of the directory
         if (defined($config::SETTINGS{'Directory'})) {
-            ibackup::Exception::UnsupportedFeature->throw(error =>
+            yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                           "Special Directory treatement ignored in restoration mode")
                 if ($config::RETRIEVE_MODE);
 
@@ -1659,7 +1658,7 @@ sub run_cmd() {
         $has_failed += system::execute("$cmd");
         #       $config::SIMULATION_MODE = $save_symmode;
     }
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "Synchronization finished yet with errors in the executed commands")
         if ($has_failed);
 }
@@ -1670,7 +1669,7 @@ sub run_cmd() {
 ##
 sub set_cmd() {
     if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
-        ibackup::Exception::UnsupportedFeature->throw(error =>
+        yaBackup::Exception::UnsupportedFeature->throw(error =>
                                                       "The use of duplicity is not yet supported");
     }
     # Set the backup source i.e the root directory of the local folders to
@@ -1681,7 +1680,7 @@ sub set_cmd() {
 #     $tmp_src_rootdir =~ s/\\(\s)/$1/g;
 #     $BACKUP_CMD_INFO{'src'} = Cwd::realpath($tmp_src_rootdir);
     $BACKUP_CMD_INFO{'src'} = $src_rootdir;
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "Empty analysed source rootdir (from $src_rootdir)")
         unless ($BACKUP_CMD_INFO{'src'});
 
@@ -1729,7 +1728,7 @@ sub set_cmd() {
     sync::select_elements();
     print::verbose("\t found in '$sync::BACKUP_CMD_INFO{'src'}': ",
                    "@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} @{$BACKUP_CMD_INFO{'tosync'}->{'files'}}");
-    ibackup::Exception::RuntimeError->throw(error =>
+    yaBackup::Exception::RuntimeError->throw(error =>
                                             "No element found to synchronize in '$BACKUP_CMD_INFO{'src'}'!")
         unless (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} or @{$BACKUP_CMD_INFO{'tosync'}->{'files'}});
 
@@ -1884,8 +1883,7 @@ use Getopt::Long;
 use Data::Dumper;
 
 # Generic variables
-#our $prefix  = "@prefix@";  # Installation prefix (inherited from the autotools)
-our $prefix  = "/usr/local/stow/ibackup-1.0"; # ******** TODO: update ********
+our $prefix  = "@prefix@";  # Installation prefix (inherited from the autotools)
 our $VERSION = '@VERSION@';                   # Script version
 our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@';   # Package summary
 our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@';   # Package website
@@ -1898,9 +1896,8 @@ our $command = `basename $0`;   # base command
 chomp($command);
 
 # Icons settings
-# TODO: remove comment!!!!!!
-our $iconsdir = "$config::prefix/share/icons/ibackup"; # icons folder (as in
-                                                       # Makefile.am)
+our $iconsdir = "$config::prefix/share/icons/yaBackup"; # icons folder (as in
+                                                        # Makefile.am)
 # The different type of available icons
 our @icon_types = ('default', 'defaultEncrypted',
                    'AFP',     'AFPEncrypted',
@@ -1929,7 +1926,7 @@ our $PRE_SCRIPT;            # Complete path to pre-backup script
 our $POST_SCRIPT;           # Complete path to post-backup script
 
 our $file;                # Configuration file.
-our @backup_sections;     # backup sections to be used in the configuration file
+our @yaBackup_profiles;     # backup sections to be used in the configuration file
 our @OS = qx(uname);      # Current OS
 
 # Configuration settings as extracted/expanded from the configuration file
@@ -1971,7 +1968,7 @@ our %GETOPT_CONFIG = (
                       'pre-script=s'    => \$PRE_SCRIPT, # script to be executed before the sync
                       'post-script=s'   => \$POST_SCRIPT, # script to be executed afetr the sync
                       'r|restore|retrieve' => sub { $RETRIEVE_MODE = 1}, # restore data from the backup
-                      's|section=s'     => \@backup_sections, # sections to consider
+                      's|section=s'     => \@yaBackup_profiles, # sections to consider
 
                       # Generic (classical) options
                       'v|verbose'  => \$VERBOSE, # Verbose mode
@@ -1998,7 +1995,7 @@ sub reset_settings() {
 ####
 # Set the current icon filename (located in $config::iconsdir) to be used in
 # the print::notification() function.
-# All icons filename are prefixed by 'ibackup' and suffixed by 'Icon.png'
+# All icons filename are prefixed by 'yaBackup' and suffixed by 'Icon.png'
 # Usage: config::icon_filename([type])
 #
 # For each icon, you can The presence of an exit status value return the icon
@@ -2007,7 +2004,7 @@ sub reset_settings() {
 sub set_icon(@) {
     my $type   = shift;
     $type      = 'default' unless defined($type);
-    my $res = "ibackup_$type" . "_Icon.png";
+    my $res = "yaBackup_$type" . "_Icon.png";
     system::check_has_file("$config::iconsdir/$res",
                            "$config::iconsdir/OK_$res",
                            "$config::iconsdir/KO_$res");
@@ -2056,7 +2053,7 @@ sub set_profile($) {
         if (exists($SETTINGS{$key})) {
             $SETTINGS{$key} = $val;
         } else {
-            print::error_and_exit($main::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+            print::error_and_exit($main::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                                   "The directive $key is not recognized");
         }
     }
@@ -2066,7 +2063,7 @@ sub set_profile($) {
 ####
 # ensure the existence of the directives listed in arguments in the merged
 # configuration of a given backup profile i.e. in $config::SETTINGS. Throw an
-# exception of type ibackup::Exception::ConfigFileFormat in case of error.
+# exception of type yaBackup::Exception::ConfigFileFormat in case of error.
 ##
 sub ensure_profile_set(@) {
     print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
@@ -2076,7 +2073,7 @@ sub ensure_profile_set(@) {
               "The directive '" .
                 format::color_msg('bold', "$directive") .
                     "' is not set in the configuration file";
-            ibackup::Exception::ConfigFileFormat->throw(error => "$error_msg");
+            yaBackup::Exception::ConfigFileFormat->throw(error => "$error_msg");
         }
     }
 }
@@ -2108,7 +2105,7 @@ sub getPasswordFromFile($$) {
         last;
     }
     close FILE;
-    ibackup::Exception::PasswordNotFound->throw(error => "Could not retrieve the password for the entry '$entry' in the password file '$file'") unless ($found);
+    yaBackup::Exception::PasswordNotFound->throw(error => "Could not retrieve the password for the entry '$entry' in the password file '$file'") unless ($found);
     return $password;
 }
 
@@ -2118,10 +2115,10 @@ sub getPasswordFromFile($$) {
 ##
 sub getPasswordForEntry($) {
     my $entry = shift;
-    ibackup::Exception::ConfigFileFormat->throw(error => "No password file defined in $config::file (you should set the 'password_file' directive)")
+    yaBackup::Exception::ConfigFileFormat->throw(error => "No password file defined in $config::file (you should set the 'password_file' directive)")
         unless (defined $config::SETTINGS{'password_file'});
     my $password_file  = $config::SETTINGS{'password_file'};
-    ibackup::Exception::ConfigFileFormat->throw(error => "Password file $password_file not found!")
+    yaBackup::Exception::ConfigFileFormat->throw(error => "Password file $password_file not found!")
         unless ( -f "$password_file" );
     return getPasswordFromFile($password_file, $entry);
 }
@@ -2130,57 +2127,57 @@ sub getPasswordForEntry($) {
 
 ##############################################################################
 # PACKAGE EXCEPTION
-# Define the exceptions throwed by ibackup
+# Define the exceptions throwed by yaBackup
 ##############################################################################
-package ibackup::Exception;
+package yaBackup::Exception;
 
 use Exception::Class (
                       # Main exception class
-                      'ibackup::Exception' =>
+                      'yaBackup::Exception' =>
                       {
                        description => 'Generic base class for all exception of this script'
                       },
                       # Specific exceptions
-                      'ibackup::Exception::RuntimeError' =>
+                      'yaBackup::Exception::RuntimeError' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Classical runtime error',
                       },
-                      'ibackup::Exception::UnsupportedFeature' =>
+                      'yaBackup::Exception::UnsupportedFeature' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Unsupported feature',
                       },
 
-                      'ibackup::Exception::Network' =>
+                      'yaBackup::Exception::Network' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Exception related to network errors (bad subnet etc.)',
                        alias       => 'network_error',
                       },
-                      'ibackup::Exception::CommandFileFormat' =>
+                      'yaBackup::Exception::CommandFileFormat' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Error in the options set on the command-line',
                       },
-                      'ibackup::Exception::ConfigFileFormat' =>
+                      'yaBackup::Exception::ConfigFileFormat' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Error in the formatting of the configuration file',
                       },
-                      'ibackup::Exception::DirectoryNotFound' =>
+                      'yaBackup::Exception::DirectoryNotFound' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'A directory used in the backup do not exist',
                       },
-                      'ibackup::Exception::FileNotFound' =>
+                      'yaBackup::Exception::FileNotFound' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'A file used in the backup do not exist',
                       },
-                      'ibackup::Exception::PasswordNotFound' =>
+                      'yaBackup::Exception::PasswordNotFound' =>
                       {
-                       isa         => 'ibackup::Exception',
+                       isa         => 'yaBackup::Exception',
                        description => 'Cannot find a matching password for an entry in the password file precised in the configuration file',
                       },
                      );
@@ -2205,15 +2202,15 @@ use Term::ANSIColor;
 our %ExitCodes = (
                   'ok' => 0,
                   'ko' => 1,
-                  'ibackup::Exception'                      => 256,
-                  'ibackup::Exception::RuntimeError'        => 2,
-                  'ibackup::Exception::CommandLineFormat'   => 3,
-                  'ibackup::Exception::ConfigFileFormat'    => 4,
-                  'ibackup::Exception::UnsupportedFeature'  => 5,
-                  'ibackup::Exception::DirectoryNotFound'   => 6,
-                  'ibackup::Exception::FileNotFound'        => 7,
-                  'ibackup::Exception::Network'             => 8,
-                  'ibackup::Exception::PasswordNotFound'    => 9,
+                  'yaBackup::Exception'                      => 256,
+                  'yaBackup::Exception::RuntimeError'        => 2,
+                  'yaBackup::Exception::CommandLineFormat'   => 3,
+                  'yaBackup::Exception::ConfigFileFormat'    => 4,
+                  'yaBackup::Exception::UnsupportedFeature'  => 5,
+                  'yaBackup::Exception::DirectoryNotFound'   => 6,
+                  'yaBackup::Exception::FileNotFound'        => 7,
+                  'yaBackup::Exception::Network'             => 8,
+                  'yaBackup::Exception::PasswordNotFound'    => 9,
                  );
 my $exit_code = 0;
 
@@ -2228,7 +2225,7 @@ log::initialize();
 
 # Process command line
 my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
-print::error_and_exit($ExitCodes{'ibackup::Exception::CommandLineFormat'},
+print::error_and_exit($ExitCodes{'yaBackup::Exception::CommandLineFormat'},
                       "Please check the format of the command-line. ",
                       "Use '$config::command --help' for more details") unless ($getoptRes);
 
@@ -2262,10 +2259,10 @@ if (($config::SYNC_MODE eq "--delete") && (! $config::QUIET)) {
     print::really_continue();
 }
 
-# Allow comma-separated backup_sections:
+# Allow comma-separated yaBackup_profiles:
 #  --sections=toto,tutu is equivalent to --sections=toto --sections=tutu
-@config::backup_sections = split(/,/,join(',',@config::backup_sections));
-@config::backup_sections = ('default') unless (@config::backup_sections);
+@config::yaBackup_profiles = split(/,/,join(',',@config::yaBackup_profiles));
+@config::yaBackup_profiles = ('default') unless (@config::yaBackup_profiles);
 
 # Find the relevant configuration file
 unless ($config::file) {
@@ -2280,15 +2277,15 @@ unless ($config::file) {
 }
 print::verbose("=> configuration file : $config::file");
 
-print::error_and_exit($ExitCodes{'ibackup::Exception::CommandLineFormat'},
+print::error_and_exit($ExitCodes{'yaBackup::Exception::CommandLineFormat'},
                       "Non-existing configuration file $config::file")
   unless (-f "$config::file");
 
 # Now put the content of the configuration file into an hash table
 %config::CONFIG_FILE_CONTENT = Config::General::ParseConfig(-ConfigFile => $config::file,
                                                             -InterPolateEnv => 1);
-print::error_and_exit($ExitCodes{'ibackup::Exception::ConfigFileFormat'},
-                      "Empty backup configuration:",
+print::error_and_exit($ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
+                      "Empty yaBackup configuration file:",
                       "ensure that the content of $config::file is correct!")
   unless (%config::CONFIG_FILE_CONTENT);
 
@@ -2296,14 +2293,14 @@ lock_hash(%config::CONFIG_FILE_CONTENT);
 print::debug("Creation of the hash table from the configuration file $config::file : ");
 print::debug(Dumper \%config::CONFIG_FILE_CONTENT);
 
-print::debug("Backup section(s) to consider in the configuration file :",
-             color('bold'), @config::backup_sections, color('reset'));
+print::debug("Backup profile(s) to consider in the configuration file :",
+             color('bold'), @config::yaBackup_profiles, color('reset'));
 
 # Check the configuration file format : there should be a section 'global' and
 # one for each backup profile considered
 unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
-                       'global', @config::backup_sections)) {
-    print::error_and_exit($ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+                       'global', @config::yaBackup_profiles)) {
+    print::error_and_exit($ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                           "The required backup profiles are missing in $config::file");
 }
 # TODO: execute pre-script if available
@@ -2311,7 +2308,7 @@ unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
 # ============================================================================
 # ========== Now proceed with each section (i.e. each backup profile) ========
 # ============================================================================
-foreach my $sec (@config::backup_sections) {
+foreach my $sec (@config::yaBackup_profiles) {
     print::info('=> proceeding backup profile: ',
                 '=========== ', format::color_msg('bold', "$sec"),
                 '===========');
@@ -2338,14 +2335,14 @@ foreach my $sec (@config::backup_sections) {
     };
     # catch
     if ( catch my $err ) {
-        if ($err->isa('ibackup::Exception::RuntimeError')       ||
-            $err->isa('ibackup::Exception::UnsupportedFeature') ||
-            $err->isa('ibackup::Exception::Network')            ||
-            $err->isa('ibackup::Exception::CommandLineFormat')  ||
-            $err->isa('ibackup::Exception::ConfigFileFormat')   ||
-            $err->isa('ibackup::Exception::DirectoryNotFound')  ||
-            $err->isa('ibackup::Exception::FileNotFound')       ||
-            $err->isa('ibackup::Exception::PasswordNotFound')) {
+        if ($err->isa('yaBackup::Exception::RuntimeError')       ||
+            $err->isa('yaBackup::Exception::UnsupportedFeature') ||
+            $err->isa('yaBackup::Exception::Network')            ||
+            $err->isa('yaBackup::Exception::CommandLineFormat')  ||
+            $err->isa('yaBackup::Exception::ConfigFileFormat')   ||
+            $err->isa('yaBackup::Exception::DirectoryNotFound')  ||
+            $err->isa('yaBackup::Exception::FileNotFound')       ||
+            $err->isa('yaBackup::Exception::PasswordNotFound')) {
             $exit_code = $ExitCodes{ref($err)};
             print::error($err->error);
             print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . " Failed:\n$err",
@@ -2382,49 +2379,49 @@ exit($exit_code);
 
 =head1 NAME
 
-I<backup> - Yet Another Backup script
+I<yaBackup> - Yet Another Backup script
 
 A highly flexible Perl script for the B<fast backup> of
 directories and/or files from your local system on various targets.
 
 =head1 SYNOPSIS
 
-      backup [options]
-      backup -f /path/to/configfile -s sectionname 
-      backup --restore
+      yabackup [options]
+      yabackup -f /path/to/configfile -s sectionname 
+      yabackup --restore
 
 =head1 DESCRIPTION
 
-I<backup> is designed to facilitate the configuration of backups over multiple
+I<yaBackup> is designed to facilitate the configuration of backups over multiple
 type of targets such as local folders, external drive, [encrypted] sparsebundle
 images, a remote machine with SSH access or a NAS with AFP access.  Except for
 the case of sparsebundle images (that can be inherently encrypted), the target
 backup folder may be encrypted using EncFS such that you don't have to worry
 about the security of your backups.
 
-Being based on B<rsync> (L<http://samba.anu.edu.au/rsync/>), I<backup>
+Being based on B<rsync> (L<http://samba.anu.edu.au/rsync/>), I<yaBackup>
 implements a traditional [incremental] backup scheme, i.e. the target contains
 all information (full backup) of the source (typically your local
 homedir). Later on, when invoking the script, only the changed information is
 transferred. 
 
-So to summarize, I<backup> claims the following functionalities:
+So to summarize, I<yaBackup> claims the following functionalities:
 
 =over 
 
 =item * B<Flexible and Easy to use>
 
-Although I<backup> is a command-line utility, the semantics of the configuration
+Although I<yaBackup> is a command-line utility, the semantics of the configuration
 file is relatively simple and permit to setup many backup profiles 
 
 =item * B<Bandwidth and space efficient>
 
-I<backup> uses the B<rsync> algorithm so only the changed parts of files are
+I<yaBackup> uses the B<rsync> algorithm so only the changed parts of files are
 sent to the target when doing an incremental backup.
 
 =item * B<Support various backup targets>
 
-Currently, I<backup> implements the following target schemes: 
+Currently, I<yaBackup> implements the following target schemes: 
 
 =over 
 
@@ -2461,7 +2458,7 @@ your backup destination.
 
 =back
 
-I<backup> rely on a configuration file (using a format similar to Apache config
+I<yaBackup> rely on a configuration file (using a format similar to Apache config
 files) to describe the characteristics of a backup to be performed (files to
 include/exclude, target url etc. -- see L</"CONFIGURATION FILE FORMAT"> for more
 details). These characteristics are aggregated into I<backup profiles>, each of
@@ -2502,33 +2499,33 @@ So appart from the 'global' section, each backup is defined in a named block
 
 To start the backup configured by default, simply run::
  
-    backup -f /path/to/configfile
+    yabackup -f /path/to/configfile
 
 To start the backup configured under the C<home> profile, just run:
 
-    backup -f /path/to/configfile -s home
+    yabackup -f /path/to/configfile -s home
 
 To restore data from the backup operated via the C<home> profile, run the
 following command: 
 
-    backup -f /path/to/configfile -s home --restore
+    yabackup -f /path/to/configfile -s home --restore
 
-Note that I<backup> tries by default to use the configuration files
+Note that I<yaBackup> tries by default to use the configuration files
 C</etc/backup.conf> and C<~/.backup.conf> so that the C<-f> option can be
 avoided. 
 
 =head1 COMMAND-LINE OPTIONS
 
-I<backup> supports the following options:
+I<yaBackup> supports the following options:
 
 =over
 
 =item B<--config-file=FILE  -f FILE>
 
-Set FILE as the I<backup> configuration file to be used.  Note that such
+Set FILE as the I<yaBackup> configuration file to be used.  Note that such
 a configuration file is mandatory (see L</"CONFIGURATION FILE FORMAT">)
 
-By default, I<backup> search for the following files: C</etc/backup.conf> and
+By default, I<yaBackup> search for the following files: C</etc/backup.conf> and
 C<~/.backup.conf>
 
 =item B<--debug>
@@ -2543,7 +2540,7 @@ not perform any actions.
 =item B<--exact-sync  --delete   -e>
 
 Exact synchronization mode.
-Causes I<backup> to delete files on the target if absent in the source directory.
+Causes I<yaBackup> to delete files on the target if absent in the source directory.
 This ensure an exact replica but you may loose files so use this option with caution.
 
 =item B<--help  -h>
@@ -2552,7 +2549,7 @@ Display a help screen and quit.
 
 =item B<--list-profiles -l>
 
-(Not yet implemented) List the available backup profiles in the I<backup>
+(Not yet implemented) List the available backup profiles in the I<yaBackup>
 configuration file.  A more detailed view is proposed when used in combination
 with the C<-v> option.
 
@@ -2562,14 +2559,14 @@ Use Mac OS resource fork for backup.  This is only relevant on Mac OS X and
 requires you to use at least the version 3.0 of B<rsync> (installed via the
 macports typically - see L<http://www.macports.org>)
 
-Causes I<backup> to use the Mac OS resource forks when calling the rsync
+Causes I<yaBackup> to use the Mac OS resource forks when calling the rsync
 function.  This will preserve Mac OS extended attributes.  If you are running
 Mac OS X, you REALLY want this. Simply pay attention not to use the default
 B<rsync> binary (2.6.9 in Snow Leopard).
 
 =item B<--notification>
 
-Activates user notification of I<backup> status, typically via B<Growl> (see
+Activates user notification of I<yaBackup> status, typically via B<Growl> (see
 L<http://growl.info/>) under Mac OS X or B<notify-send> under Linux (C<apt-get
 install libnotify-bin> on Debian/Ubuntu for instance).
 
@@ -2590,7 +2587,7 @@ not continue.
 =item B<--push -p>
 
 Push mode: push data on the backup target. This is the default behaviour of
-I<backup>.
+I<yaBackup>.
 
 =item B<--quiet>
 
@@ -2613,7 +2610,7 @@ USE WITH CAUTION as this will probably overwrite files on your local machine!
 Specify the successive sections (i.e. backup profiles) to use for the backup
 configuration (relative to the used configuration file -- 
 see L</"CONFIGURATION FILE FORMAT">) 
-If this option is not set, I<backup> will use the B<default> profile.
+If this option is not set, I<yaBackup> will use the B<default> profile.
 
 You can specify several successive sections that will generate as many backup
 attempts. 
@@ -2624,13 +2621,13 @@ Verbose mode. Display more information
 
 =item B<--version>
 
-Display the I<backup> version number then quit. 
+Display the I<yaBackup> version number then quit. 
 
 =back
 
 =head1 CONFIGURATION FILE FORMAT
 
-The configuration file for I<backup> is divided into sections defined as blocks.
+The configuration file for I<yaBackup> is divided into sections defined as blocks.
 A block looks much like a block in the wellknown apache config format. 
 It starts with C<< <blockname> >> and ends with C<< </blockname> >>
 Later on, C<blockname> can be referred to as the backup profile name you want to
@@ -2676,7 +2673,7 @@ For a given section, the following directives are recognized:
 =item B<< <Directory DIR> ... </Directory> >>
 
 (Not yet implemented) 
-This directive makes it possible to specialize the behaviour of I<backup> for the 
+This directive makes it possible to specialize the behaviour of I<yaBackup> for the 
 directory DIR. 
 
 =item B<dst_rootdir = ROOTDIR>
@@ -2688,14 +2685,14 @@ Default: C</>
 
 =item B<email = EMAIL>
 
-Specify an email address where all errors/warnings can be sent upon I<backup>
+Specify an email address where all errors/warnings can be sent upon I<yaBackup>
 execution. 
 
 =item B<encfs_rawdir = DIR>
 
 Specifies the path to the directory (generally named C<.secure/> or C<.crypt/> so
 as to be hidden) that will contain the EncFS raw data and configuration. 
-Note that the usage of this directive is sufficient to indicate to I<backup> the
+Note that the usage of this directive is sufficient to indicate to I<yaBackup> the
 will to encrypt the target backup folder (with EncFS), even in the case of a
 backup profile on a remote server (accessed by SSH or AFP).    
 
@@ -2723,7 +2720,7 @@ Consequently, the specification of DIR can appear in two modes:
 =item 1. 
 
 as a relative path to the mountpoint. To come back to the previous example, it
-can lead to the following I<backup> profile configuration: 
+can lead to the following I<yaBackup> profile configuration: 
 
         target_url   = drive:///mnt/MyBackup/backup
         encfs_rawdir = target_url:../.secure
@@ -2741,17 +2738,17 @@ following backup profile:
 =back
 
 Note that except for a profile using the SSH protocol (see L</"TARGET URL
-FORMAT">), if EncFS is not yet configured, I<backup> will proceed to the
+FORMAT">), if EncFS is not yet configured, I<yaBackup> will proceed to the
 configuration for you. Simply follow the instructions given on the screen.
 
-I<backup> tries several ways to recover the EncFS pass-phrase of the target
+I<yaBackup> tries several ways to recover the EncFS pass-phrase of the target
 backup folder
 
 =over
 
 =item 1.
 
-If the C<password_file> directive is precised, I<backup> attempts to extract the
+If the C<password_file> directive is precised, I<yaBackup> attempts to extract the
 password from the appropriate entry in the password file.
 
 =item 2.
@@ -2766,7 +2763,7 @@ obliged to rely on a password file.
 
 I<Note for Debian users>: the B<encfs> package in Lenny (v.1.4.2) contains a bug
 for the creation of EncFS mounts with the default AES encryption scheme.  When
-creating the EncFS folder, I<backup> use the C<--standard> option of encfs (see
+creating the EncFS folder, I<yaBackup> use the C<--standard> option of encfs (see
 L<encfs(1)>) that precisely use this encryption scheme.  In this case, the mount
 will fail.  The solution is to manually create the mount by running : 
 
@@ -2782,7 +2779,7 @@ B<Restrictions>:
 
 =item *
 
-in SSH mode, I<backup> currently assumes the remote server to run a Linux OS
+in SSH mode, I<yaBackup> currently assumes the remote server to run a Linux OS
 such that the remote EncFS backup target will be unmounted using the command
 C<fusermount -u> (whereas C<umount> should be used under Mac OS X).
 
@@ -2821,7 +2818,7 @@ Example:
 The following level are defined: debug (7), info (6), notice (5), warning(4),
 error(3), critical(2), alert(1) and emergency(0).
 
-I<backup> will create two log file:
+I<yaBackup> will create two log file:
 
 =over
 
@@ -2838,7 +2835,7 @@ level 0 until level 4).
 
 =item B<password_file = FILE>
 
-Set FILE as the password file for I<backup>. 
+Set FILE as the password file for I<yaBackup>. 
 Each line of the password file corresponds to a password entry with the following format:
  
    target_url   password
@@ -2854,7 +2851,7 @@ connections.
 Indeed, it seemed impossible to rely on other (more secure) mechanisms such as
 keychain (used for encrypted sparse bundle mounts for instance), or agents (used
 for SSH -- see the 'auth_auth_sock' directive).  I simply thought it's a better
-alternative than putting the password in I<backup> configuration file.
+alternative than putting the password in I<yaBackup> configuration file.
 
 By the way, it's B<NEVER> a good idea to put clear password in a text file. 
 At minimum, ensure correct rights on this file ('chmod 600 /path/to/passwordfile') and don't 
@@ -2891,7 +2888,7 @@ advised), you probably use an SSH agent (see L<ssh-agent(1)>) to manage your
 pass-phrase via a local socket C</path/to/ssh-agent.socket> (i.e. the
 C<$SSH_AUTH_SOCK> environment variable).
 
-This directive is useful for running I<backup> in a cronjob (as B<cron>
+This directive is useful for running I<yaBackup> in a cronjob (as B<cron>
 typically don't have access to the C<$SSH_AUTH_SOCK> environment variable). 
 
 Example: 
@@ -2960,12 +2957,12 @@ Define the target url of the backup (see L</"TARGET URL FORMAT">).
 
 =head1 TARGET URL FORMAT
 
-I<backup> tries to maintain a standard URL format for backup targets.  
+I<yaBackup> tries to maintain a standard URL format for backup targets.  
 The generic format for a target URL is:
 
               protocol://path|user[@host[:port]][/complementpath]
 
-I<backup> don't support the exposure of cleartext passwords on purpose for
+I<yaBackup> don't support the exposure of cleartext passwords on purpose for
 obvious security reasons. 
 When it is required (as for instance for AFP connections or EncFS directories),
 you have to use a separate password file (see the C<password_file> directive)
@@ -3004,7 +3001,7 @@ C</path/to/image.[dmg|sparsebundle]> will be mounted (let's say in
 C</Volumes/ImageName>) such that the backup process will use the target
 C</Volumes/ImageName/<dst_rootdir>>. 
 
-Note that the mount point is automatically retrieved by I<backup> so you don't
+Note that the mount point is automatically retrieved by I<yaBackup> so you don't
 have to worry about that. 
 
 Note that in this mode, you cannot encrypt the target backup folder using
@@ -3012,7 +3009,7 @@ EncFS. This is not considered as a serious security issue as B<encrypted>
 sparse-bundle images are supported (and provide a far more efficient data access
 than EncFS).
 
-For the moment, I<backup> do not permit the automatic creation of the
+For the moment, I<yaBackup> do not permit the automatic creation of the
 sparsebundle image (if not found). 
 To create such an image, simply run the C<Disk Utility> application, select the
 C<New Image> and fill the form (pay attention to select the Image format as
@@ -3032,7 +3029,7 @@ Example:
       ssh://mylogin@server2.example.org:8022
 
 Even if public key authentication is not strictly required, it is strongly
-recommended and mandatory if I<backup> it to be launched in a crontab for
+recommended and mandatory if I<yaBackup> it to be launched in a crontab for
 instance. 
 Additionally, if not set, you will be prompted for your login password on every
 synchronization step (i.e. once per source directory/file) so you will quickly
@@ -3050,7 +3047,7 @@ You may argue that in this case, you will be prompted for your pass-phrase on
 every authentication operation (therefore with no benefit compared to a regular
 password-based authentication), hopefully an SSH agent (see L<ssh-agent(1)>) can
 take care of your pass-phrase for a given period of time (the day typically).
-To make the SSH agent interact with I<backup>, please refer to the
+To make the SSH agent interact with I<yaBackup>, please refer to the
 C<ssh_auth_sock> directive.  
 
 =item * C<afp> :  AFP (Apple Filing Protocol) access (to a NAS typically). 
@@ -3083,7 +3080,7 @@ Example:
 
 Except for anonymous access (characterized by the C<guest> username), a password
 is mandatory. 
-I<backup> tries several ways to recover this password
+I<yaBackup> tries several ways to recover this password
 
 =over
 
@@ -3093,7 +3090,7 @@ directly from the target url if provided.
 
 =item 2. 
 
-if the C<password_file> directive is precised, I<backup> attempts to extract the
+if the C<password_file> directive is precised, I<yaBackup> attempts to extract the
 password from the appropriate entry in the password file.
 
 =item 3.
@@ -3111,7 +3108,7 @@ directive for details about the format required in this file).
 
 Finally, once the AFP volume is mounted (let's say in C</Volumes/volumename>)
 and if the afp url is complemented by a path towards an [encrypted]
-sparsebundle image, I<backup> handle the image as if following target url would
+sparsebundle image, I<yaBackup> handle the image as if following target url would
 have been applied:  
 
          sparsebundle:///Volumes/volumename/path/to/image.[dmg|sparsebundle]
@@ -3123,7 +3120,7 @@ i.e. the treatment inherent to the above C<sparsebundle> protocol is applied.
 
 =head1 EXIT STATUS
 
-I<backup> has the following return codes:
+I<yaBackup> has the following return codes:
 
 =over
 
@@ -3182,7 +3179,7 @@ generic exception
 
 =item C<~/.backup.conf>
 
-The I<backup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
+The I<yaBackup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
 
 A documented example of the configuration file is proposed in the file
 C<@prefix@/share/doc/backup/examples/backup.conf.example>.
@@ -3191,19 +3188,18 @@ C<@prefix@/share/doc/backup/examples/backup.conf.example>.
 
 =item C<LOGDIR/error.log>
 
-I<backup> log files (assuming you set the C<logdir> directive)
+I<yaBackup> log files (assuming you set the C<logdir> directive)
 
 =back
 
 =head1 BUGS
 
-Please report bugs using informations provided at the page L<http://ibackup.gforge.uni.lu/bugs.html>
-
+Please report bugs using informations provided at the page L<http://github.com/Falkor/yabackup/issues>
 
 
 =head1 COPYRIGHT
 
-I<backup> is released under GNU GPL Licence v3.
+I<yaBackup> is released under GNU GPL Licence v3.
 
 This  is a free software. There is NO warranty; not even for
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
