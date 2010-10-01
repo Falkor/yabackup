@@ -104,7 +104,7 @@ AC_CHECK_CPAN_MODULES(
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
 
-AC_CONFIG_SRCDIR([bin/backup.in])
+AC_CONFIG_SRCDIR([bin/yabackup.in])
 AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile

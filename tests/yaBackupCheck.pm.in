@@ -73,7 +73,7 @@ use File::Path qw(mkpath rmtree);
 our $SRCDIR     = "@srcdir@";
 our $TOP_SRCDIR = "@top_srcdir@";
 our $TESTDIR    = "@top_srcdir@/tests";
-our $SCRIPT     = "$TOP_SRCDIR/bin/backup";
+our $SCRIPT     = "$TOP_SRCDIR/bin/yabackup";
 our $TMPDIR     = "/tmp/__yaBackup_test__";
 # cf bin/yabackup.in -> this won't be required once I'll refactore the code as a separate module.
 our %ExitCodes = (

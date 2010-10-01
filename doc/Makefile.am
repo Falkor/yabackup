@@ -13,7 +13,7 @@
 man_MANS = yabackup.1
 
 # Generate man page
-yabackup.1 : $(src_rootdir)/bin/yabackup 
+yabackup.1 : $(top_srcdir)/bin/yabackup 
 	$(POD2MAN) --name=yaBackup --section=1 --center="yaBackup v@VERSION@ Script Manual" $^ > $@
 
 .PHONY: doc

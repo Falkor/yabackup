@@ -32,7 +32,7 @@ diag("Testing command line and configuration file handling");
 
 ####
 # Operate a test on the backup script 
-# Usage: do_test_on_configfile(expected_exit_code, "msg", "ibackup_arguments" [,"stdin"])
+# Usage: do_test_on_configfile(expected_exit_code, "msg", "yaBackup_arguments" [,"stdin"])
 ##
 sub do_test_on_configfile($$$@) {
     #    print '[', (caller(0))[3], "] @_\n";
@@ -79,56 +79,56 @@ $conf->verbose($DEBUG);
 $conf_file = $conf->filename();
 
 # Let's go
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::CommandLineFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::CommandLineFormat'},
                       'non-existing command-line option',
                       '--unlikely-to-be-a-valid-option');
 
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::CommandLineFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::CommandLineFormat'},
                       'non-existing configuration file',
                       "-f $conf_file.$$.non-existent");
 
 system("echo '' > $conf_file");
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                       'empty configuration file',
                       "-f $conf_file");
 
 #$conf->add_param_to_section('global', 'src_rootdir', "$yaBackupCheck::TESTDIR/");
 $conf->initialize();
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                       'missing \'default\' profile in the configuration file',
                       "-f $conf_file");
 
 $conf->add_param_to_section('default', 'strange_directive', 'you-dont-care-of-my-value');
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                       'unknown directive in a profile of the configuration file',
                       "-f $conf_file");
 $conf->delete_param_in_section('default', 'strange_directive');
 
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                       'empty default section (i.e. missing target_url)',
                       "-f $conf_file");
 
 
 $conf->add_param_to_section('global', 'src_rootdir', "$yaBackupCheck::TMPDIR/__hopefully_unexisting_dir__");
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::DirectoryNotFound'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::DirectoryNotFound'},
                       'non-existing source directory',
                       "-f $conf_file");
 
 $conf->add_param_to_section('global', 'src_rootdir',  "$yaBackupCheck::TESTDIR/t/data");
 $conf->add_param_to_section('default','target_url',   "");
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::ConfigFileFormat'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
                       'minimal valid configuration file (with directives src_rootdir and target_url) '.
                       'yet with empty target_url',
                       "-f $conf_file");
 
 $conf->add_param_to_section('default','target_url',   "badproto:///");
 $conf->write();
-do_test_on_configfile($yaBackupCheck::ExitCodes{'ibackup::Exception::UnsupportedFeature'},
+do_test_on_configfile($yaBackupCheck::ExitCodes{'yaBackup::Exception::UnsupportedFeature'},
                       'malformed target_url (unknown protocol)',
                       "-f $conf_file");
 
