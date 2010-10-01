@@ -28,7 +28,7 @@
 ############################################################################################
 
 ### Global variables
-VERSION=0.2
+VERSION=0.3
 COMMAND=`basename $0`
 VERBOSE=""
 DEBUG=""
@@ -236,7 +236,7 @@ clean() {
 }
 
 extract_perl_modules() {
-    grep "^use " bin/backup.in | cut -d ' ' -f 2 | sed -e "s/;$//" | sort | uniq
+    grep "^use " bin/yabackup.in | cut -d ' ' -f 2 | sed -e "s/;$//" | sort | uniq
 }
 
 

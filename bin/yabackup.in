@@ -1418,7 +1418,7 @@ sub parse_target_url() {
     $BACKUP_CMD_INFO{'proto'}  = $proto;
     $BACKUP_CMD_INFO{'target'} = $target;
 
-    if ($proto =~ /(file|drive|afp|sparsebundle)/) {
+    if ($proto =~ /(file|drive|ssh|afp|sparsebundle)/) {
         config::set_icon("$proto"); # Change the icon layout to match the
                                     # protocol used in this profile
     }
@@ -2266,7 +2266,7 @@ if (($config::SYNC_MODE eq "--delete") && (! $config::QUIET)) {
 
 # Find the relevant configuration file
 unless ($config::file) {
-    my @conffile_list = ('/etc/backup.conf', "$ENV{HOME}/.backup.conf");
+    my @conffile_list = ('/etc/yabackup.conf', "$ENV{HOME}/.yabackup.conf");
     # if no configuration file found in the command-line arguments, check
     # successively for files listed in @conffile_list
     foreach my $f (@conffile_list) {
@@ -2511,7 +2511,7 @@ following command:
     yabackup -f /path/to/configfile -s home --restore
 
 Note that I<yaBackup> tries by default to use the configuration files
-C</etc/backup.conf> and C<~/.backup.conf> so that the C<-f> option can be
+C</etc/yabackup.conf> and C<~/.yabackup.conf> so that the C<-f> option can be
 avoided. 
 
 =head1 COMMAND-LINE OPTIONS
@@ -2525,8 +2525,8 @@ I<yaBackup> supports the following options:
 Set FILE as the I<yaBackup> configuration file to be used.  Note that such
 a configuration file is mandatory (see L</"CONFIGURATION FILE FORMAT">)
 
-By default, I<yaBackup> search for the following files: C</etc/backup.conf> and
-C<~/.backup.conf>
+By default, I<yaBackup> search for the following files: C</etc/yabackup.conf> and
+C<~/.yabackup.conf>
 
 =item B<--debug>
 
@@ -3175,14 +3175,14 @@ generic exception
 
 =over 
 
-=item C</etc/backup.conf>
+=item C</etc/yabackup.conf>
 
-=item C<~/.backup.conf>
+=item C<~/.yabackup.conf>
 
 The I<yaBackup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
 
 A documented example of the configuration file is proposed in the file
-C<@prefix@/share/doc/backup/examples/backup.conf.example>.
+C<@prefix@/share/doc/yabackup/examples/yabackup.conf.example>.
 
 =item C<LOGDIR/common.log>
 
@@ -3192,17 +3192,59 @@ I<yaBackup> log files (assuming you set the C<logdir> directive)
 
 =back
 
+=head1 DEPENDENCIES
+
+I<yaBackup> depends on the following Perl modules:
+
+         Config::General
+         Cwd
+         Data::Dumper
+         Exception::Class
+         Exception::Class::TryCatch
+         Expect
+         File::Basename
+         Getopt::Long
+         Hash::Util
+         List::Util
+         Log::Handler
+         Mac::PropertyList
+         Pod::Usage
+         Storable
+         Term::ANSIColor
+         Term::ReadKey
+
+To install then, the most simple way is to rely on B<cpan> (see
+L<http://search.cpan.org>): run C<sudo cpan>, accept the default configurations
+and once the cpan prompt appears, run C<install Module::Name> to install the
+module C<Module::Name>.
+
 =head1 BUGS
 
-Please report bugs using informations provided at the page L<http://github.com/Falkor/yabackup/issues>
+Please report bugs on
+L<http://github.com/Falkor/yabackup/issues>
 
+=head1 DISCLAIMER
+
+I<yaBackup> is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+=head1 AUTHOR
+
+I<yaBackup> is written by Sebastien Varrette
+E<lt>Sebastien.Varrette@uni.luE<gt>.
+
+Code contribution before the complete code refactoring by Guillaume-Jean Herbiet
+E<lt>Guillaume.Herbiet@uni.luE<gt>
 
 =head1 COPYRIGHT
 
-I<yaBackup> is released under GNU GPL Licence v3.
+Copyright (c) 2009-2010 Sebastien Varrette
 
-This  is a free software. There is NO warranty; not even for
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+I<yaBackup> is released under GNU GPL Licence v3.
+This  is a free software.
+You may use, modify, and/or redistribute this software under the terms of the
+GPL Licence v3.
 
 =cut
 
