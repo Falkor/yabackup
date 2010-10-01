@@ -1896,7 +1896,7 @@ our $command = `basename $0`;   # base command
 chomp($command);
 
 # Icons settings
-our $iconsdir = "$config::prefix/share/icons/yaBackup"; # icons folder (as in
+our $iconsdir = "$config::prefix/share/icons/yabackup"; # icons folder (as in
                                                         # Makefile.am)
 # The different type of available icons
 our @icon_types = ('default', 'defaultEncrypted',
@@ -2004,7 +2004,7 @@ sub reset_settings() {
 sub set_icon(@) {
     my $type   = shift;
     $type      = 'default' unless defined($type);
-    my $res = "yaBackup_$type" . "_Icon.png";
+    my $res = "yabackup_$type" . "_Icon.png";
     system::check_has_file("$config::iconsdir/$res",
                            "$config::iconsdir/OK_$res",
                            "$config::iconsdir/KO_$res");
