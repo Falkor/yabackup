@@ -1,372 +1,184 @@
+2010-10-03  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Correct README header
+	* Rework project documentation and automatic README generation
 
-n.n.n / 2010-10-02 
-==================
+2010-10-01  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Header rewrite
+	* Correct minor bug on icon set for the SSH protocol + finalize POD document (Authors/copyright etc.)
+	* Minor correction on icon path to work on Ubuntu
+	* Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
+	* Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
+	* icon renaming ibackup -> yabackup
+	* finalize POD doc
+	* Correct CSS
+	* continue on POD documentation
 
-  * Header rewrite
-  * Correct minor bug on icon set for the SSH protocol + finalize POD document (Authors/copyright etc.)
-  * Minor correction on icon path to work on Ubuntu
-  * Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
-  * Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
-  * icon renaming ibackup -> yabackup
-  * finalize POD doc
-  * Correct CSS
-  * continue on POD documentation
-  * Start POD documentation
-  * New icons files added
-  * Correct path management in src_rootdir and finalize sparsebundel support
-  * Update checking of used modules
-  * Add function to the bootstrap script to extract the used Perl modules
-  * 
-  * Add a new tests/ directory containing the regression tests generated using the modules Test::More and Test::Cmd
-  * Add a new tests directory for regression tests based on Test::More and Test::Cmd
-  * Correct error in unmount when dealing with encfs+ssh and spaces in the directory of the mounted dir
-  * Work against spaces in filenames that appear to be a nightmare for rsync over SSH (but not only)
-  * FInalize tests for protocols file, drive, ssh and there respective encfs versions
-  * Finalize select_element over SSH (better find command)
-  * - Add new function for execute with collection of the outpu - better handling of sync::select_element() to list elements over SSH in case of restoration
-  * Update SSH icon (both encrypted and normal version to make 'SSH' more visible
-  * Rename the icon files to facilitate the access using $BACKUP_CMD_INFO{'proto'}
-  * Add icons folder
-  * Add separate icones
-  * Add remote encfs volume mount/umount Add execute_and_set_stdin
-  * Continue on EncFS port
-  * Start adding EncFS support
-  * Add sync package
-  * continue on integration
-  * Add exception mechnanism via Exception::Class. Note: install v.1.30 until 1.31 correct the bug on circular dependencies upon cpan install
-  * Start refactoring the code into packages
-  * Creating a private branch of ibackup/calc for the code splitting via packages
-  * Add link to LBackup
-  * Update the website for the release
+2010-09-30  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Start POD documentation
+	* New icons files added
+	* Correct path management in src_rootdir and finalize sparsebundel support
 
-n.n.n / 2010-10-02 
-==================
+2010-09-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Update checking of used modules
+	* Add function to the bootstrap script to extract the used Perl modules
 
-  * Header rewrite
-  * Correct minor bug on icon set for the SSH protocol + finalize POD document (Authors/copyright etc.)
-  * Minor correction on icon path to work on Ubuntu
-  * Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
-  * Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
-  * icon renaming ibackup -> yabackup
-  * finalize POD doc
-  * Correct CSS
-  * continue on POD documentation
-  * Start POD documentation
-  * New icons files added
-  * Correct path management in src_rootdir and finalize sparsebundel support
-  * Update checking of used modules
-  * Add function to the bootstrap script to extract the used Perl modules
-  * 
-  * Add a new tests/ directory containing the regression tests generated using the modules Test::More and Test::Cmd
-  * Add a new tests directory for regression tests based on Test::More and Test::Cmd
-  * Correct error in unmount when dealing with encfs+ssh and spaces in the directory of the mounted dir
-  * Work against spaces in filenames that appear to be a nightmare for rsync over SSH (but not only)
-  * FInalize tests for protocols file, drive, ssh and there respective encfs versions
-  * Finalize select_element over SSH (better find command)
-  * - Add new function for execute with collection of the outpu - better handling of sync::select_element() to list elements over SSH in case of restoration
-  * Update SSH icon (both encrypted and normal version to make 'SSH' more visible
-  * Rename the icon files to facilitate the access using $BACKUP_CMD_INFO{'proto'}
-  * Add icons folder
-  * Add separate icones
-  * Add remote encfs volume mount/umount Add execute_and_set_stdin
-  * Continue on EncFS port
-  * Start adding EncFS support
-  * Add sync package
-  * continue on integration
-  * Add exception mechnanism via Exception::Class. Note: install v.1.30 until 1.31 correct the bug on circular dependencies upon cpan install
-  * Start refactoring the code into packages
-  * Creating a private branch of ibackup/calc for the code splitting via packages
-  * Add link to LBackup
-  * Update the website for the release
-NOTE: since the project moved to github (and changed name), I didn't take to the time to find the equivalent of svn2cl.sh which explain why this ChangeLog is out-of-date. 
-	
+2010-08-18  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* 
+
+2010-08-13  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add a new tests/ directory containing the regression tests generated using the modules Test
+
+2010-08-10  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add a new tests directory for regression tests based on Test
+
+2010-08-09  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Correct error in unmount when dealing with encfs+ssh and spaces in the directory of the mounted dir
+	* Work against spaces in filenames that appear to be a nightmare for rsync over SSH (but not only)
+
+2010-08-06  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* FInalize tests for protocols file, drive, ssh and there respective encfs versions
+
+2010-08-05  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Finalize select_element over SSH (better find command)
+	* - Add new function for execute with collection of the outpu - better handling of sync
+	* Update SSH icon (both encrypted and normal version to make 'SSH' more visible
+
+2010-08-04  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Rename the icon files to facilitate the access using $BACKUP_CMD_INFO{'proto'}
+	* Add icons folder
+
+2010-07-31  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add separate icones
+
+2010-07-26  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add remote encfs volume mount/umount Add execute_and_set_stdin
+
+2010-07-22  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Continue on EncFS port
+
+2010-07-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Start adding EncFS support
+
+2010-07-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add sync package
+
+2010-07-05  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* continue on integration
+
+2010-06-28  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add exception mechnanism via Exception
+
+2010-06-25  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Start refactoring the code into packages
+
+2010-06-24  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Creating a private branch of ibackup/calc for the code splitting via packages
+
+2009-11-16  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Add link to LBackup
 
 2009-11-12  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r59] ChangeLog, Makefile.am,
-	  www/download/backup-0.3.2.tar.gz[ADD]: Release version 0.3.2
-
-	* [r58] ChangeLog, Makefile.am, README: Correct ChangeLog issue on
-	  'make dist' (cause by the absence of ChangeLog file in www/)
-
-	* [r57] bin/backup.in, www/Makefile.am, www/docs.wml,
-	  www/features.wml, www/include/main.wml, www/index.wml: Update
-	  documentation and website to prepare release 0.3.2
+	* Update the website for the release
+	* Release version 0.3.2
+	* Correct ChangeLog issue on 'make dist' (cause by the absence of ChangeLog file in www/)
+	* Update documentation and website to prepare release 0.3.2
 
 2009-11-10  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r56] bin/backup.in: Correct path bug that happens inside crontab
-	  when searching for mount_afp
+	* Correct path bug that happens inside crontab when searching for mount_afp
 
 2009-11-09  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r55] ChangeLog, TODO, configure.ac: Update ChangeLog and
-	  complement TODO
-
-	* [r54] bin/backup.in, configure.ac: Correct header
-
-	* [r53] bin/backup.in: Correct bug on sparsebundle volume
-	  containing space characters
-
-	* [r52] etc/backup.conf.example: Rework the content of the
-	  backup.conf example
-
-	* [r51] bin/backup.in: Finalize support of AFP connection,
-	  eventually on a [encrypted] sparsebundle.
+	* Update ChangeLog and complement TODO
+	* Correct header
+	* Correct bug on sparsebundle volume containing space characters
+	* Rework the content of the backup.conf example
+	* Finalize support of AFP connection, eventually on a [encrypted] sparsebundle.
 
 2009-11-08  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r50] bin/backup.in: Continue work on AFP handling
+	* Continue work on AFP handling
 
 2009-11-07  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r49] bin/backup.in: Start handling afp connection
+	* Start handling afp connection
 
 2009-11-06  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r48] ChangeLog, bin/backup.in, configure.ac: Improve
-	  sparsebundle management (automatic detection of mount point) +
-	  add global clean mechanism at the end of the synchro (to umount
-	  all volumes etc.)
+	* Improve sparsebundle management (automatic detection of mount point) + add global clean mechanism at the end of the synchro (to umount all volumes etc.)
 
 2009-08-11  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
-
-	* [r47] TODO: Modified TODO with ideas about GUI support and code
-	  rewrite
+	* Modified TODO with ideas about GUI support and code rewrite
 
 2009-08-10  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
-
-	* [r46] bin/backup.in: Commented out outdated error message when
-	  notification() was used under Linux.
-
-	* [r45] bin/backup.in: - Modified rsync options corresponding to
-	  MAC_FORK in treat_cmd_options()
-	  - Prevented activation of MAC_FORK options when target is ssh due
-	  to incompatibilities in treat_cmd_options()
+	* Commented out outdated error message when notification() was used under Linux.
+	* - Modified rsync options corresponding to MAC_FORK in treat_cmd_options() - Prevented activation of MAC_FORK options when target is ssh due to incompatibilities in treat_cmd_options()
 
 2009-08-06  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r44] bin/backup.in, configure.ac, www/download.wml: - Reactivate
-	  anonymous access to the svn repository on teh web site
-	  - Fix bug for the option unrecognized option --exact-sync (was
-	  --exact_sync in Getopt)
+	* - Reactivate anonymous access to the svn repository on teh web site - Fix bug for the option unrecognized option --exact-sync (was --exact_sync in Getopt)
 
 2009-07-31  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r43] ChangeLog, Makefile.am: Correct the ChangeLog rule for
-	  Makefile.am to include all revisions
-
-	* [r42] Makefile.am, bin/backup.in: Correct PATH issues when using
-	  growlnotify in a crontab
-	  - Fix Bug 11: --notification in crontab raise 'could not find
-	  local GrowlApplicationBridgePathway, falling back to NSDNC'
+	* Correct the ChangeLog rule for Makefile.am to include all revisions
+	* Correct PATH issues when using growlnotify in a crontab - Fix Bug 11:  --notification in crontab raise 'could not find local GrowlApplicationBridgePathway, falling back to NSDNC'
 
 2009-07-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r41] bin/backup.in, www/bugs.wml: Fix bug '10': --notification
-	  and absence of grownotification should raise a single error
-
-	* [r40] README, bin/backup.in, configure.ac, www/bugs.wml,
-	  www/index.wml: correct mispellings + add mention to the new
-	  mailing list ibackup-support@lists.gforge.uni.lu
-
-	* [r39] README, bin/backup.in, www/Makefile.am, www/docs.wml,
-	  www/download/backup-0.3.tar.gz[ADD], www/index.wml: Release v0.3
-	  on the web site
-
-	* [r38] ChangeLog: update from svn2cl.sh
-
-	* [r37] AUTHORS, ChangeLog, INSTALL[DEL], Makefile.am, README,
-	  acinclude.m4, bin/backup.in, bootstrap, configure.ac,
-	  www/Makefile.am, www/bugs.wml, www/docs.wml, www/download.wml,
-	  www/features.wml, www/gforge.wml, www/include/Makefile,
-	  www/include/definitions.tag, www/include/index.wml[DEL],
-	  www/include/main.wml, www/include/menu.tag,
-	  www/include/style.css, www/include/template.wml,
-	  www/include/wmlrc.default[DEL], www/index.wml, www/links.wml: -
-	  Add Guillaume as co-author in teh documentation
-	  - Update the bootstrap script
-	  - Add --enable-svn2cl to rely on svn2cl.sh to generate
-	  automatically the ChangeLog
-	  - Add propset for the svn keyword Id on relevant files
-	  - Version 0.3 released
+	* Fix bug '10': --notification and absence of grownotification should raise a single error
+	* correct mispellings + add mention to the new mailing list ibackup-support@lists.gforge.uni.lu
+	* Release v0.3 on the web site
+	* update from svn2cl.sh
+	* - Add Guillaume as co-author in teh documentation - Update the bootstrap script - Add --enable-svn2cl to rely on svn2cl.sh to generate automatically the ChangeLog - Add propset for the svn keyword Id on relevant files - Version 0.3 released
 
 2009-07-24  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
-
-	* [r36] bin/backup.in: Fixed bug with sparsebundle target: default
-	  mountpoint "Backup_Sparsebundle" was used which caused creation
-	  of simlink "latest" that was broken when mounting the
-	  sparsebundle manually if the sparsebundle name differed from
-	  "Backup_Sparsebundle".
-
-	* [r35] bin/backup.in: Experimental implementation of backup
-	  history :
-	  - Each backup creates a timestamped directory in the specified
-	  target where files are backuped. To limit disk usage, unchanged
-	  files are hard linked with existing version on target.
-	  - Up-to-date snapshot is always available under the "latest"
-	  directory.
-	  - (Not yet supported) Backup with history over SSH, causes a
-	  backup failure
-	  - (Not yet implemented) Behavior on target disk full
-	  - (Not yet implemented) History consolidation
-	  - (Not yet implemented) Retrieve mode from latest snapshot,
-	  causes a retrieve failure
-
-	* [r34] TODO, bin/backup.in: - Modified sparsebundle protocol error
-	  messages to be more consistant with other protocols
-	  - Updated TODO to reflect recent modifications
+	* Fixed bug with sparsebundle target: default mountpoint "Backup_Sparsebundle" was used which caused creation of simlink "latest" that was broken when mounting the sparsebundle manually if the sparsebundle name differed from "Backup_Sparsebundle".
+	* Experimental implementation of backup history : - Each backup creates a timestamped directory in the specified target where files are backuped. To limit disk usage, unchanged files are hard linked with existing version on target. - Up-to-date snapshot is always available under the "latest" directory. - (Not yet supported)   Backup with history over SSH, causes a backup failure - (Not yet implemented) Behavior on target disk full - (Not yet implemented) History consolidation - (Not yet implemented) Retrieve mode from latest snapshot, causes a retrieve failure
+	* - Modified sparsebundle protocol error messages to be more consistant with other protocols - Updated TODO to reflect recent modifications
 
 2009-07-23  Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu>
-
-	* [r33] INSTALL, bin/backup.in: - Added support for rsync with Mac
-	  OS resource forks (extended attributes), see -m option
-	  - Added support for pre/post backup scripts, see --pre-backup and
-	  --post-backup options
-	  - Added support for sparsebundle images through the
-	  sparsebundle:/// protocol
-	  - Added user notification (Growl under Mac OS X, notify-send
-	  under Linux), see the --notification option
-	  
-	  POD documentation is updated accordingly.
+	* - Added support for rsync with Mac OS resource forks (extended attributes), see -m option - Added support for pre/post backup scripts, see --pre-backup and --post-backup options - Added support for sparsebundle images through the sparsebundle:/// protocol - Added user notification (Growl under Mac OS X, notify-send under Linux), see the --notification option
 
 2009-07-23  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r32] www/.dependances.sh[ADD]:
-
-	* [r31] www/download.wml: remove anonymous svn access
-
-	* [r30] www/download.wml, www/include/andreas01.css[ADD],
-	  www/include/main.wml: Update web site
-
-	* [r29] www/Makefile.am, www/gforge.wml: update html documentation
-	  generation
-
-	* [r28] NEWS[ADD]: NEWS files is now a symbolic link to Changelog
-
-	* [r27] COPYING, NEWS[DEL], TODO, www/download[ADD],
-	  www/download.wml, www/download/backup-0.1.tar.gz[ADD],
-	  www/download/backup-0.2.tar.gz[ADD], www/links.wml: - Add new
-	  download section in the website
-	  - update COPYING file with GPL3
+	* 
+	* remove anonymous svn access
+	* Update web site
+	* update html documentation generation
+	* NEWS files is now a symbolic link to Changelog
+	* - Add new download section in the website - update COPYING file with GPL3
 
 2009-03-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r26] bin/backup.in, config/m4/ac_prog_perl_modules.m4,
-	  configure.ac: Correct issue on --quiet
-
-	* [r25] Makefile.am, acinclude.m4[ADD], bin/backup.in,
-	  configure.ac, www/.wmlrc.in[DEL], www/Makefile.am,
-	  www/bugs.wml[ADD], www/docs.wml, www/download.wml,
-	  www/features.wml, www/gforge.wml[ADD],
-	  www/include/definitions.tag, www/include/main.wml,
-	  www/include/menu.tag, www/include/wmlrc.default,
-	  www/include/wmlrc.default.in, www/index.wml, www/links.wml: -
-	  Correct --quiet bug
-	  - modify CSS for the website (not finished)
+	* Correct issue on --quiet
+	* - Correct --quiet bug - modify CSS for the website (not finished)
 
 2009-02-02  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r24] www/links.wml: Add SyncToy (Micro$oft) and BackupPC links
-
-	* [r23] Makefile.am, bin/backup.in, configure.ac,
-	  www/include/style.css: Minor change for pod output
+	* Add SyncToy (Micro$oft) and BackupPC links
+	* Minor change for pod output
 
 2009-01-30  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r22] www/include/style.css: - Correct CSS for the W3C validator
-	  (http://jigsaw.w3.org/css-validator/)
-
-	* [r21] www/Makefile.am, www/docs.wml, www/download.wml,
-	  www/include/definitions.tag, www/include/menu.tag,
-	  www/include/style.css, www/index.wml, www/links.wml: - Correct
-	  html format to make the pages validated by the W3C validator
-	  - the generated doc.html failed because of the part extracted
-	  from pod2html (<dt> balise is not closed)
-	  
-
-	* [r19] ChangeLog, Makefile.am, NEWS, www/Makefile.am,
-	  www/download.wml, www/index.wml: - Update website
-	  - Launch release 0.2
-
-	* [r18] Makefile.am, README, configure.ac: Add --enable-www option
-	  to handle web site generation
-
-	* [r17] www/Makefile.am, www/docs.wml, www/download.wml[ADD],
-	  www/features.wml, www/include/definitions.tag,
-	  www/include/menu.tag, www/include/style.css, www/index.wml:
-	  Nearly finished the web site
+	* - Correct CSS for the W3C validator (http://jigsaw.w3.org/css-validator/)
+	* - Correct html format to make the pages validated by the W3C validator - the generated doc.html failed because of the part extracted from pod2html (<dt> balise is not closed)
+	* - Update website - Launch release 0.2
+	* Add --enable-www option to handle web site generation
+	* Nearly finished the web site
 
 2009-01-29  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r16] INSTALL, Makefile.am, bin/backup.in, configure.ac,
-	  www[ADD], www/.wmkrc[ADD], www/.wmlrc.in[ADD],
-	  www/Makefile.am[ADD], www/docs.wml[ADD], www/features.wml[ADD],
-	  www/images[ADD], www/include[ADD], www/include/Makefile[ADD],
-	  www/include/definitions.tag[ADD], www/include/index.wml[ADD],
-	  www/include/main.wml[ADD], www/include/menu.tag[ADD],
-	  www/include/style.css[ADD], www/include/template.wml[ADD],
-	  www/include/wmlrc.default[ADD],
-	  www/include/wmlrc.default.in[ADD], www/index.wml[ADD],
-	  www/links.wml[ADD]: Add web site in the repository
-
-	* [r15] INSTALL, configure.ac: update install
-
-	* [r14] ChangeLog, NEWS, TODO, bin/backup.in: - FIX BUG id 9 :
-	  Target path processing ('.' ignore in target_url directive)
-	  - Add leading '/' on target drive if missing
+	* Add web site in the repository
+	* update install
+	* - FIX BUG id 9 : Target path processing ('.' ignore in target_url directive) - Add leading '/' on target drive if missing
 
 2009-01-21  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r13] bin/backup.in: - Fix Bug on IP adress lookup
+	* - Fix Bug on IP adress lookup
 
 2009-01-20  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r12] ChangeLog, FAQ[ADD], bin/backup.in,
-	  etc/backup.conf.example: - Add FAQ for ssh-agent configuration
-	  - correct interpret_cmd (to support pipe on awk)
+	* - Add FAQ for ssh-agent configuration - correct interpret_cmd (to support pipe on awk)
 
 2009-01-17  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r11] NEWS, bin/backup.in: Now Exit when no directory to
-	  backup/restore is found
-
-	* [r10] NEWS, README: update info
-
-	* [r9] ChangeLog, bin/backup.in: FIX bug 8 "Forgot ':' for ssh
-	  backup and Directory specialization"
-	  
+	* Now Exit when no directory to backup/restore is found
+	* update info
+	* FIX bug 8 "Forgot ':' for ssh backup and Directory specialization"
 
 2009-01-15  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r8] INSTALL: Add tags directory
+	* Add tags directory
 
 2009-01-13  Sebastien Varrette <Sebastien.Varrette@uni.lu>
-
-	* [r7] INSTALL: Add note about bootstrap in the INSTALL file
-
-	* [r6] DISCLAIMER, INSTALL[ADD], Makefile.am, bin/Makefile.am,
-	  bin/backup.in, bootstrap, configure.ac: - With Autotools
-	  configured
-
-	* [r5] bin/backup[DEL], bin/backup.in[CPY],
-	  config/m4/ac_prog_perl_modules.m4, configure.ac[CPY],
-	  configure.in[DEL]: - Add AC_CHECK_CPAN_MODULES to configure.ac
-
-	* [r4] bootstrap, configure.in:
-
-	* [r3] configure.ac[DEL], configure.in[CPY]: Make configure.ac
-	  compatible with aclocal 1.4 on leopard (that expect configure.in
-	  instead)
-
-	* [r2] bootstrap, configure.ac:
-
-	* [r1] .[ADD], AUTHORS[ADD], COPYING[ADD], ChangeLog[ADD],
-	  DISCLAIMER[ADD], Makefile.am[ADD], NEWS[ADD], README[ADD],
-	  TODO[ADD], bin[ADD], bin/Makefile.am[ADD], bin/backup[ADD],
-	  bootstrap[ADD], config[ADD], config/m4[ADD],
-	  config/m4/ac_prog_perl_modules.m4[ADD],
-	  config/m4/ac_prog_ssh.m4[ADD], configure.ac[ADD], etc[ADD],
-	  etc/backup.conf.example[ADD]: - Add Autotool version
-	  - First release
+	* Add note about bootstrap in the INSTALL file
+	* - With Autotools configured
+	* - Add AC_CHECK_CPAN_MODULES to configure.ac
+	* 
+	* Make configure.ac compatible with aclocal 1.4 on leopard (that expect configure.in instead)
+	* 
+	* - Add Autotool version - First release
 
