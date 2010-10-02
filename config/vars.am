@@ -1,0 +1,14 @@
+#! /bin/bash
+################################################################################
+# vars.am - simple include file to pre-define variables which are then +='d 
+#           by other scripts in this directory.
+
+# Copyright (c) 2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+#               http://varrette.gforge.uni.lu
+# $Id$ 
+################################################################################
+
+EXTRA_DIST =
+
+CLEANFILES =
+DISTCLEANFILES =

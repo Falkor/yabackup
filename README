@@ -1,37 +1,116 @@
+NAME
+    yaBackup - Yet Another Backup script
 
-	backup - Backup, a script utility to backup your system
-	
-  Homepage: http://ibackup.gforge.uni.lu
+     Homepage:   http://falkor.github.com/yabackup 
+     Bug report: http://github.com/Falkor/yabackup/issues
+     Support:    yabackup-support@lists.uni.lu
 
-  Copyright (c) 2009 Sebastien Varrette, Guillaume-Jean Herbiet
+    Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>.
+    See LICENSE for details.
 
-  backup is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 3 of the License, or
-  (at your option) any later version.
+    yaBackup is written and maintained by Sebastien Varrette (aka Falkor).
+    See AUTHORS for details about the other contributors of this project.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+    yaBackup is a free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation; either version 3 of the License, or (at your
+    option) any later version.
 
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+INSTALLATION GUIDE
+  GET YABACKUP SOURCES
+    You can retrieve the sources of *yaBackup* using one of the following
+    method:
 
+    *   Grab the current (potentially brocken) version of *yaBackup*
 
-Comments are welcome. 
-Please report bugs using informations provided at the page 
-		http://ibackup.gforge.uni.lu/bugs.html
+        In this case, proceed as follows:
 
-Support: ibackup-support@lists.gforge.uni.lu
+        *   either go to the *yaBackup* homepage at
+            <http://github.com/Falkor/yabackup>, click on the 'Download
+            Source' button on top to get a tar archive named
+            "Falkor-yabackup-xxxxxxx.tar.gz" then run:
 
-Finally, if the 'configure' script is missing (or modify any configuration 
-file of the autotools - configure.ac or Makefile.am), just run the 
-'bootstrap' script. 
-It supposes the availability on your system of the following software: 
-- autoconf v2.6 or later
-- automake v1.9.6 or later
+                       cd
+                       tar xvzf /path/to/Falkor-yabackup-xxxxxxx.tar.gz
+                       cd yabackup
 
-	Sebastien Varrette 	<Sebastien.Varrette@uni.lu>
-	Guillaume-Jean Herbiet 	<Guillaume.Herbiet@uni.lu>
+        *   retrieve the latest version using git by running:
+
+                       git clone git://github.com/Falkor/yabackup.git
+                       cd yabackup
+
+    *   Grab the latest stable realease (version 1.0)
+
+        (Details incoming)
+
+  AUTOTOOLS SETUP
+    *yaBackup* rely on the Autotools to simplify its installation (i.e. via
+    the classical "./configure; make; make install" procedure).
+
+    If the "configure" is absent (i.e. if you grab the latest version of
+    *yaBackup* from the GIT repository), or if for some reason you modify
+    any configuration file of the autotools (i.e. "configure.ac" or
+    "Makefile.am"), you have to run:
+
+             ./bootstrap
+
+    This script assumes the availability on your system of the following
+    software:
+
+    1.  "autoconf" version 2.6 or later
+
+    2.  "automake" version 1.9.6 or later
+
+  PERL CPAN MODULES
+    As I didn't want to reinvent the wheel, *yaBackup* depends on the Perl
+    modules printed by running
+
+            ./bootstrap --extract-perl-modules
+
+    Their availability on your system will be checked by the "configure"
+    script of course. If a module "Module::Name" is missing, the best
+    approach to install it is to rely on cpan (see <http://search.cpan.org>)
+    by running in a terminal:
+
+            sudo cpan
+
+    accept the default configurations and once the cpan prompt appears,
+    simply run "install Module::Name"
+
+  INSTALLATION
+    You can now run the "configure" script (see "./configure --help" for
+    configuration options).
+
+    I advice you to use stow (see <http://www.gnu.org/software/stow/> or
+    stow(8), a wonderful tool to activate/desactivate different versions of
+    the same program compiled by autotools. Once installed ("apt-get install
+    stow" under Debian or "sudo port install stow" on Mac OS X), configure
+    the directory that will host the program compiled and later installed by
+    stow as follows:
+
+             sudo mkdir /usr/local/stow
+             sudo chmod 777 /usr/local/stow
+
+    You'll then typically install *yaBackup* as follows:
+
+             ./configure --prefix=/usr/local/stow/yabackup-1.0
+             make 
+             make install
+             cd /usr/local/stow
+             sudo stow yabackup-1.0
+
+    The advantage of this approach is that *yaBackup* will be present on
+    your system in the default location ("/usr/local/bin/yabackup" is a
+    symbolic link toward "/usr/local/stow/yabackup-1.0/bin/yabackup") yet
+    you can easily disable this version of *yaBackup* (and activate another
+    one) by running:
+
+             cd /usr/local/stow
+             sudo stow -D yabackup-1.0
+
+    *Note*: this will simply remove the link "/usr/local/bin/yabackup".
+
+USAGE
+    Once install, please refer to yabackup(1) or run "yabackup --help" for
+    usage details.
+

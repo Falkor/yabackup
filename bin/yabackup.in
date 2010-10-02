@@ -1,0 +1,3256 @@
+#!@PERL@ -w
+
+################################################################################
+#     @PACKAGE_NAME@ - @PACKAGE_SUMMARY@
+#
+# Homepage:   @PACKAGE_WEBSITE@
+# Bug report: @PACKAGE_BUGS@
+# Support:    @PACKAGE_SUPPORT@
+#
+# Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+#               See LICENSE for details
+#
+# Description : a highly flexible script utility to backup directories from your
+#               local system on various targets (external drive, sparsebundle,
+#               remote server with SSH access, NAS with AFP access, EncFS volume
+#               etc.)
+#               For more information: see yabackup(1) or 'yabackup --help'
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+# Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# Sebastien Varrette  <Sebastien.Varrette@uni.lu>
+# University of Luxembourg
+# 6, rue Richard Coudenhove-Kalergi
+# L-1359 Luxembourg
+#
+# Note: the author thanks Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu> for
+# his contribution to the initial version of this script (named ibackup until
+# the 0.3.2 release) i.e before the complete code rewrite that lead to yaBackup
+# version 1.0.
+################################################################################
+
+### Function prototype declaration ###
+sub print::alert(@);
+sub print::critical(@);
+sub print::debug(@);
+sub print::error_nolog_and_exit($@);
+sub print::error_and_exit($@);
+sub print::error_nolog(@);
+sub print::error(@);
+sub print::info(@);
+sub print::notification($@);
+sub print::really_continue();
+sub print::version();
+sub print::warning(@);
+sub print::warn(@);
+sub print::hash_content($@);
+
+sub sync::parse_target_url();
+sub sync::run_cmd();
+sub sync::select_elements();
+sub sync::set_backup_target_to_drive($);
+sub sync::set_backup_target_to_ssh_server($$$);
+sub sync::set_backup_target_to_afp_server($$$$@);
+sub sync::set_backup_target_to_sparsebundle($);
+sub sync::set_cmd();
+sub sync::set_cmd_options();
+sub sync::set_restoration_mode();
+
+sub config::ensure_profile_set(@);
+sub config::getPasswordFromFile($$);
+sub config::getPasswordForEntry($);
+sub config::reset_settings();
+sub config::set_icon(@);
+sub config::set_profile($);
+sub config::test_icons();
+
+sub format::color_msg($@);
+sub format::interpret_cmd($);
+sub format::listdir_from($$@);
+
+sub hash::has_keys($@);
+
+sub log::initialize(@);
+
+sub system::check_binary(@);
+sub system::check_has_directory(@);
+sub system::check_has_directory_or_create(@);
+sub system::check_has_file(@);
+sub system::check_remote_has_directory_over_ssh($$@);
+sub system::check_remote_has_directory_or_create_over_ssh($$@);
+sub system::check_remote_has_file_over_ssh($$@);
+sub system::check_remote_binary_over_ssh($$@);
+sub system::check_subnet($@);
+sub system::execute(@);
+sub system::execute_and_get_output(@);
+sub system::execute_and_set_stdin($$);
+sub system::getIPs();
+sub system::getIPFromInterface(@);
+sub system::mount_afp($$$$$@);
+sub system::mount_encfs($$@);
+sub system::mount_sparsebundle($);
+sub system::remote_execute_over_ssh($$@);
+sub system::umount_mounted_volumes();
+
+
+##############################################################################
+# PACKAGE PRINT
+# Handle all printing features
+##############################################################################
+package print;
+
+use strict;
+use warnings;
+use List::Util qw[min max];     # To find min/max values
+use Term::ANSIColor;            # To send the ANSI color-change sequences to the
+                                # user's terminal
+use Data::Dumper;
+
+
+#our $print_level = 2;
+
+#######
+# Print information in the following form: prefix msg
+# usage: print::with_prefix(prefix, msg)
+###
+sub with_prefix($@) {
+    my $prefix = shift;
+    print "$prefix @_" unless $config::QUIET;
+}
+
+#######
+# print an error information without passing through the log manager
+###
+sub error_nolog(@) {
+    print::with_prefix('[' . format::color_msg('red', 'ERROR') . ']', @_);
+}
+#####
+# the following functions are called to display an information depending on the
+# considered level
+##
+sub error(@)    { $log::handler->error(@_); }
+sub debug(@)    { $log::handler->debug(@_) if $config::DEBUG;   }
+sub info(@)     { $log::handler->info(@_);  }
+sub verbose(@)  { info(@_) if $config::VERBOSE; }
+sub warning(@)  { $log::handler->warn(@_);  }
+sub warn(@)     { warning(@_); }
+sub critical(@) { $log::handler->crit(@_); }
+sub alert(@)    { $log::handler->alert(@_); }
+
+####
+# Print error message then exit with exit status $_[0]
+##
+sub error_nolog_and_exit($@) {
+    my $exit_code = shift;
+    print::error_nolog(@_);
+    exit($exit_code);
+}
+sub error_and_exit($@) {
+    my $exit_code = shift;
+    print::error(@_);
+    exit($exit_code);
+}
+
+######
+# Send a graphical notification to the user (using growl under Mac or
+# notify-send under Linux)
+# usage: notification(text [, icon] [, title])
+##
+sub notification($@) {
+    if ($config::NOTIFICATION) {
+        my $text  = shift;
+        my $icon  = shift;
+        my $title = shift;
+        $icon = "$config::icon" unless defined($icon);
+        unless (defined($title)) {
+            $title = "$config::command";
+            $title .= "  ($sync::current_profile profile)" if defined($sync::current_profile);
+        }
+        my $priority = 0;
+
+        my $notify_cmd="";
+        # Select notification system based on system
+        if ($config::OS[0] =~ "Darwin") { # Mac OS X: use growlnotify
+            $priority = max(min($priority, 2), -2);
+            $notify_cmd =
+              "growlnotify -p '$priority' -n '$config::command' --image '$config::iconsdir/$icon' '" .
+                $title . "' -m '$text' > /dev/null 2>&1";
+        } elsif ($config::OS[0] =~ "Linux") {
+            $priority = max(min($priority, 1), -1) +1;
+            my @levels = ("low", "normal", "critical");
+            $notify_cmd =
+              'notify-send -u ' . $levels[$priority] .
+                ' -i $icon \'' . $title . '\' \'' . $text . '\'';
+        } else {
+            print::warning('$config::command do not support graphical notification for the ',
+                           $config::OS[0], " OS\n");
+        }
+        system::execute($notify_cmd);
+    }
+}
+
+######
+# Ask the user is he wishes to continue.
+##
+sub really_continue() {
+    print "\n => ",
+      format::color_msg('bold', 'Are you sure'),
+          ' you want to continue? [yN]: ';
+    chomp(my $ans = <STDIN>);
+    unless ($ans && ($ans =~ /y|yes|1/i)) {
+        system::umount_mounted_volumes();
+        exit(0);
+    }
+}
+
+####
+# Print script version
+##
+sub version_msg() {
+    print 'This is ', color('bold'), $config::command, color('reset'),
+      ' version ', color('bold'), $config::VERSION, color('reset'), "\n",
+        $config::PACKAGE_SUMMARY;
+
+    print << 'EOF';
+Copyright (c) 2009-2010 Sebastien Varrette (http://varrette.gforge.uni.lu)
+with contributions by Guillaume-Jean Herbiet (http://herbiet.gforge.uni.lu)
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+EOF
+}
+
+#####
+# print the content of a hash table
+# Usage: print::hash_content(hash_ref [, title])
+###
+sub hash_content($@) {
+    my $hash_ref = shift;
+    my $title = defined ($_[0]) ? $_[0] : 'Hash Content';
+    print::debug("============= $title =============\n");
+    print::debug(Dumper $hash_ref);
+}
+
+
+
+##############################################################################
+# PACKAGE FORMAT
+# Handle all reformatting features
+##############################################################################
+package format;
+
+use strict;
+use warnings;
+use Term::ANSIColor; # To send the ANSI color-change sequences to the user's terminal
+
+
+####
+# Sanitize paths (to remove ../ etc.
+# I tried Cwd::realpath but it does not work against unexisting path
+# Code from http://www.webmasterkb.com/Uwe/Forum.aspx/perl/5535/Cleanup-file-path
+##
+sub trimpath {
+    local $_ = shift;
+
+    require File::Spec::Functions;
+    $_ = File::Spec::Functions::canonpath($_);
+
+    # /foo/bar/../baz -> /foo/baz
+    1 while s{/(?!\.\.?/)[^/]+/\.\.(/|$)}{$1}gx;
+
+    # /../../foo -> /foo
+    s|^/(\.\./)+|/|;
+
+    return $_;
+}
+
+
+
+#####
+# return a colored message (coloration only appens in the terminal typically)
+###
+sub color_msg($@) {
+    my @colorlist = split(' ', shift);
+    my $res = "";
+    foreach (@colorlist) {
+        $res .= Term::ANSIColor::color("$_");
+    }
+    $res .= "@_";
+    foreach (@colorlist) {
+        $res .= Term::ANSIColor::color('reset');
+    }
+    return $res;
+    #    return  Term::ANSIColor::color("$color") . "@_" . Term::ANSIColor::color("reset");
+}
+
+####
+# interpret commands delimited by ` ` in a string.
+# Return the string where `cmd` is replaced by the result of the command
+# usage: interpret_cmd("string")
+##
+sub interpret_cmd($) {
+    my $string = my $res = shift;
+    my @commands = $string =~ /`([^`]+)`/g; # retrieve commands to interpret
+    foreach my $cmd (@commands) {
+        my $cmd_exec = `$cmd` || PRINT_ERROR_THEN_EXIT("Execute of $cmd failed or return and empty string: $!\n");
+        chomp($cmd_exec);
+        $cmd =~ s/\$/\\\$/g;    # Serialize command
+        $cmd =~ s/\|/\\\|/g;    # idem
+        $res =~ s/`$cmd`/$cmd_exec/;
+    }
+    return $res;
+}
+
+####
+# Given a space separated list of patterns and a root directory, return the list
+# of effective file/directory names inside the rootdir that match the patterns.
+# In particular, expand the wildcards '*' present in the string list and permit
+# more complicated expansion based on ^ and $ characters (to match beginning and
+# end of name).
+#
+# Usage:
+#    $hash_ref = format::listdir_from("pattern list", "rootdir" [, "user@host" [, port]])
+#    Now:
+#         $hash_ref->{'dirs'}  contains the explicit dir names  (in rootdir)
+#         $hash_ref->{'files'} contains the explicit file names (in rootdir)
+#
+# Example: format::listdir_from('*', '/home/login') return the complete list of
+# files/directories contained in the folder /home/login (i.e. most probably the
+# homedir of the user 'login'). If the SSH connection arguments are provided,
+# then the rootdir is considered on the remote server and the wildcards are
+# expanded on the remote server.
+#
+# /!\ If no wildcard is used in the pattern list, the existence of the elements
+# (files or directories) IS NOT CHECKED: this should be tested latter!
+##
+sub listdir_from($$@) {
+    my $patternlist = shift;
+    my @patterns = split(/\s+/, $patternlist);
+    my $rootdir = shift;
+    my $host = shift;
+    my $port = (@_ ? shift : 22);
+    my %results = (
+                   dirs     => undef,
+                   files    => undef,
+                  );
+
+    if (defined($host) and ($rootdir !~ /^\//)) {
+        # SSH expand and rootdir is relative to the user homedir that should be
+        # retrieved to use absolute path in find
+        print::debug("Retrieve \$HOME for $host");
+        my @remote_homedir = system::execute_and_get_output("ssh -p $port $host -- echo '\$HOME'");
+        chomp(@remote_homedir);
+        $rootdir = $remote_homedir[0] . "/$rootdir";
+    }
+
+    foreach my $pattern (@patterns) {
+        my $tmp_pattern = $pattern;
+        $tmp_pattern =~ s/\/$//; # proceed with the trailing '/' characters
+        $tmp_pattern = '^' . $tmp_pattern . '$' if ($tmp_pattern !~  /\*|\^|\$/);
+        $tmp_pattern =~ s/\./\\\./g; # proceed with the '.' characters
+        $tmp_pattern =~ s/\*/\.\*/g; # proceed with the '*' characters
+
+        my @dir_list;
+        my @file_list;
+
+        if (defined($host)) {
+            # Expand the pattern over SSH
+            #                print::debug("Expand over SSH (using find) for rootdir = $rootdir");
+            if ($tmp_pattern =~ /\^/) {
+                $tmp_pattern =~ s/\^/\^\.\//;
+            } else {
+                $tmp_pattern = "\.\/$tmp_pattern";
+            }
+            #                $tmp_pattern = "\.\/$tmp_pattern";
+            my $find_cmd = "cd $rootdir && find . -maxdepth 1 -regex '$tmp_pattern'";
+            @dir_list  = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type d\"");
+            @file_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type f \"");
+            chomp(@dir_list);
+            chomp(@file_list);
+            # Add links
+            my @link_list = system::execute_and_get_output("ssh -p $port $host \"$find_cmd -type l \"");
+            chomp(@link_list);
+            push(@file_list, @link_list);
+        } else {
+            # Expand the pattern on the local system and rely on opendir
+            # (far more efficient)
+            $rootdir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+            opendir(DIR, $rootdir) || die "Couldn't open $rootdir : $!\n";
+            my @filenames = readdir(DIR);
+            @dir_list =
+              map { $_->[0] }                    # extract subdir name
+                grep { -d $_->[1] }              # check absolute path is a dir
+                  map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
+                    grep { !/^\.\.$/}            # filter out .. entry
+                      grep { !/^\.$/}            # filter out . entry
+                        grep { /$tmp_pattern/ }  # apply pattern filter
+                          @filenames;
+            @file_list =
+              map { $_->[0] }                    # extract subdir name
+                grep { -f $_->[1] }              # check absolute path is a dir
+                  map  { [ $_, "$rootdir/$_" ] } # create name, absolute path
+                    grep { !/^\.\.$/}            # filter out .. entry
+                      grep { !/^\.$/}            # filter out . entry
+                        grep { /$tmp_pattern/ }  # apply pattern filter
+                          @filenames;
+            closedir(DIR);
+        }
+        #        print::debug("dir_list  = @dir_list");
+        #        print::debug("file_list = @file_list");
+        push(@{$results{'dirs'}},  @dir_list);
+        push(@{$results{'files'}}, @file_list);
+    }
+    return \%results;
+}
+
+##############################################################################
+# PACKAGE ARRAY
+# Toolkit for managing perl arrays
+##############################################################################
+package array;
+use strict;
+use warnings;
+
+####
+# Construct the difference between two arrays @A and @B i.e the elements in @A
+# that are not in @B
+# Usage: @diff = array::get_difference(\@A, \@B)
+##
+sub get_difference($$) {
+    my $a_ref = shift;
+    my $b_ref = shift;
+    my %seen = ();              # lookup table
+    my @res = ();               # initialize the final receip
+    @seen{@{$b_ref}} = ();      # build lookup table
+    foreach my $item (@{$a_ref}) {
+        push(@res, $item) unless exists $seen{$item};
+    }
+    return @res;
+}
+
+
+
+##############################################################################
+# PACKAGE HASH
+# Toolkit for managing perl hashes
+##############################################################################
+package hash;
+use strict;
+use warnings;
+
+####
+# check the existence of a set of keys in the hash table passed as reference
+# return: 1 if every key listed exist in the hash, 0 otherwise
+# Usage: hash::has_keys(hash_ref, key1 [,key2 ...])
+##
+sub has_keys($@) {
+    my $hash_ref = shift;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing keys') unless (@_);
+    my $res = 1;
+    foreach my $field (@_) {
+        if (not exists($hash_ref->{$field})) {
+            print::warning("The key '$field' do not exist");
+            $res = 0;
+        }
+    }
+    return $res;
+}
+
+
+##############################################################################
+# PACKAGE LOG
+# Handle all logging features
+##############################################################################
+package log;
+use strict;
+use warnings;
+
+use Log::Handler;               # Log manager
+#
+# The following log levels are defined:
+#     7   debug
+#     6   info
+#     5   notice
+#     4   warning, warn
+#     3   error, err
+#     2   critical, crit
+#     1   alert
+#     0   emergency, emerg
+#
+# The message layout in the printf style with the following options:
+#
+#     %L   Log level
+#     %T   Time or full timestamp (option timeformat)
+#     %D   Date (option dateformat)
+#     %P   PID
+#     %H   Hostname
+#     %U   User name
+#     %G   Group name
+#     %N   Newline
+#     %S   Program name
+#     %C   Caller - filename and line number
+#     %p   Caller - package name
+#     %f   Caller - file name
+#     %l   Caller - line number
+#     %s   Caller - subroutine name
+#     %r   Runtime in seconds since program start
+#     %t   Time measurement - replaced with the time since the last call of $log->$level
+#     %m   Message
+#     %%   Procent
+
+our $handler    = Log::Handler->new();
+our $timeformat = '%Y/%m/%d %H:%M:%S';
+our $msg_layout = '%T [%L] %m';
+
+########
+# Initialize the log handler
+# Usage: initialize([logdir],[email])
+#        initialize([logdir])
+#        initialize([email])
+##
+sub initialize(@) {
+    my ($logdir, $email) = @_;
+
+    # Recognize a mail address instead of a directory as
+    if ((scalar(@_) == 1) &&
+        ($logdir =~ /\b[\w0-9._%+-]+@(?:[\w0-9-]+\.)+[\w]{2,4}\b/)) {
+        print "First argument is an email: $logdir\n";
+        $email  = $logdir;
+        $logdir = undef;
+    }
+    my $yellow_level  = format::color_msg('yellow',  '%L');
+    my $magenta_level = format::color_msg('magenta', '%L');
+    my $red_level     = format::color_msg('red',     '%L');
+
+    my $debug_msg_layout = my $error_msg_layout = my $warning_msg_layout = $msg_layout;
+
+    # ===  Initialize screen log (in the terminal) ===
+    # Redirect debug logs to STDOUT (in yellow)
+    $debug_msg_layout =~ s/%L/$yellow_level/g;
+    $handler->add(
+                  screen => {
+                             log_to   => "STDOUT",
+                             maxlevel => 7,
+                             minlevel => 7,
+                             timeformat      => "", #$timeformat",
+                             message_layout  => "$debug_msg_layout",
+                            }
+                 );
+
+    # Redirect common logs to STDOUT
+    $handler->add(
+                  screen => {
+                             log_to   => "STDOUT",
+                             maxlevel => 6,
+                             minlevel => 5,
+                             timeformat      => "", #$timeformat",
+                             message_layout  => "$msg_layout",
+                            }
+                 );
+
+    # redirect warnings to STDERR
+    $warning_msg_layout =~ s/%L/$magenta_level/g;
+    $handler->add(
+                  screen => {
+                             log_to   => "STDERR",
+                             maxlevel => 4,
+                             minlevel => 4,
+                             timeformat      => "", #$timeformat",
+                             message_layout  => "$warning_msg_layout",
+                            }
+                 );
+
+    # Redirect errors to STDERR
+    $error_msg_layout =~ s/%L/$red_level/g;
+    $handler->add(
+                  screen => {
+                             log_to   => "STDERR",
+                             maxlevel => 3,         # error
+                             minlevel => 0,         # emerg
+                             timeformat      => "", #$timeformat",
+                             message_layout  => "$error_msg_layout",
+                            }
+                 );
+
+    # ===  Initialize file log (in $logdir) ===
+    if (defined($logdir)) {
+        # ensure the directory exists
+        print::error_and_exit(1,
+                              "The directory $logdir do not exist: ",
+                              "impossible to create log files into ",
+                              "this directory\n")
+            unless (-d "$logdir");
+
+        # Initialie the log file for common logs
+        $handler->add(
+                      file => {
+                               filename   => "${logdir}/common.log",
+                               maxlevel   => 7, # debug
+                               minlevel   => 5, # notice
+                               timeformat      => "$timeformat",
+                               message_layout  => "$msg_layout",
+                              }
+                     );
+
+        # Initialize the log file for error logs
+        $handler->add(
+                      file => {
+                               filename => "${logdir}/error.log",
+                               maxlevel => 4, # warning
+                               minlevel => 0, # emerg
+                               timeformat      => "$timeformat",
+                               message_layout  => "$msg_layout",
+                              }
+                     );
+    }
+
+    # Eventually mail errors/warnings
+    if (defined($email)) {
+        chomp(my $username = `whoami`);
+        chomp(my $hostname = `hostname -f`);
+        my $from = $username . '@' . $hostname;
+        print::debug("Setup log by mail (from=$from) to $email\n");
+
+        $handler->add(
+                      sendmail => {
+                                   from     => "${username}\@${hostname}",
+                                   to       => "$email",
+                                   subject  => "(yaBackup)",
+                                   maxlevel => 4,
+                                   minlevel => 0,
+                                   message_pattern => '%L',
+                                   timeformat      => "$timeformat",
+                                   message_layout  => "$msg_layout",
+                                  }
+                     );
+    }
+}
+
+##############################################################################
+# PACKAGE SYSTEM
+# Handle all system calls/behaviour/information etc.
+##############################################################################
+package system;
+
+use strict;
+use warnings;
+use Cwd;                        # for realpath
+use File::Basename;
+use Data::Dumper;
+use Term::ReadKey;
+use Exception::Class::TryCatch;
+use Expect;
+use Mac::PropertyList qw(parse_plist); # To parse plist files obtained
+                                       # under Mac OS X. I should take
+                                       # care of the current OS to avoid
+                                       # the use of this module under Linux.
+
+
+
+# List of mounted volume through the backup process, per mount type
+our %MOUNTED_VOLUMES = (
+                        'afp'          => undef,
+                        'drive'        => undef,
+                        'encfs'        => undef,
+                        'sparsebundle' => undef,
+                       );
+
+####
+# check the presence of the binaries @_ on the local system using 'which'
+# usage:  check_binary(bin1 [, bin2 ...]);
+##
+sub check_binary(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
+    my $which = "$ENV{'PATH'} which";
+    foreach my $app (@_) {
+        print::verbose("=> check availability of the command '$app' on the local system.");
+        system::execute("which $app 1>/dev/null") &&
+            print::error_and_exit(1, "'$app': command not found in PATH=$ENV{'PATH'}");
+    }
+}
+
+####
+# check the presence of the binaries @_ on the remote system (reachable by ssh)
+# using 'which' over ssh.
+# Usage: check_remote_binary_over_ssh("user@host", port, bin1 [, bin2 ...]);
+##
+sub check_remote_binary_over_ssh($$@) {
+    my ($host, $port, @apps) = @_;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing remote binary list') unless (@apps);
+    foreach my $app (@apps) {
+        print::verbose("=> check availability of the command '$app' on the remote system $host (SSH access via port $port).");
+        system::remote_execute_over_ssh($host, $port, "which $app") &&
+            print::error_and_exit(1, "'$app': command not found for $host (SSH access via port $port)");
+    }
+}
+
+####
+# check if the IP associated with an interface match another subnet.
+# If no interface argument is provided, then
+# Usage: check_subnet(subnet [, interface])
+##
+sub check_subnet($@) {
+    my $subnet = shift;
+    my $IP = (@_) ? getIPFromInterface($_[0]) : getIPFromInterface();
+    print::verbose("=> check subnet '$subnet' (current IP address found: '$IP')");
+    my $pattern=$subnet;
+    $pattern =~ s/\./\\\./g;    # proceed with the '.' characters
+    if ($IP !~ /$pattern/) {
+        yaBackup::Exception::Network->throw(error =>
+                                           "Network error: the IP adress '$IP' does not belong to the subnet '$subnet'");
+    }
+}
+
+####
+# check the existence of a set of local directories
+# Usage: check_has_directory(dir1 [, dir2 ...])
+###
+sub check_has_directory(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory argument') unless (@_);
+    foreach my $dir (@_) {
+        my $tmp_dir = $dir;
+        $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+        unless ( -d "$tmp_dir" ) {
+            yaBackup::Exception::DirectoryNotFound->throw(error =>
+                                                         "The directory '$dir' cannot be found")
+          }
+    }
+}
+
+####
+# check the existence of a set of local files (filenames are globbing sso
+# wildcards can be given in the names
+# Usage: check_has_file(file1 [, file2 ...])
+###
+sub check_has_file(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing file argument') unless (@_);
+    my @files = @_;
+    if ("@files" =~ /\*/) {
+        @files = <@_>;
+        # Necessity to glob
+        yaBackup::Exception::FileNotFound->throw(error =>
+                                                "The file(s) @files cannot be found")
+            unless (@files);
+    }
+    foreach my $file (@files) {
+        unless ( -f "$file" ) {
+            yaBackup::Exception::FileNotFound->throw(error =>
+                                                    "The file $file cannot be found")
+          }
+    }
+}
+
+####
+# check the existence of a set of directories on the remote system (reachable by
+# ssh)
+# Usage: check_remote_has_directory_over_ssh("user@host", port, dir1 [, dir2 ...])
+###
+sub check_remote_has_directory_over_ssh($$@) {
+    my ($host, $port, @dirs) = @_;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory list') unless (@dirs);
+    foreach my $dir (@dirs) {
+        #        my $tmp_dir = $dir;
+        #        $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+        system::remote_execute_over_ssh($host, $port, "test -d '$dir'");
+        if ($? != 0) {
+            my $error_msg = 'The directory ' .
+              (($dir =~ /^\//) ? "$dir" : "\$HOME/$dir" ) .
+                " cannot be found on the remote server for $host (SSH access via port $port)";
+            if ($dir !~ /^\//) {
+                $error_msg .=
+                  "\n" . format::color_msg('bold', 'Note: ') .
+                    "The \$HOME mentionned above corresponds to the user homedir ON THE REMOTE SERVER";
+            }
+            yaBackup::Exception::DirectoryNotFound->throw(error => "$error_msg");
+        }
+    }
+}
+
+####
+# check the existence of a set of files on the remote system (reachable by
+# ssh)
+# Usage: check_remote_has_file_over_ssh("user@host", port, file1 [, file2 ...])
+###
+sub check_remote_has_file_over_ssh($$@) {
+    my ($host, $port, @files) = @_;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing file list') unless (@files);
+    foreach my $file (@files) {
+        system::remote_execute_over_ssh($host, $port, "test -f '$file'");
+        if ($? != 0) {
+            my $error_msg = 'The file ' .
+              (($file =~ /^\//) ? "$file" : "\$HOME/$file" ) .
+                " cannot be found on the remote server for $host (SSH access via port $port)";
+            if ($file !~ /^\//) {
+                $error_msg .=
+                  "\n" . format::color_msg('bold', 'Note: ') .
+                    "The \$HOME mentionned above corresponds to the user homedir ON THE REMOTE SERVER";
+            }
+            yaBackup::Exception::FileNotFound->throw(error => "$error_msg");
+        }
+    }
+}
+
+
+####
+# check the existence of a set of local directories. Propose the creation of
+# them if they do not exists (or raise the exception
+# yaBackup::Exception::DirectoryNotFound if in QUIET or RETRIEVE mode).
+# Usage: check_has_directory_or_create(dir1 [, dir2 ...])
+###
+sub check_has_directory_or_create(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory argument') unless (@_);
+    foreach my $dir (@_) {
+        eval {
+            system::check_has_directory($dir);
+        };
+        if ( catch my $err ) {
+            if ($err->isa('yaBackup::Exception::DirectoryNotFound') and
+                (not $config::QUIET) and (not $config::RETRIEVE_MODE)) {
+                # Propose the creation of the directory
+                print::warning($err->error);
+                print::warning("=> about to create the directory $dir");
+                print::really_continue();
+                my $tmp_dir = $dir;
+                $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problems
+                system::execute("mkdir -p '$tmp_dir'");
+                if ($? != 0) {
+                    print::error_and_exit(1, "Unable to create the directory $dir");
+                }
+            } else {
+                $err->rethrow;
+            }
+        }
+    }
+}
+
+####
+# check the existence of a set of remote directories. Propose the creation of
+# them if they do not exists (or raise the exception
+# yaBackup::Exception::DirectoryNotFound if in QUIET mode).
+# Usage: check_has_directory_or_create_over_ssh("user@host", port, dir1 [, dir2 ...])
+###
+sub check_remote_has_directory_or_create_over_ssh($$@) {
+    my ($host, $port, @dirs) = @_;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing directory list') unless (@dirs);
+    foreach my $dir (@dirs) {
+        eval {
+            system::check_remote_has_directory_over_ssh($host, $port, "$dir");
+        };
+        if ( catch my $err ) {
+            if ($err->isa('yaBackup::Exception::DirectoryNotFound') and
+                (not $config::QUIET) and (not $config::RETRIEVE_MODE)) {
+                # Propose the creation of the directory
+                print::warning($err->error);
+                print::warning("=> about to create the remote directory ",
+                               ($dir =~ /^\//) ? "$dir" : "\$HOME/$dir" );
+                print::really_continue();
+                #                my $tmp_dir = $dir;
+                #                $tmp_dir =~ s/\\(\s)/$1/g; # remove escaped space that pose problem
+                system::remote_execute_over_ssh($host, $port, "mkdir -p '$dir'");
+                if ($? != 0) {
+                    print::error_and_exit(1, "Unable to create the remote directory ",
+                                          ($dir =~ /^\//) ? "$dir" : "\$HOME/$dir",
+                                          " for $host (SSH access on port $port)");
+                }
+            } else {
+                $err->rethrow;
+            }
+        }
+    }
+}
+
+#####
+# execute a local command and return the exit code
+# usage: execute(command)
+###
+sub execute(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
+    print::debug('[' . (caller(0))[3] . "] @_\n");
+    ($config::SIMULATION_MODE) ?
+      print format::color_msg('bold', "@_\n") : system("@_");
+    my $exit_status = $?;
+    print::debug('[' . (caller(0))[3] . "] exit status : $exit_status\n");
+    return $exit_status;
+}
+
+####
+# execute a local command and return the result of the command (stderr and
+# stdout are MERGED for convenience.
+# Throw yaBackup::Exception::RuntimeError exception if the exit status is not 0;
+###
+sub execute_and_get_output(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing command argument') unless (@_);
+    print::debug('[' . (caller(0))[3] . "] @_\n");
+    my @res;
+    if ($config::SIMULATION_MODE) {
+        print format::color_msg('bold', "@_\n");
+    } else {
+        @res = qx(@_ 2>&1);
+        my $exit_status = $?;
+        if ($exit_status != 0) {
+            yaBackup::Exception::RuntimeError->throw(error =>
+                                                    "The command '@_' FAILED with exit status $exit_status");
+        }
+        #        chomp(@res);
+    }
+    return @res;
+}
+
+#####
+# execute a local command that expect something on stdin fed with the value of
+# the second argument. Very useful to run a command that expect a password on
+# stdin (ex: -S option of encfs)
+#
+# Usage: execute_and_set_stdin("command", "expected_value");
+##
+sub execute_and_set_stdin($$) {
+    my $cmd                = shift;
+    my $stdin_expected_val = shift;
+    print::debug('[' . (caller(0))[3] . "] $cmd\n");
+    if ($config::SIMULATION_MODE) {
+        print format::color_msg('bold', "$cmd")
+    } else {
+        open my $encfs_exec, '|-', "$cmd" or die "Could not fork $cmd: $!";
+        print {$encfs_exec} "$stdin_expected_val\n";
+        close ($encfs_exec);
+    }
+    my $exit_status = $?;
+    print::debug('[' . (caller(0))[3] . "] exit status : $exit_status\n");
+    return $exit_status;
+}
+
+
+######
+# get current IPs adresses using ifconfig.
+# return an hash table associating an interface name with an IP and a state (up or down)
+##
+sub getIPs() {
+    my $interface;
+    my %IPs;
+    foreach ( qx{ (LC_ALL=C /sbin/ifconfig -a 2>&1) } ) {
+        $interface = $1 if /^(\S+?):?\s/;
+        next unless defined $interface;
+        $IPs{$interface}->{STATE}=uc($1) if /\b(up|down)\b/i;
+        $IPs{$interface}->{IP}=$1 if /inet\D+(\d+\.\d+\.\d+\.\d+)/i;
+    }
+    return %IPs;
+}
+
+######
+# get current IP adresses associated with an interface.
+# If the interface parameter is not procided, the checked interfaces ar e (eth0,
+# eth1) on Linux system and (en0, en1) on BSD-like.
+# usage: getIPFromInterface(interface)
+###
+sub getIPFromInterface(@) {
+    my %IPs = getIPs();
+    print::debug("Analysing IPs on the local system. Found:\n");
+    print::debug(Dumper \%IPs);
+    my @interfaces;
+    if (@_) {
+        @interfaces = @_;
+    } else {
+        @interfaces = ('eth0', 'eth1') if ($config::OS[0] eq "Linux");
+        @interfaces = ('en0',  'en1')  if ($config::OS[0] =~ "FreeBSD|OpenBSD|Darwin");
+    }
+    foreach my $i (@interfaces) {
+        return $IPs{$i}->{IP} if ($IPs{$i} && $IPs{$i}->{IP});
+    }
+    # TODO: throw an exception here instead!
+    print::error_and_exit(1,"IP not found for interface(s) @interfaces");
+    return;
+}
+
+####
+# Mount an AFP volume.  Currently only available if your local machine run Mac
+# OS X - I need to investigate the 'Netatalk' interface on Linux to make the
+# equivalent under Linux.
+#
+# Note: use 'guest' as username if you want a guest mount. Additionnaly, the
+# default port for afp servers is 548 and the fullvolumename can contain not
+# only the volumename but also a complement path towards a sparse-bundle image
+# or a sub directory where the backup should operate
+#
+# If not given, the password for username is searched into the password_file (is
+# defined) or asked on stdin to the user. This does not apply to the 'guest'
+# that is always assumed to refer to an anonymous connection where the password
+# is not required.
+#
+# Usage: system::mount_afp(username, server, port, volumename, mount_point [, password])
+#
+# Example: system::mount_afp('guest', server, 548, 'shared')
+
+###
+sub mount_afp($$$$$@) {
+    my $username    = shift;
+    my $server      = shift;
+    my $port        = shift;
+    my $volname     = shift;
+    my $mount_point = shift;
+    my $password    = (@_) ? shift : undef;
+
+    # Ensure the 'mount_afp' command is available
+    system::check_binary('mount_afp');
+
+    # Various format checks (really mandatory?)
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a server name")
+        unless defined($server);
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a volume name")
+        unless defined($volname);
+    yaBackup::Exception::ConfigFileFormat->throw(error => "AFP protocol requires a username (use 'guest' eventually in the target_url for anonymous access)")
+        unless defined($username);
+
+    # Let's go now
+    yaBackup::Exception::RuntimeError->throw(error => "Bad mount point $mount_point")
+        if ($mount_point eq '/');
+
+    if (-d "$mount_point") {
+        print::warning("$mount_point is already mounted");
+    } else {
+        # Otherwise, perform the mount
+        my $passfile_entry = "afp://$username\@$server/$volname";
+
+        #        my $afp_url = "$passfile_entry";
+        my $afp_url = "afp://";
+
+        # All users except 'guest' should have a password
+        if ($username ne 'guest') {
+            #_url .= ";AUTH=No%20User%20Authent";
+            $afp_url .= "$username";
+            # Eventually retrieve the password of the encfs mount that can be either
+            # present in the password file (i.e. in $config::SETTINGS{'password_file'})
+            # or prompted to the user (which is not possible in quiet mode)
+            unless (defined $password) {
+                eval {
+                    $password = config::getPasswordForEntry("$passfile_entry");
+                };
+                # catch
+                if ( catch my $err ) {
+                    if ($err->isa('yaBackup::Exception::PasswordNotFound')) {
+                        # if in quiet mode (i.e. typically executed in the
+                        # framework of a cronjobs), rethrow the error
+                        $err->rethrow if ($config::QUIET);
+                        print::warning($err->error);
+                    } elsif ($err->isa('yaBackup::Exception::ConfigFileFormat')) {
+                        $err->rethrow if (defined $config::SETTINGS{'password_file'});
+                    }
+                }
+            }
+            # If password still undefined (and this point reached), ask the user to fill
+            # it (or raise exception if in QUIET mode)
+            unless (defined $password) {
+                yaBackup::Exception::PasswordNotFound->throw(error =>
+                                                            "Cannot retrieve the passphrase for the AFP mount (impossible in quiet mode)")
+                    if ($config::QUIET);
+                # prompt for the pass-phrase
+                print "Enter the AFP password for '$username\@$server' : ";
+                ReadMode 'noecho';
+                $password = ReadLine 0;
+                chomp $password;
+                ReadMode 'normal';
+                print "\n";
+            }
+            # Finally raise exception if you still don't have a password
+            yaBackup::Exception::PasswordNotFound->throw(error => "Empty AFP password for '$username\@$server'")
+                if ($password eq "");
+            $afp_url .= ":$password\@";
+        }
+        $afp_url .= "$server:$port/$volname";
+        print::verbose("=> creating AFP mount point '$mount_point'");
+        system::execute("mkdir -p $mount_point") &&
+            yaBackup::Exception::RuntimeError->throw(error =>
+                                                    "Unable to create the AFP mount directory $mount_point");
+        # Now execute the mount
+        system::execute("mount_afp $afp_url $mount_point");
+        if ($? != 0) {
+            print::info("AFP mount failed: removing the mount directory $mount_point");
+            system::execute("rm -rf $mount_point");
+            yaBackup::Exception::RuntimeError->throw(error =>
+                                                    "Could not mount the AFP volume '$volname' for '$username\@$server'");
+        }
+        print::info("=> AFP volume '$volname' successfully mounted for '$username\@$server'");
+        push(@{ $system::MOUNTED_VOLUMES{'afp'} }, "$mount_point");
+    }
+    return 0;
+}
+
+
+
+####
+# Mount a local EncFS folder.  The rawdir (containing the EncFS raw data &
+# configs) is always given on the basis of the target url pre-parsed (see
+# sync::parse_target_url() ) in the following form:
+#      target_url:relative/path/to/encfs/rawdir
+# or:
+#      target_url:/absolute/path/to/encfs/rawdir
+#
+# Appart from the rawdir, this function takes as argument the mountpoint (derived
+# from the target_url) and uses the information of $sync::BACKUP_CMD_INFO and
+# $config::SETTINGS.
+#
+#Usage: mount_encfs(rawdir_url, mountpoint [, password])
+###
+sub mount_encfs($$@) {
+    my $rawdir_url = shift;
+    my $rawdir     = undef;
+    my $mountpoint = shift;
+    my $password   = (@_) ? shift : undef;
+    # convenient variables
+    my $proto = $sync::BACKUP_CMD_INFO{'proto'};
+    my $passfile_entry =
+      "$sync::BACKUP_CMD_INFO{'proto'}+encfs://$sync::BACKUP_CMD_INFO{'dst'}";
+
+    print::info("=> prepare to mount the target '$sync::BACKUP_CMD_INFO{'dst'}'",
+                "using EncFS");
+
+    # Ensure the encfs program is available
+    system::check_binary('encfs') unless ($proto eq 'ssh');
+    system::check_remote_binary_over_ssh($sync::BACKUP_CMD_INFO{'target'},
+                                         $sync::BACKUP_CMD_INFO{'port'},
+                                         'encfs')
+        if ($proto eq 'ssh');
+
+    # Set the rawdir value (from rawdir_url)
+    print::debug("EncFS rawdir url: '$rawdir_url'");
+    if ($rawdir_url =~ /^target_url:(([\w\.\/]|\\\s)+)$/) {
+        $rawdir_url = $1;
+    } else {
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "Malformed 'encfs_rawdir' directive in the configuration file (should respect the format: 'target_url:[/]path/to/encfs/rawdir'");
+    }
+    if ($rawdir_url =~ /^\//) {
+        # Absolute path
+        $rawdir = "$rawdir_url";
+    } else {
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "You cannot use a relative path in the 'encfs_rawdir' directive when the target_url use the SSH protocol")
+            if ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh');
+        # Relative url against target_url
+        my $tmp_rawdir = "$mountpoint/$rawdir_url";
+        $tmp_rawdir =~ s/\\(\s)/$1/g;
+        $rawdir = Cwd::realpath("$tmp_rawdir");
+        yaBackup::Exception::RuntimeError->throw(error =>
+                                                "Runtime error when determining the canonical path of encfs_rawdir")
+            unless ($rawdir);
+    }
+    print::debug("EncFS rawdir : $rawdir");
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "The dirname of an EncFS rawdir cannot correspond to the mountpoint")
+        if (dirname($rawdir) eq "$mountpoint");
+
+    # Eventually create the rawdir (to deal with first invocation)
+    system::check_has_directory_or_create($rawdir) unless ($proto eq 'ssh');
+    system::check_remote_has_directory_or_create_over_ssh($sync::BACKUP_CMD_INFO{'target'},
+                                                          $sync::BACKUP_CMD_INFO{'port'},
+                                                          $rawdir) if ($proto eq 'ssh');
+
+    # Check if it is a valid EncFS directory (via the presence of a .encfs* file)
+
+    eval {
+        system::check_has_file("$rawdir/.encfs*") unless ($proto eq 'ssh');
+        system::check_remote_has_file_over_ssh($sync::BACKUP_CMD_INFO{'target'},
+                                               $sync::BACKUP_CMD_INFO{'port'},
+                                               "$rawdir/.encfs*") if ($proto eq 'ssh');
+    };
+    if ( catch my $err ) {
+        if ($err->isa('yaBackup::Exception::FileNotFound')) {
+            # if in quiet mode (i.e. typically executed in the
+            # framework of a cronjobs) or in restore mode, rethrow the error
+            $err->rethrow if ($config::QUIET or $config::RETRIEVE_MODE);
+            # Otherwise, ask for the creation of an EncFS directory
+            my $encfs_cmd = "encfs --standard $rawdir $mountpoint";
+            my $note_on_passfile =
+              "If you plan to use this profile in a cronjob, ".
+                "don't forget to place the EncFS password in a password file ".
+                  "(specified by the directive 'password_file' in the ".
+                    "configuration file) i.e an entry as follows:\n".
+                      "\n\t$passfile_entry\tyour_clear_password_here\n\n".
+                        "Of course, ensure the password file is readable only by you ".
+                          "('chmod 600 /path/to/passfile')";
+            print::warning("$rawdir' is not a valid EncFS raw directory");
+            yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                          "The creation of an encrypted virtual filesystem for the target directory '$sync::BACKUP_CMD_INFO{'dst'}' is not supported over SSH.\n" .
+                                                          "You should create the EncFS volume manually, typically by issuing the following command ON THE SERVER:\n\n\t$encfs_cmd\n\n".
+                                                          "$note_on_passfile")
+                if ($proto eq 'ssh');
+            print::warning("=> about to create an encrypted virtual filesystem ",
+                           "for the target directory '$sync::BACKUP_CMD_INFO{'dst'}'");
+            print::warning("   The encrypted data will be stored in the EncFS raw ",
+                           "directory '$rawdir'");
+            print::really_continue();
+            system::execute("$encfs_cmd");
+            if ($? != 0) {
+                yaBackup::Exception::RuntimeError->throw(error =>
+                                                        "Could not create the EncFS directory $mountpoint");
+            }
+            print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully created",
+                                "OK_$config::icon");
+            print::info(format::color_msg('bold', 'Important note:'), "$note_on_passfile");
+            push(@{ $system::MOUNTED_VOLUMES{'encfs'} }, $sync::BACKUP_CMD_INFO{'dst'});
+            return;
+        } else {
+            $err->rethrow;
+        }
+    }
+
+    # Eventually retrieve the password of the encfs mount that can be either
+    # present in the password file (i.e. in $config::SETTINGS{'password_file'})
+    # or prompted to the user (which is not possible in quiet mode)
+    unless (defined $password) {
+        eval {
+            $password = config::getPasswordForEntry("$passfile_entry");
+        };
+        # catch
+        if ( catch my $err ) {
+            if ($err->isa('yaBackup::Exception::PasswordNotFound')) {
+                # if in quiet mode (i.e. typically executed in the
+                # framework of a cronjobs), rethrow the error
+                $err->rethrow if ($config::QUIET);
+                print::warning($err->error);
+            } elsif ($err->isa('yaBackup::Exception::ConfigFileFormat')) {
+                $err->rethrow if (defined $config::SETTINGS{'password_file'});
+            }
+        }
+    }
+    # If password still undefined (and this point reached), ask the user to fill
+    # it (or raise exeption if in QUIET mode)
+    unless (defined $password) {
+        yaBackup::Exception::PasswordNotFound->throw(error =>
+                                                    "Cannot retrieve the passphrase for the EncFS mount (impossible in quiet mode)")
+            if ($config::QUIET);
+        # prompt for the pass-phrase
+        print "Enter the EncFS pass-phrase: ";
+        ReadMode 'noecho';
+        $password = ReadLine 0;
+        chomp $password;
+        ReadMode 'normal';
+        print "\n";
+    }
+    # Finally raise exception if you still don't have a password
+    yaBackup::Exception::PasswordNotFound->throw(error => "Empty EncFS password")
+        if ($password eq "");
+
+    # Now mount the EncFS volume and do not expose the password
+    my $encfs_cmd = "encfs --stdinpass --idle=1 $rawdir $mountpoint";
+    $encfs_cmd =
+      "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} " .
+        "\"$encfs_cmd\"" if ($proto eq 'ssh');
+
+    system::execute_and_set_stdin("$encfs_cmd", "$password");
+    # could have been (but this expose the password):
+    # system::execute("echo $password | $encfs_cmd");
+    if ($? != 0) {
+        yaBackup::Exception::RuntimeError->throw(error =>
+                                                "Could not mount the EncFS volume $mountpoint");
+    }
+    print::notification("EncFS Volume '$sync::BACKUP_CMD_INFO{'dst'}' successfully mounted",
+                        "$config::icon") if ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh');
+    sleep 1;
+    push(@{ $system::MOUNTED_VOLUMES{'encfs'} },
+         ($proto eq 'ssh') ? "$mountpoint" : "$sync::BACKUP_CMD_INFO{'dst'}");
+}
+
+####
+# Mount a sparsebundle image (only supported on Mac OS X) -- see
+# http://db.tidbits.com/article/9673 for instance for some details.  If it is an
+# encrypted sparse-bundle, the password SHOULD BE stored in your keychain so it
+# can be retrieved transparently when the script is invoked in a cronjob.
+#
+# Return the mount point where the sparsebundle is mounted (or throw an
+# exception if the mount failed)
+#
+# Usage: my $mountpoint = system::mount_sparsebundle('/path/to/image.[sparsebundle|dmg]')
+###
+sub mount_sparsebundle($) {
+    my $sparsebundle = shift;
+    # sanitize the path (change '\ ' to ' '), mandatory to effectively check the
+    # existence of the file via the -e test
+    my $tmp_sparsebundle = $sparsebundle;
+    $tmp_sparsebundle =~ s/\\(\s)/$1/g;
+    yaBackup::Exception::FileNotFound->throw(error =>
+                                            "The sparsebundle image '$sparsebundle' cannot be found")
+        unless (-e $tmp_sparsebundle);
+    # TODO: eventually create the sparsebundle!
+
+    # Ensure the 'hdiutil' command is available
+    system::check_binary('hdiutil');
+
+    # Let's go: mount the sparsebundle
+    my $attach_cmd = "hdiutil attach $sparsebundle -plist";
+    my @plist_out = system::execute_and_get_output("$attach_cmd");
+    return '/Volumes/Simulated_Backup_Drive' if ($config::SIMULATION_MODE);
+
+    # If real execution: extract from the plist the volume name
+    print::debug("plist infos from sparsebundle:\n@plist_out");
+    my $plist = Mac::PropertyList::parse_plist( "@plist_out" );
+    # Extract from it the mount point
+    my $mount_point = "";
+    foreach my $dict ($plist->{'system-entities'}->value()) {
+        next unless $dict->exists('mount-point');
+        $mount_point = $dict->{'mount-point'}->value();
+    }
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "The mount point associated to the sparsebundle '$sparsebundle' cannot be found")
+        unless ($mount_point);
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "The sparsebundle '$sparsebundle' cannot be mounted (in $mount_point)")
+        unless (-d "$mount_point");
+    print::debug("=> successfully mount the sparsebundle '$sparsebundle' in ",
+                 format::color_msg('bold', "'$mount_point'"));
+    if ($mount_point =~ /\s/) {
+        $mount_point =~ s/(\s)/\\$1/g; # Handle space
+        print::debug("New mount point (with escaped spaces): $mount_point");
+    }
+    push(@{$MOUNTED_VOLUMES{'sparsebundle'}}, "$mount_point");
+    return "$mount_point";
+}
+
+
+#####
+# execute a command on a remote server by ssh
+# usage: remote_execute_over_ssh("user@host", port, "command")
+###
+sub remote_execute_over_ssh($$@) {
+    my ($host, $port, @command) = @_;
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing remote command argument') unless (@command);
+    my $cmd = "ssh -p $port $host @command 1>/dev/null";
+    return system::execute($cmd);
+}
+
+
+#####
+# Umount previously mounted volumes (stored in $system::MOUNTED_VOLUMES)
+# Usage: system::umount_mounted_volumes()
+###
+sub umount_mounted_volumes() {
+    #    print::hash_content(\%system::MOUNTED_VOLUMES, '%system::MOUNTED_VOLUMES');
+    sleep 1;
+    # (bad) Hack to unmount first sparsebundle then afp ;)
+    foreach my $proto (reverse sort keys %system::MOUNTED_VOLUMES) {
+        if (defined ($system::MOUNTED_VOLUMES{$proto})) {
+            my $umount_cmd = undef;
+            $umount_cmd = "umount "       if ($proto =~ "drive|afp|encfs");
+            $umount_cmd = "fusermount -u" if (($proto =~ "encfs") and ($config::OS[0] =~ "Linux"));
+            # TODO: remote umount for ssh+encfs : check remote OS (for umount or fusermount)
+            $umount_cmd = "ssh -p $sync::BACKUP_CMD_INFO{'port'} $sync::BACKUP_CMD_INFO{'target'} fusermount -u '"
+              if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
+            $umount_cmd = "hdiutil detach -quiet " if ($proto eq 'sparsebundle');
+            print::error_and_exit(1, "No unmount command set!") unless (defined $umount_cmd);
+
+            foreach my $vol (@{$MOUNTED_VOLUMES{$proto}}) {
+                print::info("Unmounting the volume $vol (mounted via $proto)\n");
+                $vol = "$vol'" if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
+                system::execute("$umount_cmd $vol");
+                if ($? != 0) {
+                    yaBackup::Exception::RuntimeError->throw(error =>
+                                                            "Unable to unmount $vol (using the command '$umount_cmd': $!");
+                }
+                pop @{$MOUNTED_VOLUMES{$proto}};
+                print::notification("EncFS Volume '$vol' on $sync::BACKUP_CMD_INFO{'target'} successfully unmounted",
+                                    "$config::icon")
+                    if (($proto =~ "encfs") and ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh'));
+            }
+        }
+    }
+}
+
+
+
+##############################################################################
+# PACKAGE sync
+# Handle all synchronization aspects etc.
+##############################################################################
+package sync;
+
+use Storable qw(dclone);        # for recursive copy of nested hash
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Cwd;                        # for realpath
+use Data::Dumper;
+
+# Store information on the synchronization command to be issued
+our %BACKUP_CMD_INFO = (
+                        'basecmd'  => 'rsync', # synchronization command
+                        'opt'      => '',      # command-line options
+                        'src'      => undef,   # source
+                        'dst'      => undef,   # destination
+                        'tosync'   => undef,   # list of element names to sync
+                        'proto'    => undef,   # protocol used
+                        'port'     => undef,   # port number on backup target
+                        'target'   => undef,   # backup target
+                       );
+our %DEFAULT_BACKUP_CMD_INFO = %BACKUP_CMD_INFO;
+lock_hash(%DEFAULT_BACKUP_CMD_INFO); # for extra safety
+
+# Current backup profile
+our $current_profile = undef;
+
+####
+# Analyse the target url (stored in $config::SETTINGS{'target_url'} normally)
+# that specify the backup destination.
+##
+sub parse_target_url() {
+    unless (defined($config::SETTINGS{'target_url'})) {
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "Undefined target_url for this profile");
+    }
+    $config::SETTINGS{'target_url'} = format::interpret_cmd("$config::SETTINGS{'target_url'}");
+    # let the Perl magic operate here:
+    $config::SETTINGS{'target_url'} =~ /^\b(\w+):\/\/((([\.\w\/]|\\\s)+)(:([\w]+))?((\@([-\w\.]+))(:(\d+))?)?(\/(([\.\w\/]|\\\s)+))?)/;
+    my ($proto, $target, $user, $passwd, $server, $port, $volname) = ($1, $2, $3, $5, $9, $11, $13);
+    print::debug("Protocol: $proto\n")   if ($proto);
+    print::debug("target  : $target\n")  if ($target);
+    print::debug("user    : $user\n")    if ($user);
+    print::debug("passwd  : $passwd\n")  if ($passwd);
+    print::debug("server  : $server\n")  if ($server);
+    print::debug("port    : $port\n")    if ($port);
+    print::debug("volname : $volname\n") if ($volname);
+
+    unless ($proto && $target) {
+        yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                    "Malformed target url $config::SETTINGS{'target_url'}");
+    }
+    $BACKUP_CMD_INFO{'proto'}  = $proto;
+    $BACKUP_CMD_INFO{'target'} = $target;
+
+    if ($proto =~ /(file|drive|ssh|afp|sparsebundle)/) {
+        config::set_icon("$proto"); # Change the icon layout to match the
+                                    # protocol used in this profile
+    }
+    my $set_to_msg="=> set the backup destination to";
+
+    # Handle each protocol
+    if (($proto eq 'drive') or ($proto eq 'file')) {
+        # ---- Drive / File ----
+        print::verbose("$set_to_msg the ",
+                       ($proto eq 'drive') ? 'external drive' : 'local directory',
+                       " '$target'\n");
+        set_backup_target_to_drive($target);
+
+    } elsif ($proto eq 'ssh') {
+        # ---- SSH ----
+        unless ($user && $server) {
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                        "Configuration file format error: Malformed SSH target '$target'");
+        }
+        $port = 22 unless ($port);
+        print::verbose("$set_to_msg the remote server '$server' ");
+        print::verbose("    (access by SSH on port $port for the user '$user')");
+        set_backup_target_to_ssh_server($user, $server, $port);
+    } elsif ($proto eq 'sparsebundle') {
+        # ---- Sparse-bundle ----
+        print::verbose("$set_to_msg the sparsebundle image '$target'");
+        set_backup_target_to_sparsebundle($target);
+    } elsif ($proto eq 'afp') {
+        # ---- AFP ----
+        unless ($user && $server) {
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                        "Configuration file format error: Malformed AFP target '$target'");
+        }
+        $port = 548 unless ($port);
+        print::verbose("$set_to_msg the remote server '$server' ");
+        print::verbose("    (access by Apple Filing Protocol (AFP) on port $port for the user '$user')");
+        set_backup_target_to_afp_server($user, $server, $port, $volname, $passwd);
+
+    } else {
+        yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                      "Unsupported protocol $proto");
+    }
+}
+
+###
+# setup the target of the backup command to an external drive or a local directory
+# usage: set_backup_target_to_drive(path)
+##
+sub set_backup_target_to_drive($) {
+    my $path = shift;
+
+    $BACKUP_CMD_INFO{'dst'} = format::interpret_cmd($path);
+    # Ensure the target drive starts with a '/'
+    if ($BACKUP_CMD_INFO{'dst'} !~ /^\//) {
+        print::warning("The target drive path ($BACKUP_CMD_INFO{'dst'})",
+                       "does not starts with a '/' => '/' character added\n");
+        $BACKUP_CMD_INFO{'dst'} = "/$BACKUP_CMD_INFO{'dst'}";
+    }
+
+    # Ensure the drive is present
+    if ($BACKUP_CMD_INFO{'proto'} eq 'drive') {
+        yaBackup::Exception::DirectoryNotFound->throw(error => "The drive $BACKUP_CMD_INFO{'dst'} is not mounted")
+            unless ( -d "$BACKUP_CMD_INFO{'dst'}");
+        push(@{$system::MOUNTED_VOLUMES{ $BACKUP_CMD_INFO{'proto'} }}, $BACKUP_CMD_INFO{'dst'});
+    }
+}
+
+###
+# setup the target of the backup command to a remote server reachable by SSH
+# usage: set_backup_target_to_ssh_server(user, server, port)
+##
+sub set_backup_target_to_ssh_server($$$) {
+    my ($user, $server, $port) = @_;
+
+    # Check the SSH connectivity
+    system::remote_execute_over_ssh("$user".'@'."$server", $port, "whoami") &&
+        yaBackup::Exception::Network->throw(error => "SSH connection to '$server' for the user '$user' (using port $port) FAILED");
+
+    $BACKUP_CMD_INFO{'port'}   = $port;
+    $BACKUP_CMD_INFO{'target'} = "$user" . '@' . "$server";
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "The use of duplicity (or anything different than rsync) is not yet supported")
+        unless ($BACKUP_CMD_INFO{'basecmd'} eq 'rsync');
+    $BACKUP_CMD_INFO{'opt'} .= "--rsh=" . (($port == 22) ? "ssh" : "'ssh -p $port'");
+    $BACKUP_CMD_INFO{'dst'} = "$user" . '@' . "$server:'";
+    # Ensure 'rsync' (or whatever basecmd such as rdiff-backup is available remotely
+    system::check_remote_binary_over_ssh($BACKUP_CMD_INFO{'target'},
+                                         $BACKUP_CMD_INFO{'port'},
+                                         $BACKUP_CMD_INFO{'basecmd'});
+}
+
+###
+# setup the target of the backup command on a sparsebundle image
+# usage: sync::set_backup_target_to_sparsebundle('path/to/image.sparsebundle')
+##
+sub set_backup_target_to_sparsebundle($) {
+    my $path_to_sparsebundle = shift;
+    my $explicit_path = format::interpret_cmd($path_to_sparsebundle);
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "The use of sparsebundle images is only supported under Mac OS X")
+        unless ($config::OS[0] =~ "Darwin");
+    my $mount_point = system::mount_sparsebundle($explicit_path);
+    # If this point is reached, the mount is successfull
+    $sync::BACKUP_CMD_INFO{'dst'} = "$mount_point";
+}
+
+###
+# setup the target of the backup command to a remote server reachable by AFP
+# usage: set_backup_target_to_afp_server(user, server, port, fullvolumename [, password])
+##
+sub set_backup_target_to_afp_server($$$$@) {
+    my $user        = shift;
+    my $server      = shift;
+    my $port        = shift;
+    my $fullvolname = shift;
+    my $password    = (@_) ? shift : undef;
+
+    # Currently operate only on Mac OS X
+    yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                  "Apple Filing Protocol (AFP) are only supported under Mac OS X for the moment")
+        unless ($config::OS[0] =~ "Darwin");
+    $fullvolname =~ /(\w+)(\/([\/\w\.]|\\\s)*)/;
+    my ($volname, $complementpath) = ($1 , $2);
+    print::debug("Volume name : $volname\n");
+    print::debug("Complement path : $complementpath\n") if ($complementpath);
+    my $mount_point = "/Volumes/$volname"; # Default Mac OS mount point:
+                                           # important to be coherent to detect
+                                           # already mounted volume
+    system::mount_afp($user, $server, $port, $volname, $mount_point, $password);
+    # If this point is reached, the mount is successfull
+    $sync::BACKUP_CMD_INFO{'dst'} = "$mount_point";
+
+    # Now handle complement paths
+    if ($complementpath) {
+        print::info("=> found complement path $complementpath");
+        if ($complementpath =~ /\.sparsebundle\/?\s*$/) {
+            print::info("   Reference to a sparsebundle image found");
+            set_backup_target_to_sparsebundle("$mount_point/$complementpath");
+        } else {
+            yaBackup::Exception::ConfigFileFormat->throw(error =>
+                                                        "Malformed AFP target_url for the complement path '$complementpath' that don't have a leading '/'")
+                unless ($complementpath =~ /^\//);
+            system::check_has_directory_or_create("$mount_point/$complementpath");
+            $BACKUP_CMD_INFO{'dst'} .=  "$complementpath";
+        }
+    }
+}
+
+
+####
+# run the synchronization command
+##
+sub run_cmd() {
+    # Warn the user
+    print::info("=> about to",
+                ($config::RETRIEVE_MODE) ? format::color_msg('bold red', "RESTORE") : 'backup',
+                "the following elements: ",
+                "@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} @{$BACKUP_CMD_INFO{'tosync'}->{'files'}}",
+                "\n\t   from: ", format::color_msg('bold', "'$BACKUP_CMD_INFO{'src'}'"),
+                "\n\t   to:   ", format::color_msg('bold', "'$BACKUP_CMD_INFO{'dst'}'"));
+    print::warning("This will most probably ",
+                   format::color_msg('bold red',
+                                     uc("overwrite files on your local system")),
+                   "!!!") if ($config::RETRIEVE_MODE);
+    print::warning("This will lead to the",
+                   format::color_msg('bold red',
+                                     uc("deletion of files/directories in")),
+                   format::color_msg('bold',"$BACKUP_CMD_INFO{'src'}"))
+        if ($config::SYNC_MODE eq '--delete');
+    print::really_continue() unless ($config::QUIET);
+    print::notification('Starting ' .
+                        ($config::RETRIEVE_MODE ? "restoration\n" : "backup\n") .
+                        "From: $BACKUP_CMD_INFO{'src'}\n" .
+                        "To:   $BACKUP_CMD_INFO{'dst'}",
+                        "$config::icon");
+    my $has_failed = 0;
+    # Let's go!
+    my $src_basedir = "$BACKUP_CMD_INFO{'src'}";
+    my $dst_basedir = "$BACKUP_CMD_INFO{'dst'}";
+
+    if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+        # Remove trailing \' (handling spaces in filename over SSH is just a
+        # nightmare: I select the use of single quotes -- see
+        # http://www.samba.org/rsync/FAQ.html#9 )
+        $dst_basedir =~ s/'$// unless ($config::RETRIEVE_MODE);
+        $src_basedir =~ s/'$// if     ($config::RETRIEVE_MODE);
+    }
+
+    # First proceed the subdirectories (NOTE: sync::select_elements() ensure the elements exists)
+    foreach my $dir (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}}) {
+        print::info('=> proceeding directory ', format::color_msg('bold', "$dir"));
+        my ($src_dir, $dst_dir) = ($dir, $dir);
+        # Manage special treatment of the directory
+        if (defined($config::SETTINGS{'Directory'})) {
+            yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                          "Special Directory treatement ignored in restoration mode")
+                if ($config::RETRIEVE_MODE);
+
+            if (exists($config::SETTINGS{'Directory'}->{$dir})) {
+
+                # First interpret included commands
+                foreach my $directive (keys %{$config::SETTINGS{'Directory'}->{$dir}}) {
+                    $config::SETTINGS{'Directory'}->{$dir}->{$directive} =
+                      format::interpret_cmd("$config::SETTINGS{'Directory'}->{$dir}->{$directive}");
+                }
+                print::verbose("   using special settings : ");
+                #                print::verbose(Data::Dumper $config::SETTINGS{'Directory'}->{$dir});
+                print::verbose("TO BE CONTINUED");
+            }
+        }
+        my $src = "$src_basedir/$src_dir/";
+        my $dst = "$dst_basedir/$dst_dir" ;
+        if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+            $dst .= "'" unless ($config::RETRIEVE_MODE);
+            $src .= "'" if     ($config::RETRIEVE_MODE);
+        }
+
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src $dst";
+        #        my $save_symmode = $config::SIMULATION_MODE;
+        #        $config::SIMULATION_MODE = 1;
+        $has_failed += system::execute("$cmd");
+        #        $config::SIMULATION_MODE = $save_symmode;
+    }
+
+    # Now proceed with the files
+    foreach my $file (@{$BACKUP_CMD_INFO{'tosync'}->{'files'}}) {
+        print::info('=> proceeding file ', format::color_msg('bold', "$file"));
+        my $src = "$src_basedir/$file";
+        my $dst = "$dst_basedir/$file";
+        if ($BACKUP_CMD_INFO{'proto'} eq 'ssh') {
+            $dst .= "'" unless ($config::RETRIEVE_MODE);
+            $src .= "'" if     ($config::RETRIEVE_MODE);
+        }
+        my $cmd = "$BACKUP_CMD_INFO{'basecmd'} $BACKUP_CMD_INFO{'opt'} $src $dst";
+        #       my $save_symmode = $config::SIMULATION_MODE;
+        #       $config::SIMULATION_MODE = 1;
+        $has_failed += system::execute("$cmd");
+        #       $config::SIMULATION_MODE = $save_symmode;
+    }
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "Synchronization finished yet with errors in the executed commands")
+        if ($has_failed);
+}
+
+####
+# Configure the synchronization command to be executed (This assumes the hash
+# $config::SETTINGS is correctly populated)
+##
+sub set_cmd() {
+    if ($config::SETTINGS{'use_duplicity'} =~ /1|y|yes/i) {
+        yaBackup::Exception::UnsupportedFeature->throw(error =>
+                                                      "The use of duplicity is not yet supported");
+    }
+    # Set the backup source i.e the root directory of the local folders to
+    # backup, ensuring this directory exists
+    my $src_rootdir = format::interpret_cmd($config::SETTINGS{'src_rootdir'});
+    system::check_has_directory( $src_rootdir );
+#     my $tmp_src_rootdir = $src_rootdir;
+#     $tmp_src_rootdir =~ s/\\(\s)/$1/g;
+#     $BACKUP_CMD_INFO{'src'} = Cwd::realpath($tmp_src_rootdir);
+    $BACKUP_CMD_INFO{'src'} = $src_rootdir;
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "Empty analysed source rootdir (from $src_rootdir)")
+        unless ($BACKUP_CMD_INFO{'src'});
+
+    # Set the backup destination by analysing the target_url
+    sync::parse_target_url();
+
+    # Analyze the dst_rootdir to eventually complement $BACKUP_CMD_INFO{'dst'}
+    my $dst_rootdir = format::interpret_cmd($config::SETTINGS{'dst_rootdir'});
+    $BACKUP_CMD_INFO{'dst'} .= '/'
+      unless (($BACKUP_CMD_INFO{'proto'} eq 'ssh') or ($dst_rootdir =~ /^\//));
+    $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir" unless ($dst_rootdir eq '/');
+    $BACKUP_CMD_INFO{'dst'} .= "'" if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
+
+    print::debug("\$BACKUP_CMD_INFO{'dst'} = $BACKUP_CMD_INFO{'dst'}");
+
+    # Ensure the destination directory exists (or propose its creation if not in
+    # QUIET mode
+    print::verbose("=> ensure the destination directory exists");
+    if ($config::RETRIEVE_MODE) {
+        system::check_has_directory_or_create("$BACKUP_CMD_INFO{'src'}");
+    } else {
+        # Normal mode
+        if ($BACKUP_CMD_INFO{'proto'} ne 'ssh') {
+            system::check_has_directory_or_create("$BACKUP_CMD_INFO{'dst'}");
+        } else {
+            system::check_remote_has_directory_or_create_over_ssh($BACKUP_CMD_INFO{'target'},
+                                                                  $BACKUP_CMD_INFO{'port'},
+                                                                  "$dst_rootdir");
+        }
+    }
+
+    # Now handle an eventual EncFS folder encryption on the target (folder or
+    # volume) characterized by the presence of the directive 'encfs_rawdir' in
+    # the configuration file
+    if (defined $config::SETTINGS{'encfs_rawdir'}) {
+        config::set_icon("$BACKUP_CMD_INFO{'proto'}Encrypted"); # Change the
+                                                                # icon layout
+        system::mount_encfs($config::SETTINGS{'encfs_rawdir'},
+                            ($BACKUP_CMD_INFO{'proto'} ne 'ssh') ? "$BACKUP_CMD_INFO{'dst'}" : "$dst_rootdir");
+    }
+
+    # Setup directories to backup/restore i.e set $BACKUP_CMD_INFO{'tosync'}
+    print::verbose("=> select the elements - file(s)/directorie(s) - to synchronize");
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO before sync::select_elements()');
+    sync::select_elements();
+    print::verbose("\t found in '$sync::BACKUP_CMD_INFO{'src'}': ",
+                   "@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} @{$BACKUP_CMD_INFO{'tosync'}->{'files'}}");
+    yaBackup::Exception::RuntimeError->throw(error =>
+                                            "No element found to synchronize in '$BACKUP_CMD_INFO{'src'}'!")
+        unless (@{$BACKUP_CMD_INFO{'tosync'}->{'dirs'}} or @{$BACKUP_CMD_INFO{'tosync'}->{'files'}});
+
+    # Set the command-line options i.e populate $BACKUP_CMD_INFO{'opt'}
+    sync::set_cmd_options();
+
+    print::hash_content(\%sync::BACKUP_CMD_INFO, 'BACKUP_CMD_INFO final');
+}
+
+####
+# Select the elements (files or folders) to synchronize (i.e to backup or to
+# restore) i.e. set $BACKUP_CMD_INFO{'tosync'} using the informations given in
+# the configuration file i.e the directives 'sync_include', 'sync_exclude' and
+# 'sync_exclude_exception'.  Note that these directives specialize the treatment
+# of the elements directly UNDER the root directory in the FS hierarchy
+# i.e. $config::SETTINGS{'src_rootdir'} in case of backup and
+# $sync::BACKUP_CMD_INFO{'dst'} in case of restoration.
+#
+# Finally,the use of the wildcards * in all 'sync_' directives is supported.
+# For instance '*' select all subdirectories (including the hidden
+# one) of src_rootdir.  You may use more complicated pattern mixing ^, * and $
+# special characters such as
+#        ^AR* : all directories that start with AR
+#        *ES$ : all directories that ends with ES
+#        ^.* : all hidden directories (the one that start by '.')
+#
+# Usage: sync::select_elements()
+##
+sub select_elements() {
+    config::ensure_profile_set('sync_include');
+    # Select the appropriate rootdir
+    my $rootdir = $config::SETTINGS{'src_rootdir'};
+    my @optional_ssh_args;
+    if ($config::RETRIEVE_MODE) {
+        $rootdir = ($sync::BACKUP_CMD_INFO{'proto'} eq 'ssh') ?
+          $config::SETTINGS{'dst_rootdir'} : $sync::BACKUP_CMD_INFO{'dst'};
+        @optional_ssh_args = ($sync::BACKUP_CMD_INFO{'target'}, $sync::BACKUP_CMD_INFO{'port'})
+          if ($BACKUP_CMD_INFO{'proto'} eq 'ssh');
+    }
+
+    # Construct list of the sub-directories and subfiles of $rootdir
+    # to include in the synchronization
+    my $sync_include_href = format::listdir_from($config::SETTINGS{'sync_include'},
+                                                 $rootdir, @optional_ssh_args);
+    # Reminder: $sync_include_href->{'dirs'} contains the list of subdirs   in $rootdir,
+    #           $sync_include_href->{'files'} contains the list of subfiles in $rootdir,
+    #print::hash_content($sync_include_href, 'sync_include_href'); # *******************
+
+    if (defined($config::SETTINGS{'sync_exclude'})) {
+        my $sync_exclude_href = format::listdir_from($config::SETTINGS{'sync_exclude'},
+                                                     $rootdir, @optional_ssh_args);
+        #print::hash_content($sync_exclude_href, 'sync_exclude_href'); # *******************
+        if (defined($config::SETTINGS{'sync_exclude_exception'})) {
+            my $sync_exclude_exception_href = format::listdir_from($config::SETTINGS{'sync_exclude_exception'},
+                                                                   $rootdir, @optional_ssh_args);
+            #print::hash_content($sync_exclude_exception_href, 'sync_exclude_exception_href'); # *******************
+            foreach my $type ('dirs', 'files') {
+                my @diff = array::get_difference(\@{$sync_exclude_href->{$type}},
+                                                 \@{$sync_exclude_exception_href->{$type}});
+                $sync_exclude_href->{$type} = dclone \@diff;
+            }
+            #print::hash_content($sync_exclude_href, 'NEW sync_exclude_href'); # *******************
+        }
+        foreach my $type ('dirs', 'files') {
+            my @diff = array::get_difference(\@{$sync_include_href->{$type}},
+                                             \@{$sync_exclude_href->{$type}});
+            $sync_include_href->{$type} = dclone \@diff;
+        }
+        #print::hash_content($sync_include_href, 'NEW sync_include_href'); # *******************
+    }
+    # Eventually apply the patterns listed in 'exclude_pattern'
+    if (defined($config::SETTINGS{'exclude_pattern'})) {
+        my $additionnal_exclude_href = format::listdir_from($config::SETTINGS{'exclude_pattern'},
+                                                            $rootdir, @optional_ssh_args);
+        #print::hash_content($additionnal_exclude_href, 'additionnal_exclude_href'); # *******************
+        foreach my $type ('dirs', 'files') {
+            my @diff = array::get_difference(\@{$sync_include_href->{$type}},
+                                             \@{$additionnal_exclude_href->{$type}});
+            $sync_include_href->{$type} = dclone \@diff;
+        }
+        #print::hash_content($sync_include_href, 'NEW NEW sync_include_href'); # *******************
+    }
+
+    # Now $sync_include_href contains the exact list of directories/files directly
+    # under $rootdir that should be considered for the backup/restoration
+
+    # Invert $BACKUP_CMD_INFO{'src'} and $BACKUP_CMD_INFO{'dst'} when on
+    # restoration.
+    # Various place are possible for this call, I choose here to
+    # ensure the src and dst are coherent after the call to select_element()
+    sync::set_restoration_mode() if ($config::RETRIEVE_MODE);
+
+    # populate final receipt for the directories to backup
+    $BACKUP_CMD_INFO{'tosync'} = dclone $sync_include_href;
+}
+
+####
+# Specialize the command-line options of the synchronization command
+# i.e. populate $BACKUP_CMD_INFO{'opt'}
+# Usage: sync::set_cmd_options()
+##
+sub set_cmd_options() {
+    if (defined $config::SETTINGS{'exclude_pattern_from'}) {
+        if (-f "$config::SETTINGS{'exclude_pattern_from'}") {
+            $BACKUP_CMD_INFO{'opt'} .= " --exclude-from=$config::SETTINGS{'exclude_pattern_from'}";
+        } else {
+            print::warning("The pattern file for exclusion $config::SETTINGS{'exclude_pattern_from'}",
+                           'does not exists and will be ignored');
+        }
+    }
+    if (defined $config::SETTINGS{'exclude_pattern'}) {
+        foreach my $pattern (split(' ', $config::SETTINGS{'exclude_pattern'})) {
+            $BACKUP_CMD_INFO{'opt'} .= " --exclude='$pattern'";
+        }
+    }
+    # Add classical options
+    #    $BACKUP_CMD_INFO{'opt'} .= ""
+    $BACKUP_CMD_INFO{'opt'} .= " -avz";
+    #    $BACKUP_CMD_INFO{'opt'} .= " -E"
+
+    $BACKUP_CMD_INFO{'opt'} .= " -NHAX --protect-args --fileflags --force-change"
+      if ($config::MAC_FORK and ($BACKUP_CMD_INFO{'proto'} ne 'ssh'));
+    #    $BACKUP_CMD_INFO{'opt'} .= " --progress" if $config::VERBOSE;
+    $BACKUP_CMD_INFO{'opt'} .= " --quiet"    if $config::QUIET;
+    $BACKUP_CMD_INFO{'opt'} .= " $config::SYNC_MODE";
+}
+
+####
+# Specialize the command-line for a restoration i.e. invert src and dst in
+# $sync::BACKUP_CMD_INFO
+# Usage: sync::set_restoration_mode()
+##
+sub set_restoration_mode() {
+    ($BACKUP_CMD_INFO{'src'}, $BACKUP_CMD_INFO{'dst'}) = ($BACKUP_CMD_INFO{'dst'}, $BACKUP_CMD_INFO{'src'});
+}
+
+
+
+
+##############################################################################
+# PACKAGE config
+# Handle all configuration aspects etc.
+##############################################################################
+package config;
+
+use strict;
+use warnings;
+
+use Storable qw(dclone);        # for recursive copy of nested hash
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Getopt::Long;
+use Data::Dumper;
+
+# Generic variables
+our $prefix  = "@prefix@";  # Installation prefix (inherited from the autotools)
+our $VERSION = '@VERSION@';                   # Script version
+our $PACKAGE_SUMMARY = '@PACKAGE_SUMMARY@';   # Package summary
+our $PACKAGE_WEBSITE = '@PACKAGE_WEBSITE@';   # Package website
+our $VERBOSE = 0;            # option variable for verbose mode (default: false)
+our $DEBUG   = 0;            # option variable for debug mode with default
+# value (false)
+our $QUIET   = 0;               # By default, display all informations
+our $numargs = scalar(@ARGV);   # Number of arguments
+our $command = `basename $0`;   # base command
+chomp($command);
+
+# Icons settings
+our $iconsdir = "$config::prefix/share/icons/yabackup"; # icons folder (as in
+                                                        # Makefile.am)
+# The different type of available icons
+our @icon_types = ('default', 'defaultEncrypted',
+                   'AFP',     'AFPEncrypted',
+                   'Drive',   'DriveEncrypted',
+                   'File',    'FileEncrypted',
+                   'SSH',     'SSHEncrypted',
+                   'SparseBundle');
+
+# Current icon and icon type
+our $icon = undef;
+our $icon_type = 'default';
+
+
+# Specific variables
+our $SIMULATION_MODE   = 0;     # By default, don't simulate
+our $SYNC_MODE = "--update"; # By default, update directories, don't delete obsolete files
+#our $BACKUP_HISTORY_MODE = 0; # By default do not keep an history of older
+                                # backups (obsolete once duplicity/rdiff-backup
+                                # support available?
+
+our $MAC_FORK          = 0; # option variable for Mac OS resource forks with default value (false)
+our $NOTIFICATION      = 0; # By default, don't use system user notification feature
+our $RETRIEVE_MODE     = 0; # By default, push data on the backup target and don't retrieve anything
+our $LIST_PROFILE_MODE = 0; # by default, don't list the profiles available
+our $PRE_SCRIPT;            # Complete path to pre-backup script
+our $POST_SCRIPT;           # Complete path to post-backup script
+
+our $file;                # Configuration file.
+our @yaBackup_profiles;     # backup sections to be used in the configuration file
+our @OS = qx(uname);      # Current OS
+
+# Configuration settings as extracted/expanded from the configuration file
+our %SETTINGS = (
+                 'use_duplicity'          => 'no',
+                 'password_file'          => undef,
+                 'restrict_on_subnet'     => undef,
+                 'ssh_auth_sock'          => undef,
+                 'src_rootdir'            => '/',
+                 'dst_rootdir'            => '/',
+                 'sync_include'           => '*',
+                 'sync_exclude'           => undef,
+                 'sync_exclude_exception' => undef,
+                 'exclude_pattern'        => undef,
+                 'exclude_pattern_from'   => undef,
+                 'Directory'              => undef,
+                 'target_url'             => undef,
+                 'logdir'                 => undef,
+                 'email'                  => undef,
+                 'encfs_rawdir'           => undef,
+                );
+our %DEFAULT_SETTINGS = %SETTINGS;
+lock_hash(%DEFAULT_SETTINGS);   # for extra safety
+
+our %GETOPT_CONFIG = (
+                      # Specific options
+                      'e|exact-sync|delete' => sub { $SYNC_MODE="--delete" }, # Exact synchro
+                      'f|config-file=s' => \$file, # Configuration file
+                      #                      'history'         => sub {   # Keep history of backups
+                      #                          $BACKUP_HISTORY_MODE = 1;
+                      #                          $SYNC_MODE="--delete"
+                      #                      },
+                      'l|list-profiles' => \$LIST_PROFILE_MODE, # List available profiles
+                      'm|mac-fork'      => \$MAC_FORK, # Mac resource fork (assume rsync >= 3.0 ?)
+                      'n|dry-run'       => \$SIMULATION_MODE, # Simulation mode
+                      'notification'    => \$NOTIFICATION, # User notification features
+                      'p|push'          => sub { $RETRIEVE_MODE = 0}, # push data on the backup target
+
+                      'pre-script=s'    => \$PRE_SCRIPT, # script to be executed before the sync
+                      'post-script=s'   => \$POST_SCRIPT, # script to be executed afetr the sync
+                      'r|restore|retrieve' => sub { $RETRIEVE_MODE = 1}, # restore data from the backup
+                      's|section=s'     => \@yaBackup_profiles, # sections to consider
+
+                      # Generic (classical) options
+                      'v|verbose'  => \$VERBOSE, # Verbose mode
+                      'q|quiet'    => \$QUIET,   # Quiet mode
+                      'debug'      => sub { $DEBUG = 1; $VERBOSE = 1; }, # Debug mode
+                      'h|help'     => sub { ::pod2usage(-exitval => 1, # Show help
+                                                        -verbose => 2); },
+                      'version'    => sub { print::version_msg(); exit(0); } # Show version
+                     );
+
+our %CONFIG_FILE_CONTENT;      # Hash table constructed from the analysis of the
+# content of the configuration file via
+# Config::General
+
+####
+# reset the settings
+##
+sub reset_settings() {
+    %config::SETTINGS      = %config::DEFAULT_SETTINGS;
+    %sync::BACKUP_CMD_INFO = %sync::DEFAULT_BACKUP_CMD_INFO;
+    config::set_icon();         # reset icon layout
+}
+
+####
+# Set the current icon filename (located in $config::iconsdir) to be used in
+# the print::notification() function.
+# All icons filename are prefixed by 'yaBackup' and suffixed by 'Icon.png'
+# Usage: config::icon_filename([type])
+#
+# For each icon, you can The presence of an exit status value return the icon
+# with the status logo on the top left icon.
+##
+sub set_icon(@) {
+    my $type   = shift;
+    $type      = 'default' unless defined($type);
+    my $res = "yabackup_$type" . "_Icon.png";
+    system::check_has_file("$config::iconsdir/$res",
+                           "$config::iconsdir/OK_$res",
+                           "$config::iconsdir/KO_$res");
+    $config::icon_type = "$type";
+    $config::icon      = "$res";
+}
+
+sub test_icons() {
+    my $msg   = 'Test Message';
+
+    for my $type (@config::icon_types) {
+        config::set_icon($type);
+        print::notification("msg");
+        print::notification("msg", "OK_$config::icon");
+        print::notification("msg", "KO_$config::icon");
+        sleep 1;
+    }
+}
+
+####
+# Update the backup settings i.e. the hash $SETTINGS from the informations
+# stored in $CONFIG_FILE_CONTENT{profile} i.e. a given profile (or section) in
+# the configuration file.
+# Usage: update_settings_from("profile")
+##
+sub set_profile($) {
+    my $profile = shift;
+    print::verbose("=> loading the profile '$profile'");
+    my %subsection = %{ dclone($CONFIG_FILE_CONTENT{$profile})}; # deep copy
+    while (my ($key, $val) = each(%subsection)) {
+        # Special treatment for the SSH agent
+        if ($key eq 'ssh_auth_sock') {
+            $SETTINGS{'ssh_auth_sock'} = format::interpret_cmd($subsection{'ssh_auth_sock'});
+            print::debug('Setting the environment variable SSH_AUTH_SOCK ',
+                         "to $SETTINGS{'ssh_auth_sock'}");
+            $ENV{SSH_AUTH_SOCK} = $SETTINGS{'ssh_auth_sock'};
+            next;
+        }
+        if (($key eq 'Directory') && defined($SETTINGS{$key})) {
+            # Here we need to append the directories definitions
+            while ( my ($dir, $dir_setting) = each(%{$subsection{$key}})) {
+                $SETTINGS{$key}->{$dir} = $dir_setting;
+            }
+            next;
+        }
+        if (exists($SETTINGS{$key})) {
+            $SETTINGS{$key} = $val;
+        } else {
+            print::error_and_exit($main::ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
+                                  "The directive $key is not recognized");
+        }
+    }
+    $sync::current_profile = "$profile";
+}
+
+####
+# ensure the existence of the directives listed in arguments in the merged
+# configuration of a given backup profile i.e. in $config::SETTINGS. Throw an
+# exception of type yaBackup::Exception::ConfigFileFormat in case of error.
+##
+sub ensure_profile_set(@) {
+    print::error_and_exit(1, '[' . (caller(0))[3] . '] missing argument') unless (@_);
+    foreach my $directive (@_) {
+        unless (exists($config::SETTINGS{$directive})) {
+            my $error_msg =
+              "The directive '" .
+                format::color_msg('bold', "$directive") .
+                    "' is not set in the configuration file";
+            yaBackup::Exception::ConfigFileFormat->throw(error => "$error_msg");
+        }
+    }
+}
+
+####
+# Retrieve password entry from file formatted as follows:
+#       entry_name1    password1
+#       entry_name2    password2
+#       .....
+#
+# usage: config::getPasswordFromFile(password_file, entry)
+##
+sub getPasswordFromFile($$) {
+    my $file = shift;
+    my $entry = my $entry_regexp = shift;
+    $entry_regexp =~ s/\+/\\\+/;   # handle the protocol part
+    $entry_regexp =~ s/\/{0,2}$//; # remove trailing slash
+    print::error_and_exit(1, "Empty regular expression to find (associated entry: $entry)")
+        if ($entry_regexp eq '');
+    my $password = "";
+    my $found = 0;
+    open(FILE, "$file") || die("Cannot open $file: $!\n");
+    while (<FILE>) {
+        chomp;
+        next unless (/\s*$entry_regexp\s+(.*)/);
+        $password = $1;
+        print::debug("Found password for the entry '$entry' in file $file");
+        $found = 14;            #psh psh
+        last;
+    }
+    close FILE;
+    yaBackup::Exception::PasswordNotFound->throw(error => "Could not retrieve the password for the entry '$entry' in the password file '$file'") unless ($found);
+    return $password;
+}
+
+####
+# As above, using the password_file $config::SETTINGS{'password_file'}
+# usage: config::getPasswordForEntry(entry)
+##
+sub getPasswordForEntry($) {
+    my $entry = shift;
+    yaBackup::Exception::ConfigFileFormat->throw(error => "No password file defined in $config::file (you should set the 'password_file' directive)")
+        unless (defined $config::SETTINGS{'password_file'});
+    my $password_file  = $config::SETTINGS{'password_file'};
+    yaBackup::Exception::ConfigFileFormat->throw(error => "Password file $password_file not found!")
+        unless ( -f "$password_file" );
+    return getPasswordFromFile($password_file, $entry);
+}
+
+
+
+##############################################################################
+# PACKAGE EXCEPTION
+# Define the exceptions throwed by yaBackup
+##############################################################################
+package yaBackup::Exception;
+
+use Exception::Class (
+                      # Main exception class
+                      'yaBackup::Exception' =>
+                      {
+                       description => 'Generic base class for all exception of this script'
+                      },
+                      # Specific exceptions
+                      'yaBackup::Exception::RuntimeError' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Classical runtime error',
+                      },
+                      'yaBackup::Exception::UnsupportedFeature' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Unsupported feature',
+                      },
+
+                      'yaBackup::Exception::Network' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Exception related to network errors (bad subnet etc.)',
+                       alias       => 'network_error',
+                      },
+                      'yaBackup::Exception::CommandFileFormat' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Error in the options set on the command-line',
+                      },
+                      'yaBackup::Exception::ConfigFileFormat' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Error in the formatting of the configuration file',
+                      },
+                      'yaBackup::Exception::DirectoryNotFound' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'A directory used in the backup do not exist',
+                      },
+                      'yaBackup::Exception::FileNotFound' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'A file used in the backup do not exist',
+                      },
+                      'yaBackup::Exception::PasswordNotFound' =>
+                      {
+                       isa         => 'yaBackup::Exception',
+                       description => 'Cannot find a matching password for an entry in the password file precised in the configuration file',
+                      },
+                     );
+
+##############################################################################
+#     PACKAGE MAIN
+##############################################################################
+package main;
+
+use strict;
+use warnings;
+
+use Exception::Class::TryCatch;
+use Hash::Util qw{lock_hash};   # To be able to lock keys/values in hash tables
+use Config::General;            # For configuration file parsing
+use Getopt::Long;               # For command line management (long version)
+use Pod::Usage;
+use Data::Dumper;
+use Term::ANSIColor;
+
+# This provide correspondences between exceptions and exit code (facilitate testings)
+our %ExitCodes = (
+                  'ok' => 0,
+                  'ko' => 1,
+                  'yaBackup::Exception'                      => 256,
+                  'yaBackup::Exception::RuntimeError'        => 2,
+                  'yaBackup::Exception::CommandLineFormat'   => 3,
+                  'yaBackup::Exception::ConfigFileFormat'    => 4,
+                  'yaBackup::Exception::UnsupportedFeature'  => 5,
+                  'yaBackup::Exception::DirectoryNotFound'   => 6,
+                  'yaBackup::Exception::FileNotFound'        => 7,
+                  'yaBackup::Exception::Network'             => 8,
+                  'yaBackup::Exception::PasswordNotFound'    => 9,
+                 );
+my $exit_code = 0;
+
+# PATH (/sbin required for mount_afp)
+$ENV{'PATH'} = "$ENV{'PATH'}:/bin:/usr/bin:/usr/local/bin:$ENV{'HOME'}/bin:/sbin";
+
+# Initialize the icon
+config::set_icon();
+
+# Initialize the logs
+log::initialize();
+
+# Process command line
+my $getoptRes = GetOptions(%config::GETOPT_CONFIG);
+print::error_and_exit($ExitCodes{'yaBackup::Exception::CommandLineFormat'},
+                      "Please check the format of the command-line. ",
+                      "Use '$config::command --help' for more details") unless ($getoptRes);
+
+# Ensure the notification command exists (if used)
+if ($config::NOTIFICATION) {
+    system::check_binary('growlnotify') if ($config::OS[0] =~ "Darwin"); # Mac OS X: check growlnotify
+    system::check_binary('notify-send') if ($config::OS[0] =~ "Linux"); # Linux: check notify-send
+}
+
+# Ensure the rsync command is present
+system::check_binary('rsync');
+my @rsync_version = system::execute_and_get_output("rsync --version | head -n 1 | cut -d ' ' -f 4");
+chomp(@rsync_version);
+print::debug("Rsync version : @rsync_version");
+if ($config::MAC_FORK and ("@rsync_version" !~ '^3.')) {
+    print::warning("Using Mac OS resource fork for backup requires rsync version >= 3.0 ",
+                   "while you are running version @rsync_version");
+    print::warning("=> disabling mac-fork");
+    $config::MAC_FORK = 0;
+}
+
+
+# Disable quiet mode on retrieval of data
+if ($config::QUIET && $config::RETRIEVE_MODE) {
+    $config::QUIET = 0;
+    print::info("Quiet mode desactivated when retrieving data\n");
+}
+
+if (($config::SYNC_MODE eq "--delete") && (! $config::QUIET)) {
+    print::warning("This option force an exact duplication and can lead to deletion of files.\n");
+    print::really_continue();
+}
+
+# Allow comma-separated yaBackup_profiles:
+#  --sections=toto,tutu is equivalent to --sections=toto --sections=tutu
+@config::yaBackup_profiles = split(/,/,join(',',@config::yaBackup_profiles));
+@config::yaBackup_profiles = ('default') unless (@config::yaBackup_profiles);
+
+# Find the relevant configuration file
+unless ($config::file) {
+    my @conffile_list = ('/etc/yabackup.conf', "$ENV{HOME}/.yabackup.conf");
+    # if no configuration file found in the command-line arguments, check
+    # successively for files listed in @conffile_list
+    foreach my $f (@conffile_list) {
+        $config::file = $f if (-e $f);
+    }
+    print::error_and_exit(1, "No configuration file found among @conffile_list")
+        unless ($config::file);
+}
+print::verbose("=> configuration file : $config::file");
+
+print::error_and_exit($ExitCodes{'yaBackup::Exception::CommandLineFormat'},
+                      "Non-existing configuration file $config::file")
+  unless (-f "$config::file");
+
+# Now put the content of the configuration file into an hash table
+%config::CONFIG_FILE_CONTENT = Config::General::ParseConfig(-ConfigFile => $config::file,
+                                                            -InterPolateEnv => 1);
+print::error_and_exit($ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
+                      "Empty yaBackup configuration file:",
+                      "ensure that the content of $config::file is correct!")
+  unless (%config::CONFIG_FILE_CONTENT);
+
+lock_hash(%config::CONFIG_FILE_CONTENT);
+print::debug("Creation of the hash table from the configuration file $config::file : ");
+print::debug(Dumper \%config::CONFIG_FILE_CONTENT);
+
+print::debug("Backup profile(s) to consider in the configuration file :",
+             color('bold'), @config::yaBackup_profiles, color('reset'));
+
+# Check the configuration file format : there should be a section 'global' and
+# one for each backup profile considered
+unless (hash::has_keys(\%config::CONFIG_FILE_CONTENT,
+                       'global', @config::yaBackup_profiles)) {
+    print::error_and_exit($ExitCodes{'yaBackup::Exception::ConfigFileFormat'},
+                          "The required backup profiles are missing in $config::file");
+}
+# TODO: execute pre-script if available
+
+# ============================================================================
+# ========== Now proceed with each section (i.e. each backup profile) ========
+# ============================================================================
+foreach my $sec (@config::yaBackup_profiles) {
+    print::info('=> proceeding backup profile: ',
+                '=========== ', format::color_msg('bold', "$sec"),
+                '===========');
+    # Restore global settings
+    config::reset_settings();
+
+    # Now merge the global profile and the selected one
+    config::set_profile('global');
+    config::set_profile("$sec");
+    print::hash_content(\%config::SETTINGS, 'backup settings configured');
+
+    #try
+    eval {
+        config::ensure_profile_set('src_rootdir', 'dst_rootdir',
+                                   'sync_include', 'target_url');
+        # First check subnet
+        system::check_subnet($config::SETTINGS{'restrict_on_subnet'})
+            if ($config::SETTINGS{'restrict_on_subnet'});
+
+        sync::set_cmd();        # configure the synchronization command
+        sync::run_cmd();        # run it
+        # clean everything once synchro is finished
+        system::umount_mounted_volumes();
+    };
+    # catch
+    if ( catch my $err ) {
+        if ($err->isa('yaBackup::Exception::RuntimeError')       ||
+            $err->isa('yaBackup::Exception::UnsupportedFeature') ||
+            $err->isa('yaBackup::Exception::Network')            ||
+            $err->isa('yaBackup::Exception::CommandLineFormat')  ||
+            $err->isa('yaBackup::Exception::ConfigFileFormat')   ||
+            $err->isa('yaBackup::Exception::DirectoryNotFound')  ||
+            $err->isa('yaBackup::Exception::FileNotFound')       ||
+            $err->isa('yaBackup::Exception::PasswordNotFound')) {
+            $exit_code = $ExitCodes{ref($err)};
+            print::error($err->error);
+            print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . " Failed:\n$err",
+                                "KO_$config::icon");
+        } else {
+            # not recoverable
+            print::warn "Unrecoverable error: $err \n";
+            $err->rethrow;
+        }
+        print::warn("The profile $sec is now ",
+                    format::color_msg('bold', 'skipped'), " !");
+        print "\n";
+        next;
+    }
+    print::notification(($config::RETRIEVE_MODE ? 'Restoration' : 'Backup') . ' succeeded!',
+                        "OK_$config::icon");
+    print::verbose('=> ', ($config::RETRIEVE_MODE ? 'restoration' : 'backup'),
+                   " for the profile '$sync::current_profile' ended successfully");
+    #    sleep 1;
+}
+# re-clean eventually
+#print::hash_content(\%MOUNTED_VOLUMES, 'system::MOUNTED_VOLUMES');
+system::umount_mounted_volumes();
+
+# TODO: execute post-script if available
+
+
+# That's all folks!
+print::verbose("Exit code: $exit_code");
+exit($exit_code);
+
+######################## POD documentation ########################
+=pod
+
+=head1 NAME
+
+I<yaBackup> - Yet Another Backup script
+
+A highly flexible Perl script for the B<fast backup> of
+directories and/or files from your local system on various targets.
+
+=head1 SYNOPSIS
+
+      yabackup [options]
+      yabackup -f /path/to/configfile -s sectionname 
+      yabackup --restore
+
+=head1 DESCRIPTION
+
+I<yaBackup> is designed to facilitate the configuration of backups over multiple
+type of targets such as local folders, external drive, [encrypted] sparsebundle
+images, a remote machine with SSH access or a NAS with AFP access.  Except for
+the case of sparsebundle images (that can be inherently encrypted), the target
+backup folder may be encrypted using EncFS such that you don't have to worry
+about the security of your backups.
+
+Being based on B<rsync> (L<http://samba.anu.edu.au/rsync/>), I<yaBackup>
+implements a traditional [incremental] backup scheme, i.e. the target contains
+all information (full backup) of the source (typically your local
+homedir). Later on, when invoking the script, only the changed information is
+transferred. 
+
+So to summarize, I<yaBackup> claims the following functionalities:
+
+=over 
+
+=item * B<Flexible and Easy to use>
+
+Although I<yaBackup> is a command-line utility, the semantics of the configuration
+file is relatively simple and permit to setup many backup profiles 
+
+=item * B<Bandwidth and space efficient>
+
+I<yaBackup> uses the B<rsync> algorithm so only the changed parts of files are
+sent to the target when doing an incremental backup.
+
+=item * B<Support various backup targets>
+
+Currently, I<yaBackup> implements the following target schemes: 
+
+=over 
+
+=item *
+
+"local" drive (i.e a hard disk connected by USB or Firewire to your system) or
+"local" folder. 
+
+=item *
+
+"local" [encrypted] sparsebundle images (available only on Mac OS X)
+
+=item *
+
+"remote" folder on a server with SSH access
+
+=item *
+
+"remote" folder on a NAS with AFP access (available only on Mac OS X)
+
+=item *
+
+remote [encrypted] sparsebundle images on a NAS with AFP access
+
+=back
+
+=item * B<Secure>
+
+The target backup folder may be encrypted using EncFS (see
+L<http://www.arg0.net/encfs>) except when dealing with sparsebundle
+images. 
+In the later case, you can setup an encrypted sparsebundle that already secure
+your backup destination.
+
+=back
+
+I<yaBackup> rely on a configuration file (using a format similar to Apache config
+files) to describe the characteristics of a backup to be performed (files to
+include/exclude, target url etc. -- see L</"CONFIGURATION FILE FORMAT"> for more
+details). These characteristics are aggregated into I<backup profiles>, each of
+them corresponding to a given section in the configuration file.
+
+Here is a illustrative examples: 
+
+    # Configuration file example
+    #
+    ### Mandatory global settings ### 
+    <global>
+         src_rootdir  = $HOME     # Root directory on the (local) source
+         sync_include = *         # backup everything (relative to src_rootdir)
+    </global>
+
+    ### Mandatory default backup profile: backup on your external drive ###
+    <default>
+        target_url = drive:///Volumes/MyBackupDrive
+    </default>
+
+    ### Now put as many profiles as you want
+
+    # Profile for my home backups (on an encrypted sparsebundle of a NAS accessed via AFP)
+    <home>
+        target_url = afp://mylogin@myhomenas/volname/path/to/image.sparsebundle
+        restrict_on_subnet = 192.168.0               # backup only when you're at home
+    </home>
+
+    # profile for work backup (on my desktop machine reachable by SSH)
+    <work>
+        target_url = ssh://mylogin@toto.company.org  # backup through ssh
+        dst_rootdir = /backup/`whoami`@`hostname`    # Specialized root directory on target server
+        restrict_on_subnet = 10.100                  # backup only when you're working
+    </work> 
+
+So appart from the 'global' section, each backup is defined in a named block
+(aka profile) that complete and/or overwrite the global settings.
+
+To start the backup configured by default, simply run::
+ 
+    yabackup -f /path/to/configfile
+
+To start the backup configured under the C<home> profile, just run:
+
+    yabackup -f /path/to/configfile -s home
+
+To restore data from the backup operated via the C<home> profile, run the
+following command: 
+
+    yabackup -f /path/to/configfile -s home --restore
+
+Note that I<yaBackup> tries by default to use the configuration files
+C</etc/yabackup.conf> and C<~/.yabackup.conf> so that the C<-f> option can be
+avoided. 
+
+=head1 COMMAND-LINE OPTIONS
+
+I<yaBackup> supports the following options:
+
+=over
+
+=item B<--config-file=FILE  -f FILE>
+
+Set FILE as the I<yaBackup> configuration file to be used.  Note that such
+a configuration file is mandatory (see L</"CONFIGURATION FILE FORMAT">)
+
+By default, I<yaBackup> search for the following files: C</etc/yabackup.conf> and
+C<~/.yabackup.conf>
+
+=item B<--debug>
+
+Debug mode. Display debugging information probably only relevant to me ;)
+
+=item B<--dry-run   -n>
+
+Simulates the operations to show what would have been done and/or transferred but do 
+not perform any actions.
+
+=item B<--exact-sync  --delete   -e>
+
+Exact synchronization mode.
+Causes I<yaBackup> to delete files on the target if absent in the source directory.
+This ensure an exact replica but you may loose files so use this option with caution.
+
+=item B<--help  -h>
+
+Display a help screen and quit.
+
+=item B<--list-profiles -l>
+
+(Not yet implemented) List the available backup profiles in the I<yaBackup>
+configuration file.  A more detailed view is proposed when used in combination
+with the C<-v> option.
+
+=item B<--mac-fork  -m>
+
+Use Mac OS resource fork for backup.  This is only relevant on Mac OS X and
+requires you to use at least the version 3.0 of B<rsync> (installed via the
+macports typically - see L<http://www.macports.org>)
+
+Causes I<yaBackup> to use the Mac OS resource forks when calling the rsync
+function.  This will preserve Mac OS extended attributes.  If you are running
+Mac OS X, you REALLY want this. Simply pay attention not to use the default
+B<rsync> binary (2.6.9 in Snow Leopard).
+
+=item B<--notification>
+
+Activates user notification of I<yaBackup> status, typically via B<Growl> (see
+L<http://growl.info/>) under Mac OS X or B<notify-send> under Linux (C<apt-get
+install libnotify-bin> on Debian/Ubuntu for instance).
+
+Under Mac OS X, you will have to install the B<growlnotify> command-line utility
+in your application path (see L<http://growl.info/extras.php>)
+
+=item B<--post-script=SCRIPT>
+
+(Not yet implemented) Execute the script C<SCRIPT> (use absolute path) AFTER the
+backup operation.
+
+=item B<--pre-script=SCRIPT>
+
+(Not yet implemented) Execute the script C<SCRIPT> (use absolute path) BEFORE
+the backup operation.  If the execution of this script fails, the backup will
+not continue.
+
+=item B<--push -p>
+
+Push mode: push data on the backup target. This is the default behaviour of
+I<yaBackup>.
+
+=item B<--quiet>
+
+Quiet mode: minimize the number of printed messages and don't ask questions. 
+Very useful for invoking this script in a crontab yet USE WITH CAUTION has all 
+operations will be performed without your interaction.
+
+Note that this option cannot be used in conjunction with the C<--restore> option
+(that automatically disable this mode).
+
+=item B<--restore  --retrieve  -r>
+
+Retrieve mode: restore data from the backup. 
+USE WITH CAUTION as this will probably overwrite files on your local machine!
+
+=item B<--section=SECTION[, SECTION2 ...]>
+
+=item B<-s SECTION[, SECTION2 ...]>
+
+Specify the successive sections (i.e. backup profiles) to use for the backup
+configuration (relative to the used configuration file -- 
+see L</"CONFIGURATION FILE FORMAT">) 
+If this option is not set, I<yaBackup> will use the B<default> profile.
+
+You can specify several successive sections that will generate as many backup
+attempts. 
+
+=item B<--verbose  -v>
+
+Verbose mode. Display more information
+
+=item B<--version>
+
+Display the I<yaBackup> version number then quit. 
+
+=back
+
+=head1 CONFIGURATION FILE FORMAT
+
+The configuration file for I<yaBackup> is divided into sections defined as blocks.
+A block looks much like a block in the wellknown apache config format. 
+It starts with C<< <blockname> >> and ends with C<< </blockname> >>
+Later on, C<blockname> can be referred to as the backup profile name you want 
+to use for a given backup operation. 
+
+Two sections are mandatory: C<global> (which define global settings for the backup) and 
+C<default> (which refer to the default backup profile). 
+Each additionnal section is considered as a separate profile and can be 
+referred to using the command-line option C<-s> (see L</"DESCRIPTION">).
+
+Note that when defining directory or files patterns, you can invoke external
+commands using backquotes (C<`hostname -f`> for instance), use the environment
+variable C<$HOME> or integrate the following
+pattern symbols : the wildcard C<*>, the symbol C<^> to specify the begining
+of a name and the symbol C<$> to refer to its end.
+For instance, you can use the following patterns: 
+
+=over
+
+=item * 
+
+C<*> : all sub-directories (including the hidden one that starts with '.')
+
+=item * 
+
+C<^AR*> : all elements whose name starts by AR
+
+=item * 
+
+C<*ES$> : all elements whose name ends by ES
+
+=item * 
+
+C<^.*>  : all hidden directories/files (the one that starts by '.')
+
+=back
+
+
+For a given section, the following directives are recognized: 
+
+=over 
+
+=item B<< <Directory DIR> ... </Directory> >>
+
+(Not yet implemented) 
+This directive makes it possible to specialize the behaviour of I<yaBackup> for the 
+directory DIR. 
+
+=item B<dst_rootdir = ROOTDIR>
+
+Root directory on the backup target (specialized by the C<target_url> directive)
+where the data should be synchronized. 
+
+Default: C</>
+
+=item B<email = EMAIL>
+
+Specify an email address where all errors/warnings can be sent upon I<yaBackup>
+execution. 
+
+=item B<encfs_rawdir = DIR>
+
+Specifies the path to the directory (generally named C<.secure/> or C<.crypt/> so
+as to be hidden) that will contain the EncFS raw data and configuration. 
+Note that the usage of this directive is sufficient to indicate to I<yaBackup> the
+will to encrypt the target backup folder (with EncFS), even in the case of a
+backup profile on a remote server (accessed by SSH or AFP).    
+
+This path is always given on the basis of the target url defining the backup
+target such that the general format of the value for this directive is as
+follows:  
+
+         encfs_rawdir = target_url:[/]path/to/encfs/rawdir<path>
+
+It is important to understand that whereas the EncFS mountpoint will correspond
+to the target backup folder (globally, C<target_url>/C<dst_rootdir>), the EncFS
+raw dir CANNOT be a subdirectory of this target folder. 
+In most cases, the EncFS raw directory is chosen at the same level (in the file
+system tree) than the mountpoint. 
+
+Example: 
+
+         EncFS mountpoint:    /mnt/MyBackup/backup
+         EncFS raw directory: /mnt/MyBackup/.secure
+
+Consequently, the specification of DIR can appear in two modes:
+
+=over 
+
+=item 1. 
+
+as a relative path to the mountpoint. To come back to the previous example, it
+can lead to the following I<yaBackup> profile configuration: 
+
+        target_url   = drive:///mnt/MyBackup/backup
+        encfs_rawdir = target_url:../.secure
+
+=item 2. 
+
+as an absolute path. This mode is mandatory for backup profile relying on the
+SSH protocol. Again, on the basis of the previous example, we can have the
+following backup profile: 
+
+        target_url   = ssh://login@server
+        dst_rootdir  = /mnt/MyBackup/backup
+        encfs_rawdir = target_url:/mnt/MyBackup/.secure
+
+=back
+
+Note that except for a profile using the SSH protocol (see L</"TARGET URL
+FORMAT">), if EncFS is not yet configured, I<yaBackup> will proceed to the
+configuration for you. Simply follow the instructions given on the screen.
+
+I<yaBackup> tries several ways to recover the EncFS pass-phrase of the target
+backup folder
+
+=over
+
+=item 1.
+
+If the C<password_file> directive is precised, I<yaBackup> attempts to extract the
+password from the appropriate entry in the password file.
+
+=item 2.
+
+Ask the user the fill the password (except with the C<--quiet> command-line
+option -- see L</"COMMAND-LINE OPTIONS">)
+
+=back
+
+If you want to automate the synchronization process in a cronjob, you will be
+obliged to rely on a password file.
+
+I<Note for Debian users>: the B<encfs> package in Lenny (v.1.4.2) contains a bug
+for the creation of EncFS mounts with the default AES encryption scheme.  When
+creating the EncFS folder, I<yaBackup> use the C<--standard> option of encfs (see
+L<encfs(1)>) that precisely use this encryption scheme.  In this case, the mount
+will fail.  The solution is to manually create the mount by running : 
+
+       encfs /path/to/rawdir  /path/to/mountpoint
+
+and selecting the C<expert configuration mode> so as to choose the B<Blowfish>
+cypher scheme (recommended configuration: 256 bits key size and Block filename
+encoding).
+
+B<Restrictions>: 
+
+=over
+
+=item *
+
+in SSH mode, I<yaBackup> currently assumes the remote server to run a Linux OS
+such that the remote EncFS backup target will be unmounted using the command
+C<fusermount -u> (whereas C<umount> should be used under Mac OS X).
+
+=item *
+
+EncFS is currently not supported in sparsebundle mode (this also applies to
+sparsebundle over AFP shares).
+
+=back
+
+=item B<exclude_pattern = PATTERN>
+
+Specify the file patterns to be excluded from the synchronization process (see
+also the C<--exclude> option in L<rsync(1)>).
+This is useful to avoid the backup of temporary files etc. 
+
+Example:
+
+        exclude_pattern = .DS_Store   *~  #*#   .#*
+
+=item B<exclude_pattern_from = FILE>
+
+This directive is related to the C<exclude_pattern> directive, but it specifies
+a FILE that contains exclude patterns (one per line).
+Blank lines in the file and lines starting with C<;> or C<#> are ignored.  
+
+=item B<logdir = LOGDIR>
+
+Set the directory that will contain the log files. 
+Ensure you set the correct write rights to this directory. 
+
+Example: 
+
+         logdir=/var/log/backup
+
+The following level are defined: debug (7), info (6), notice (5), warning(4),
+error(3), critical(2), alert(1) and emergency(0).
+
+I<yaBackup> will create two log file:
+
+=over
+
+=item 1.
+
+C<DIR/common.log> that contains common logs (i.e. from level 5 until level 7)
+
+=item 2.
+
+C<DIR/error.log> that contains error logs you should pay attention (i.e. from
+level 0 until level 4). 
+
+=back
+
+=item B<password_file = FILE>
+
+Set FILE as the password file for I<yaBackup>. 
+Each line of the password file corresponds to a password entry with the following format:
+ 
+   target_url   password
+
+Example: 
+
+    afp://user@server/volumename                        mypasword     
+    ssh+encfs://user@server:/path/to/SecureBackup	encfspassword
+
+
+For the moment, this option is only relevant for EncFS volumes and AFP
+connections. 
+Indeed, it seemed impossible to rely on other (more secure) mechanisms such as
+keychain (used for encrypted sparse bundle mounts for instance), or agents (used
+for SSH -- see the 'auth_auth_sock' directive).  I simply thought it's a better
+alternative than putting the password in I<yaBackup> configuration file.
+
+By the way, it's B<NEVER> a good idea to put clear password in a text file. 
+At minimum, ensure correct rights on this file ('chmod 600 /path/to/passwordfile') and don't 
+put a personnal password in it. 
+Prefer a random (unique) one generated by openSSL (run C<openssl rand 16 -base64>
+for instance). 
+
+=item B<restrict_on_subnet = SUBNET> 
+
+Operate the synchronization only when your machine (i.e the network interface)
+belongs to the subnet SUBNET. 
+The successive network interface checked for an IP to be compared with SUBNET
+are as follows: 
+
+=over 4
+
+=item * 
+
+C<(eth0, eth1)> on Linux system (obtained by the B<uname> command)
+
+=item * 
+
+C<(en0, en1)> on FreeBSD, OpenBSD and Darwin systems (which include Mac OS X)
+
+=back
+
+=item B<ssh_auth_sock = /path/to/ssh-agent.socket>
+
+Set the C<$SSH_AUTH_SOCK> environment variable for the synchronization process.
+
+To automate the connection to an SSH server (via public key authentication)
+despite the presence of a pass-phrase for your SSH key pair (which is more then
+advised), you probably use an SSH agent (see L<ssh-agent(1)>) to manage your
+pass-phrase via a local socket C</path/to/ssh-agent.socket> (i.e. the
+C<$SSH_AUTH_SOCK> environment variable).
+
+This directive is useful for running I<yaBackup> in a cronjob (as B<cron>
+typically don't have access to the C<$SSH_AUTH_SOCK> environment variable). 
+
+Example: 
+
+         # static socket path 
+         ssh_auth_sock = /tmp/502/SSHKeychain.socket    
+
+         # ssh-agent socket on Mac OS X (> 10.5)
+         ssh_auth_sock = `/usr/sbin/lsof | grep Listeners | grep ssh-agent | awk '{print $8}'`
+
+I<Note for Linux users>: by default, B<ssh-agent> binds the agent to a
+unix-domain socket with a dynamic path name
+(C</tmp/ssh-XXXXXXXXXX/agent.<ppid>>) which render this directive useless. 
+Hopefully, you can use the C<-a> option to set the path to the socket statically
+(see L<ssh-agent(1)>) so you probably want to run the SSH agent as follows: 
+
+         ssh-agent -a /path/to/ssh-agent.socket
+
+
+=item B<src_rootdir = ROOTDIR>
+
+Root directory on the (local) machine from where the data to be backup should be
+considered. 
+
+Default: C</>
+
+=item B<sync_include = PATTERNLIST>
+
+Space separated list of directories/files pattern to include from
+synchronization (each of them relative to B<src_rootdir>).
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the
+list.
+
+Default: C<*>
+
+=item B<sync_exclude = PATTERNLIST>
+
+Space separated list of directories/files patterns to exclude from
+synchronization (each of them relative to B<src_rootdir>).
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the
+list.
+
+This is particularly useful when you want to backup all but a few directories in
+C<src_rootdir> (let's say the C<Library> and C<Applications> directories in your
+homedir).  
+
+=item B<sync_exclude_exception = PATTERNLIST>
+
+Add exceptions to the pattern precised in the B<sync_exclude> directive.
+You may use the pattern symbols C<*>, C<^> and C<$> for each element of the list. 
+
+This is particularly useful if you use wildcards in both B<sync_include> and
+B<sync_exclude>.  
+
+Typical example of usage:
+ 
+         sync_include = *    # backup everything ...
+         sync_exclude = ^.*  # ... except all hidden files and directories ... 
+         sync_exclude_exception = .ssh .gnupg .emacs.d  # ... yet this does not apply to these directories 
+
+=item B<target_url = URL>
+
+Define the target url of the backup (see L</"TARGET URL FORMAT">).
+
+=back
+
+=head1 TARGET URL FORMAT
+
+I<yaBackup> tries to maintain a standard URL format for backup targets.  
+The generic format for a target URL is:
+
+              protocol://path|user[@host[:port]][/complementpath]
+
+I<yaBackup> don't support the exposure of cleartext passwords on purpose for
+obvious security reasons. 
+When it is required (as for instance for AFP connections or EncFS directories),
+you have to use a separate password file (see the C<password_file> directive)
+where you put the correct access rights (600 typically). 
+
+Current supported protocols include: 
+
+=over 
+
+=item * C<drive> : an external drive 
+
+Example:  
+
+      drive:///Volumes/MyDrive         (under Mac OS X)
+      drive:///mnt/mydrive             (under Linux) 
+
+=item * C<file>  : a local folder
+
+Example: 
+
+      file:///path/to/local/folder
+
+=item * C<sparsebundle> :  a Mac OS X [encrypted] sparse bundle image
+
+(Only relevant under Mac OS X)
+
+Example: 
+
+      sparsebundle:///path/to/image.[dmg|sparsebundle]
+
+      # See below with the afp protocol
+      afp://user@nas/volumename/path/to/image.[dmg|sparsebundle]
+
+With the previous line, the sparse bundle image
+C</path/to/image.[dmg|sparsebundle]> will be mounted (let's say in
+C</Volumes/ImageName>) such that the backup process will use the target
+C</Volumes/ImageName/<dst_rootdir>>. 
+
+Note that the mount point is automatically retrieved by I<yaBackup> so you don't
+have to worry about that. 
+
+Note that in this mode, you cannot encrypt the target backup folder using
+EncFS. This is not considered as a serious security issue as B<encrypted>
+sparse-bundle images are supported (and provide a far more efficient data access
+than EncFS).
+
+For the moment, I<yaBackup> do not permit the automatic creation of the
+sparsebundle image (if not found). 
+To create such an image, simply run the C<Disk Utility> application, select the
+C<New Image> and fill the form (pay attention to select the Image format as
+C<sparse bundle disk image> and C<No partition map>).
+If you want to create an encrypted sparse bundle image (which is strongly
+advised as it transparently secure the backup container), select a 256-bits AES
+encryption scheme and store the password (generate a random strong password)
+into your B<Keychain> such that the synchronization can interviene in a
+cronjob. 
+
+=item * C<ssh>   : SSH access to a remote server, with public key authentication 
+
+Example: 
+
+      ssh://mylogin@server1
+      ssh://mylogin@server1.example.org
+      ssh://mylogin@server2.example.org:8022
+
+Even if public key authentication is not strictly required, it is strongly
+recommended and mandatory if I<yaBackup> it to be launched in a crontab for
+instance. 
+Additionally, if not set, you will be prompted for your login password on every
+synchronization step (i.e. once per source directory/file) so you will quickly
+want to automate the authentication.  
+
+To setup public key authentication, please refer to
+L<http://sial.org/howto/openssh/publickey-auth/>
+
+Moreover, you are more than encouraged to associate with your SSH key pair a
+strong pass-phrase such that even if the secret key is stolen (let's say because
+the external drive where you backup your homedir has been stolen), the pair
+cannot be used to impersonate you. 
+
+You may argue that in this case, you will be prompted for your pass-phrase on
+every authentication operation (therefore with no benefit compared to a regular
+password-based authentication), hopefully an SSH agent (see L<ssh-agent(1)>) can
+take care of your pass-phrase for a given period of time (the day typically).
+To make the SSH agent interact with I<yaBackup>, please refer to the
+C<ssh_auth_sock> directive.  
+
+=item * C<afp> :  AFP (Apple Filing Protocol) access (to a NAS typically). 
+
+(Only relevant under Mac OS X)
+
+The general url format in this case is as follows (see also L<mount_afp(8)>):
+
+        afp://[user[:password]@]host[:port]/volumename[/complement/path]
+
+The optional complement path permits to precise a root directory in the mounted
+AFP volume where the synchronization process should operate. It can also be a
+path to an [encrypted] sparsebundle image located in the mounted AFP volume. 
+
+Example:
+
+        # Anonymous access to the shared volume                
+        afp://guest@compagnynas.org/shared
+
+        # Access to the personnal volume of an authorized user
+        afp://login:secretpasword@compagnynas.org/loginhomedir
+        afp://login@compagnynas.org/loginhomedir  # (better): assumes you put the 
+                                                  # password in a password file
+
+        # As above and backup in /Volumes/volumename/backup
+        afp://login@compagnynas.org/loginhomedir/backup
+
+        # As above and backup in the sparsebundle image /Volumes/volumename/backup/image.sparsebundle
+        afp://login@compagnynas.org/loginhomedir/backup/image.sparsebundle
+
+Except for anonymous access (characterized by the C<guest> username), a password
+is mandatory. 
+I<yaBackup> tries several ways to recover this password
+
+=over
+
+=item 1.
+
+directly from the target url if provided. 
+
+=item 2. 
+
+if the C<password_file> directive is precised, I<yaBackup> attempts to extract the
+password from the appropriate entry in the password file.
+
+=item 3.
+
+ask the user the fill the password (except with the C<--quiet> command-line
+option -- see L</"COMMAND-LINE OPTIONS">)
+
+=back
+
+Whereas you can precise the password directly in cleartext in the target_url, it
+is strongly unadvised.
+If the synchronization process is meant to be automated (in a cronjob
+typically), prefer relying on a separate password file (see the C<password_file>
+directive for details about the format required in this file). 
+
+Finally, once the AFP volume is mounted (let's say in C</Volumes/volumename>)
+and if the afp url is complemented by a path towards an [encrypted]
+sparsebundle image, I<yaBackup> handle the image as if following target url would
+have been applied:  
+
+         sparsebundle:///Volumes/volumename/path/to/image.[dmg|sparsebundle]
+
+i.e. the treatment inherent to the above C<sparsebundle> protocol is applied. 
+
+=back
+
+
+=head1 EXIT STATUS
+
+I<yaBackup> has the following return codes:
+
+=over
+
+=item 0
+
+success
+
+=item 1
+
+generic error
+
+=item 2
+
+runtime error
+
+=item 3
+
+command-line format error
+
+=item 4
+
+configuration file format error
+
+=item 5
+
+unsupported feature
+
+=item 6
+
+a required directory cannot be found
+
+=item 7
+
+a required file cannot be found
+
+=item 8
+
+network error (SSH/AFP connection failure, restriction imposed by the
+C<restrict_on_subnet> directive etc.) 
+
+=item 9
+
+a mandatory password/pass-phrase cannot be retrieved (EncFS mount, AFP access etc.)
+
+=item 256
+
+generic exception
+
+=back
+
+=head1 FILES
+
+=over 
+
+=item C</etc/yabackup.conf>
+
+=item C<~/.yabackup.conf>
+
+The I<yaBackup> configuration file (see L</"CONFIGURATION FILE FORMAT">.
+
+A documented example of the configuration file is proposed in the file
+C<@prefix@/share/doc/yabackup/examples/yabackup.conf.example>.
+
+=item C<LOGDIR/common.log>
+
+=item C<LOGDIR/error.log>
+
+I<yaBackup> log files (assuming you set the C<logdir> directive)
+
+=back
+
+=head1 DEPENDENCIES
+
+I<yaBackup> depends on the following Perl modules:
+
+         Config::General
+         Cwd
+         Data::Dumper
+         Exception::Class
+         Exception::Class::TryCatch
+         Expect
+         File::Basename
+         Getopt::Long
+         Hash::Util
+         List::Util
+         Log::Handler
+         Mac::PropertyList
+         Pod::Usage
+         Storable
+         Term::ANSIColor
+         Term::ReadKey
+
+To install then, the most simple way is to rely on B<cpan> (see
+L<http://search.cpan.org>): run C<sudo cpan>, accept the default configurations
+and once the cpan prompt appears, run C<install Module::Name> to install the
+module C<Module::Name>.
+
+=head1 BUGS
+
+Please report bugs on
+L<http://github.com/Falkor/yabackup/issues>
+
+=head1 DISCLAIMER
+
+I<yaBackup> is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+=head1 AUTHOR
+
+I<yaBackup> is written by Sebastien Varrette
+E<lt>Sebastien.Varrette@uni.luE<gt>.
+
+Code contribution before the complete code refactoring by Guillaume-Jean Herbiet
+E<lt>Guillaume.Herbiet@uni.luE<gt>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2009-2010 Sebastien Varrette
+
+I<yaBackup> is released under GNU GPL Licence v3.
+This  is a free software.
+You may use, modify, and/or redistribute this software under the terms of the
+GPL Licence v3.
+
+=cut
+

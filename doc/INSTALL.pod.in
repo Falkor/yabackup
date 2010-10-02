@@ -1,0 +1,119 @@
+=head1 INSTALLATION GUIDE
+
+=head2 GET YABACKUP SOURCES
+
+You can retrieve the sources of I<yaBackup> using one of the following method: 
+
+=over
+
+=item * Grab the current (potentially brocken) version of I<yaBackup>
+
+In this case, proceed as follows: 
+
+=over 
+
+=item *
+
+either go to the I<yaBackup> homepage at L<http://github.com/Falkor/yabackup>, 
+click on the 'Download Source' button on top to get a tar archive named
+C<Falkor-yabackup-xxxxxxx.tar.gz> then run:  
+
+           cd
+           tar xvzf /path/to/Falkor-yabackup-xxxxxxx.tar.gz
+           cd yabackup
+
+=item *
+
+retrieve the latest version using git by running: 
+
+           git clone git://github.com/Falkor/yabackup.git
+           cd yabackup
+
+=back
+
+=item * Grab the latest stable realease (version @VERSION@)
+
+(Details incoming)
+
+=back
+
+=head2 AUTOTOOLS SETUP
+
+I<yaBackup> rely on the Autotools to simplify its installation (i.e. via the
+classical C<./configure; make; make install> procedure).
+
+If the C<configure> is absent (i.e. if you grab the latest version of
+I<yaBackup> from the GIT repository), or if for some reason you modify any
+configuration file of the autotools (i.e. C<configure.ac> or C<Makefile.am>), 
+you have to run: 
+
+         ./bootstrap
+
+This script assumes the availability on your system of the following software: 
+
+=over 
+
+=item 1. 
+
+C<autoconf> version 2.6 or later
+
+=item 2. 
+
+C<automake> version 1.9.6 or later
+
+=back
+
+=head2 PERL CPAN MODULES
+
+As I didn't want to reinvent the wheel, I<yaBackup> depends on the Perl modules
+printed by running 
+
+        ./bootstrap --extract-perl-modules
+
+Their availability on your system will be checked by the C<configure> script of
+course. If a module C<Module::Name> is missing, the best approach to install it
+is to rely on B<cpan> (see L<http://search.cpan.org>) by running in a terminal: 
+
+        sudo cpan
+
+accept the default configurations and once the cpan prompt appears, simply run
+C<install Module::Name> 
+
+=head2 INSTALLATION
+
+You can now run the C<configure> script (see C<./configure --help> for
+configuration options). 
+
+I advice you to use B<stow> (see L<http://www.gnu.org/software/stow/> or
+L<stow(8)>, a wonderful tool to activate/desactivate different versions of the
+same program compiled by autotools. Once installed (C<apt-get install stow>
+under Debian or C<sudo port install stow> on Mac OS X), configure the directory
+that will host the program compiled and later installed by B<stow> as follows:
+
+         sudo mkdir /usr/local/stow
+         sudo chmod 777 /usr/local/stow
+
+You'll then typically install I<yaBackup> as follows:  
+
+         ./configure --prefix=/usr/local/stow/yabackup-@VERSION@
+         make 
+         make install
+         cd /usr/local/stow
+         sudo stow yabackup-@VERSION@
+
+The advantage of this approach is that I<yaBackup> will be present on your
+system in the default location (C</usr/local/bin/yabackup> is a symbolic link
+toward C</usr/local/stow/yabackup-@VERSION@/bin/yabackup>) yet you can easily
+disable this version of I<yaBackup> (and activate another one) by running: 
+
+         cd /usr/local/stow
+         sudo stow -D yabackup-@VERSION@
+
+I<Note>: this will simply remove the link C</usr/local/bin/yabackup>.
+
+=head1 USAGE
+
+Once installed, please refer to L<yabackup(1)> or run C<yabackup --help> for usage
+details. 
+
+=cut

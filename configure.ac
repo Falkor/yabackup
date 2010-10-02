@@ -2,23 +2,30 @@
 #                                                -*- Autoconf -*-
 # Copyright (c) 2009 -- see the copyright file
 # Author: Sebastien Varrette <Sebastien.Varrette@uni.lu> 
-# $Id$
 #
 # This is the configure.ac file for backup.
 # Process this file with autoconf to produce a configure script.
 # ----------------------------------------------------------------
 
-AC_INIT([backup],[0.3.2],[ibackup-support@lists.gforge.uni.lu])
+AC_INIT([yabackup],[1.0],[yabackup-support@lists.uni.lu])
 
 AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
 
-PACKAGE_SUMMARY="a highly flexible script utility to backup directories on various targets"
-AC_SUBST(PACKAGE_SUMMARY)
-PACKAGE_WEBSITE="http://ibackup.gforge.uni.lu"
-AC_SUBST(PACKAGE_WEBSITE)
+PACKAGE_NAME="yaBackup"
+PACKAGE_SUMMARY="Yet Another Backup script"
+PACKAGE_DESCRIPTION="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, NAS with AFP access, EncFS volume etc.)"
+PACKAGE_WEBSITE="http://falkor.github.com/yabackup"
+PACKAGE_BUGS="http://github.com/Falkor/yabackup/issues"
+PACKAGE_SUPPORT="yabackup-support@lists.uni.lu"
 
+AC_SUBST(PACKAGE_NAME)
+AC_SUBST(PACKAGE_SUMMARY)
+AC_SUBST(PACKAGE_DESCRIPTION)
+AC_SUBST(PACKAGE_WEBSITE)
+AC_SUBST(PACKAGE_BUGS)
+AC_SUBST(PACKAGE_SUPPORT)
 
 # ----------------------------------------------------------------
 # Checks for programs.
@@ -28,6 +35,7 @@ AC_PROG_SSH
 # following macro defined in acinclude.m4
 PROG_PERL
 PROG_POD2MAN
+PROG_POD2TEXT
 PROG_RSYNC
 
 # ----------------------------------------------------------------
@@ -39,68 +47,84 @@ PROG_RSYNC
 # ----------------------------------------------------------------
 AC_MSG_CHECKING([for website generation using pod2html and Website Meta Langage] )
 AC_ARG_ENABLE(
-    www, 
-    [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
-    [case "${enableval}" in
-    	  yes) AC_MSG_RESULT([on])
-	       PROG_POD2HTML
-	       PROG_WMK
-	       PROG_WML
-	       generate_website=true ;;
-  	  no)  AC_MSG_RESULT([off])
-	       generate_website=false ;;
-  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-www) ;;
-     esac],
-     [AC_MSG_RESULT([off])
-      generate_website=false]
+        www, 
+        [AS_HELP_STRING([--enable-www],[enable the generation of the web site using pod2html and wml [default=no]])],
+        [case "${enableval}" in
+    	      yes) AC_MSG_RESULT([on])
+	           PROG_POD2HTML
+	           PROG_WMK
+	           PROG_WML
+	           generate_website=true ;;
+  	      no)  AC_MSG_RESULT([off])
+	           generate_website=false ;;
+  	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-www) ;;
+         esac
+        ],
+        [AC_MSG_RESULT([off])
+        generate_website=false]
 )
 AM_CONDITIONAL(generate_WEBSITE, test x$generate_website = xtrue)
 
 
-AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
-AC_ARG_ENABLE(
-    svn2cl, 
-    [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
-    [case "${enableval}" in
-    	  yes) AC_MSG_RESULT([on])
-	       PROG_SVN2CL
-	       use_svn2cl=true ;;
-  	  no)  AC_MSG_RESULT([off])
-	       use_svn2cl=false ;;
-  	  *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
-     esac],
-     [AC_MSG_RESULT([off])
-      use_svn2cl=false]
-)
-AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
-
-
+# TODO: see equivalent tool now that I move everything to git
+dnl AC_MSG_CHECKING([for automatic generation of ChangeLog from the subversion repository logs])
+dnl AC_ARG_ENABLE(
+dnl         svn2cl, 
+dnl         [AS_HELP_STRING([--enable-svn2cl],[enable the  automatic generation of ChangeLog from the subversion repository logs using the script svn2cl.sh (see http://arthurdejong.org/svn2cl/) [default=no]])],
+dnl         [case "${enableval}" in
+dnl     	      yes) AC_MSG_RESULT([on])
+dnl 	           PROG_SVN2CL
+dnl 	           use_svn2cl=true ;;
+dnl   	      no)  AC_MSG_RESULT([off])
+dnl 	           use_svn2cl=false ;;
+dnl   	      *)   AC_MSG_ERROR(bad value ${enableval} for --enable-svn2cl) ;;
+dnl          esac
+dnl         ],
+dnl         [AC_MSG_RESULT([off])
+dnl          use_svn2cl=false]
+dnl )
+dnl AM_CONDITIONAL(use_SVN2CL, test x$use_svn2cl = xtrue)
 
 # ----------------------------------------------------------------
 # Checks for libraries.
 # ----------------------------------------------------------------
+# Generate this list by: 
+# ./bootstrap -e
+# You can also look/launch 'perl tests/t/modules.t'
+
 AC_CHECK_CPAN_MODULES(
-    Switch 
-    Storable 
-    Hash::Util
-    List::Util 
-    POSIX 
-    Getopt::Long 
-    Config::General 
-    Term::ANSIColor 
-    Mac::PropertyList
-    Data::Dumper 
-    Pod::Usage
+        Config::General
+        Cwd
+        Data::Dumper
+        Exception::Class
+        Exception::Class::TryCatch
+        Expect
+        File::Basename
+        Getopt::Long
+        Hash::Util
+        List::Util
+        Log::Handler
+        Mac::PropertyList
+        Pod::Usage
+        Storable
+        Term::ANSIColor
+        Term::ReadKey
 )
 
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
 
-AC_CONFIG_SRCDIR([bin/backup.in])
+AC_CONFIG_SRCDIR([bin/yabackup.in])
 AC_CONFIG_FILES([
 	Makefile
 	bin/Makefile
-	bin/backup
+	bin/yabackup
+        doc/Makefile
+        doc/yabackup.conf.example
+        doc/README_HEADER.pod
+        doc/INSTALL.pod
+        tests/Makefile
+        tests/yaBackupCheck.pm
 	www/include/wmlrc.default
 	www/Makefile
 ])
