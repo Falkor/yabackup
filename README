@@ -1,11 +1,9 @@
 NAME
     yaBackup - Yet Another Backup script
 
-     Homepage:   http://falkor.github.com/yabackup 
-     Bug report: http://github.com/Falkor/yabackup/issues
-     Support:    yabackup-support@lists.uni.lu
+    Homepage: <http://falkor.github.com/yabackup>
 
-    Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>.
+    Copyright (c) 2009-2010 Sebastien Varrette Sebastien.Varrette@uni.lu.
     See LICENSE for details.
 
     yaBackup is written and maintained by Sebastien Varrette (aka Falkor).
@@ -15,6 +13,9 @@ NAME
     under the terms of the GNU General Public License as published by the
     Free Software Foundation; either version 3 of the License, or (at your
     option) any later version.
+
+    Comments are welcome. Kindly submit bugs/feature requests on
+    <http://github.com/Falkor/yabackup/issues>
 
 INSTALLATION GUIDE
   GET YABACKUP SOURCES
@@ -111,6 +112,6 @@ INSTALLATION GUIDE
     *Note*: this will simply remove the link "/usr/local/bin/yabackup".
 
 USAGE
-    Once install, please refer to yabackup(1) or run "yabackup --help" for
+    Once installed, please refer to yabackup(1) or run "yabackup --help" for
     usage details.
 
