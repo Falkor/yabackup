@@ -1,4 +1,7 @@
 2010-10-03  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* Release version 1.0 - Full code rewrite (package based), official project rename to "yaBackup".
+	* Merge branch 'refactoring'
+	* ChangeLog update
 	* update wml to reflect the new project name (yaBackup instead of iBackup)
 	* Update ChangeLog (using git-changelog retrieve from http://snipplr.com/view.php?codeview&id=6261)
 	* Correct README header
@@ -11,6 +14,7 @@
 	* Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
 	* Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
 	* icon renaming ibackup -> yabackup
+	* andreas CSS correction
 	* finalize POD doc
 	* Correct CSS
 	* continue on POD documentation
