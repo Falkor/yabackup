@@ -1,3 +1,83 @@
+
+n.n.n / 2010-10-02 
+==================
+
+  * Header rewrite
+  * Correct minor bug on icon set for the SSH protocol + finalize POD document (Authors/copyright etc.)
+  * Minor correction on icon path to work on Ubuntu
+  * Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
+  * Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
+  * icon renaming ibackup -> yabackup
+  * finalize POD doc
+  * Correct CSS
+  * continue on POD documentation
+  * Start POD documentation
+  * New icons files added
+  * Correct path management in src_rootdir and finalize sparsebundel support
+  * Update checking of used modules
+  * Add function to the bootstrap script to extract the used Perl modules
+  * 
+  * Add a new tests/ directory containing the regression tests generated using the modules Test::More and Test::Cmd
+  * Add a new tests directory for regression tests based on Test::More and Test::Cmd
+  * Correct error in unmount when dealing with encfs+ssh and spaces in the directory of the mounted dir
+  * Work against spaces in filenames that appear to be a nightmare for rsync over SSH (but not only)
+  * FInalize tests for protocols file, drive, ssh and there respective encfs versions
+  * Finalize select_element over SSH (better find command)
+  * - Add new function for execute with collection of the outpu - better handling of sync::select_element() to list elements over SSH in case of restoration
+  * Update SSH icon (both encrypted and normal version to make 'SSH' more visible
+  * Rename the icon files to facilitate the access using $BACKUP_CMD_INFO{'proto'}
+  * Add icons folder
+  * Add separate icones
+  * Add remote encfs volume mount/umount Add execute_and_set_stdin
+  * Continue on EncFS port
+  * Start adding EncFS support
+  * Add sync package
+  * continue on integration
+  * Add exception mechnanism via Exception::Class. Note: install v.1.30 until 1.31 correct the bug on circular dependencies upon cpan install
+  * Start refactoring the code into packages
+  * Creating a private branch of ibackup/calc for the code splitting via packages
+  * Add link to LBackup
+  * Update the website for the release
+
+n.n.n / 2010-10-02 
+==================
+
+  * Header rewrite
+  * Correct minor bug on icon set for the SSH protocol + finalize POD document (Authors/copyright etc.)
+  * Minor correction on icon path to work on Ubuntu
+  * Correct last mispellings after iBackup -> yaBackup renaming (especially in the 'make check' tests)
+  * Finish (hopefully) the complete renaming of the script (together with the dependencies) from ibackup to yaBackup
+  * icon renaming ibackup -> yabackup
+  * finalize POD doc
+  * Correct CSS
+  * continue on POD documentation
+  * Start POD documentation
+  * New icons files added
+  * Correct path management in src_rootdir and finalize sparsebundel support
+  * Update checking of used modules
+  * Add function to the bootstrap script to extract the used Perl modules
+  * 
+  * Add a new tests/ directory containing the regression tests generated using the modules Test::More and Test::Cmd
+  * Add a new tests directory for regression tests based on Test::More and Test::Cmd
+  * Correct error in unmount when dealing with encfs+ssh and spaces in the directory of the mounted dir
+  * Work against spaces in filenames that appear to be a nightmare for rsync over SSH (but not only)
+  * FInalize tests for protocols file, drive, ssh and there respective encfs versions
+  * Finalize select_element over SSH (better find command)
+  * - Add new function for execute with collection of the outpu - better handling of sync::select_element() to list elements over SSH in case of restoration
+  * Update SSH icon (both encrypted and normal version to make 'SSH' more visible
+  * Rename the icon files to facilitate the access using $BACKUP_CMD_INFO{'proto'}
+  * Add icons folder
+  * Add separate icones
+  * Add remote encfs volume mount/umount Add execute_and_set_stdin
+  * Continue on EncFS port
+  * Start adding EncFS support
+  * Add sync package
+  * continue on integration
+  * Add exception mechnanism via Exception::Class. Note: install v.1.30 until 1.31 correct the bug on circular dependencies upon cpan install
+  * Start refactoring the code into packages
+  * Creating a private branch of ibackup/calc for the code splitting via packages
+  * Add link to LBackup
+  * Update the website for the release
 NOTE: since the project moved to github (and changed name), I didn't take to the time to find the equivalent of svn2cl.sh which explain why this ChangeLog is out-of-date. 
 	
 

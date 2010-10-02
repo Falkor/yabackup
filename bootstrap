@@ -5,7 +5,7 @@
 # Author : Sebastien VARRETTE <Sebastien.Varrette@uni.lu>
 #          (Web page : http://varrette.gforge.uni.lu)
 # Creation date : 21 Jul 2009
-# Time-stamp: <Wed 2010-09-29 21:56 svarrette>
+# Time-stamp: <Sat 2010-10-02 14:04 svarrette>
 #
 # $Id: bootstrap 1 2009-07-21 14:18:56Z svarrette $
 #
@@ -50,6 +50,9 @@ DO_ALL_MODE=""  # In addition to rebuilding the autotools, run configure && make
 CSCOPE_MODE=""  # Initialise the cscope process
 
 # Commands
+SCRIPT=bin/yabackup.in
+TEST_MODULE=tests/yaBackupCheck
+
 #AUTOHEADER="autoheader"
 ACLOCAL="aclocal -I config/m4"
 AUTOCONF="autoconf -I."
@@ -94,6 +97,7 @@ NAME
 SYNOPSIS
 	$COMMAND [-V | -h]	
 	$COMMAND [-v] [--clean|-a] [-n]	
+        $COMMAND --extract-perl-modules
 
 DESCRIPTION
 	$COMMAND 
@@ -101,17 +105,19 @@ DESCRIPTION
 OPTIONS
         -a | --do-all
                 Also complete the installation by running ./configure && make
-        -c --clean
+        -c | --clean
                 Clean the current directory with generated files
 	--debug
 		Debug mode. Causes $COMMAND to print debugging messages.
-	-h --help
+        -e | --extract-perl-modules
+                List the Perl modules used by yaBackup 
+	-h | --help
 		Display a help screen and quit.
-	-n --dry-run
+	-n | --dry-run
 		Simulation mode. 
-	-v --verbose
+	-v | --verbose
 		Verbose mode. 
-	-V --version
+	-V | --version
 		Display the version number then quit. 
 
 AUTHOR
@@ -235,10 +241,20 @@ clean() {
     info "remove automake files"   && execute "rm -f ${AUTOMAKE_FILES}"
 }
 
+####
+# Extract the used modules
+##
 extract_perl_modules() {
-    grep "^use " bin/yabackup.in | cut -d ' ' -f 2 | sed -e "s/;$//" | sort | uniq
-}
+    info "list of the Perl modules used in yaBackup:\n "
+    grep "^use " ${SCRIPT} | cut -d ' ' -f 2 | sed -e "s/;$//" | sort | uniq
 
+    echo -e "\n"
+    info "list if the Perl modules used in the yaBackupCheck module (used for 'make check')\n"
+    echo Test::Harness
+    echo Test::More
+    echo Test::Cmd
+    cat ${TEST_MODULE}/* ${TEST_MODULE}.pm.in | grep "^use " | cut -d ' ' -f 2 | sed -e "s/;$//" | sort | uniq | grep -v yaBackupCheck
+}
 
 ################################################################################
 ################################################################################
@@ -251,6 +267,7 @@ extract_perl_modules() {
 while [ $# -ge 1 ]; do
     case $1 in
         -e | --extract-perl-modules) extract_perl_modules; exit 0;;
+        -r | --readme) generate_readme;    exit 0;;
 	-h | --help)    print_help;        exit 0;;
 	-V | --version) print_version;     exit 0;;
 	--debug)        DEBUG="--debug"; 

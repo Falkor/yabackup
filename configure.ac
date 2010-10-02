@@ -13,10 +13,19 @@ AC_PREREQ(2.60)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([-Wall -Wno-portability])	
 
-PACKAGE_SUMMARY="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, NAS with AFP access, EncFS volume etc.)"
-AC_SUBST(PACKAGE_SUMMARY)
+PACKAGE_NAME="yaBackup"
+PACKAGE_SUMMARY="Yet Another Backup script"
+PACKAGE_DESCRIPTION="a highly flexible script utility to backup directories from your local system on various targets (external drive, sparsebundle, remote server with SSH access, NAS with AFP access, EncFS volume etc.)"
 PACKAGE_WEBSITE="http://falkor.github.com/yabackup"
+PACKAGE_BUGS="http://github.com/Falkor/yabackup/issues"
+PACKAGE_SUPPORT="yabackup-support@lists.uni.lu"
+
+AC_SUBST(PACKAGE_NAME)
+AC_SUBST(PACKAGE_SUMMARY)
+AC_SUBST(PACKAGE_DESCRIPTION)
 AC_SUBST(PACKAGE_WEBSITE)
+AC_SUBST(PACKAGE_BUGS)
+AC_SUBST(PACKAGE_SUPPORT)
 
 # ----------------------------------------------------------------
 # Checks for programs.
@@ -26,6 +35,7 @@ AC_PROG_SSH
 # following macro defined in acinclude.m4
 PROG_PERL
 PROG_POD2MAN
+PROG_POD2TEXT
 PROG_RSYNC
 
 # ----------------------------------------------------------------
@@ -111,6 +121,8 @@ AC_CONFIG_FILES([
 	bin/yabackup
         doc/Makefile
         doc/yabackup.conf.example
+        doc/README_HEADER.pod
+        doc/INSTALL.pod
         tests/Makefile
         tests/yaBackupCheck.pm
 	www/include/wmlrc.default

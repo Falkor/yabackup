@@ -25,11 +25,12 @@ AC_DEFUN([ACX_PROG_PROG], [
 # ================================================================
 # PROGS to check
 # ================================================================
-AC_DEFUN([PROG_PERL], 	 [ACX_PROG_PROG([PERL],    [perl])])
-AC_DEFUN([PROG_POD2MAN], [ACX_PROG_PROG([POD2MAN], [pod2man])])
-AC_DEFUN([PROG_POD2HTML],[ACX_PROG_PROG([POD2HTML],[pod2html])])
+AC_DEFUN([PROG_PERL], 	  [ACX_PROG_PROG([PERL],     [perl])])
+AC_DEFUN([PROG_POD2MAN],  [ACX_PROG_PROG([POD2MAN],  [pod2man])])
+AC_DEFUN([PROG_POD2TEXT], [ACX_PROG_PROG([POD2TEXT], [pod2text])])
+AC_DEFUN([PROG_POD2HTML], [ACX_PROG_PROG([POD2HTML], [pod2html])])
 AC_DEFUN([PROG_POD2XHTML],[ACX_PROG_PROG([POD2XHTML],[pod2xhtml])])
-AC_DEFUN([PROG_RSYNC], 	 [ACX_PROG_PROG([RSYNC],   [rsync])])
-AC_DEFUN([PROG_WMK],     [ACX_PROG_PROG([WMK],     [wmk])])
-AC_DEFUN([PROG_WML],     [ACX_PROG_PROG([WML],     [wml])])
-AC_DEFUN([PROG_SVN2CL],  [ACX_PROG_PROG([SVN2CL],  [svn2cl.sh])])
+AC_DEFUN([PROG_RSYNC], 	  [ACX_PROG_PROG([RSYNC],    [rsync])])
+AC_DEFUN([PROG_WMK],      [ACX_PROG_PROG([WMK],      [wmk])])
+AC_DEFUN([PROG_WML],      [ACX_PROG_PROG([WML],      [wml])])
+AC_DEFUN([PROG_SVN2CL],   [ACX_PROG_PROG([SVN2CL],   [svn2cl.sh])])

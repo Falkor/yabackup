@@ -1,13 +1,20 @@
 #!@PERL@ -w
 
-##############################################################################
-#     yaBackup - Yet Another Backup script
+################################################################################
+#     @PACKAGE_NAME@ - @PACKAGE_SUMMARY@
+#
+# Homepage:   @PACKAGE_WEBSITE@
+# Bug report: @PACKAGE_BUGS@
+# Support:    @PACKAGE_SUPPORT@
 #
 # Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
+#               See LICENSE for details
 #
-# Description : @PACKAGE_SUMMARY@
-#               For more information: see yabackup(1), 'yabackup --help' or
-#               @PACKAGE_WEBSITE@
+# Description : a highly flexible script utility to backup directories from your
+#               local system on various targets (external drive, sparsebundle,
+#               remote server with SSH access, NAS with AFP access, EncFS volume
+#               etc.)
+#               For more information: see yabackup(1) or 'yabackup --help'
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -23,16 +30,16 @@
 # this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
 # Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Sebastien Varrette  <Sebastien.Varrette@uni.lu>\n
-# University of Luxembourg                       \n
-# 6, rue Richard Coudenhove-Kalergi              \n
-# L-1359 Luxembourg                              \n
+# Sebastien Varrette  <Sebastien.Varrette@uni.lu>
+# University of Luxembourg
+# 6, rue Richard Coudenhove-Kalergi
+# L-1359 Luxembourg
 #
 # Note: the author thanks Guillaume-Jean Herbiet <Guillaume.Herbiet@uni.lu> for
 # his contribution to the initial version of this script (named ibackup until
 # the 0.3.2 release) i.e before the complete code rewrite that lead to yaBackup
 # version 1.0.
-##############################################################################
+################################################################################
 
 ### Function prototype declaration ###
 sub print::alert(@);
@@ -2629,8 +2636,8 @@ Display the I<yaBackup> version number then quit.
 The configuration file for I<yaBackup> is divided into sections defined as blocks.
 A block looks much like a block in the wellknown apache config format. 
 It starts with C<< <blockname> >> and ends with C<< </blockname> >>
-Later on, C<blockname> can be referred to as the backup profile name you want to
-use for a given backup operation. 
+Later on, C<blockname> can be referred to as the backup profile name you want 
+to use for a given backup operation. 
 
 Two sections are mandatory: C<global> (which define global settings for the backup) and 
 C<default> (which refer to the default backup profile). 

@@ -15,7 +15,7 @@ ACLOCAL_AMFLAGS = -I config/m4
 include $(top_srcdir)/config/vars.am
 
 EXTRA_DIST += \
-	AUTHORS \
+	AUTHORS    \
 	ChangeLog  \
 	COPYING    \
 	bootstrap  \
@@ -24,14 +24,16 @@ EXTRA_DIST += \
 	NEWS       \
 	FAQ        \
 	README     \
+	README.pod \
 	TODO       \
-	acinclude.m4 \
-	config/m4  \
+	acinclude.m4   \
+	config/m4      \
 	config/vars.am \
-	doc        \
-	$(icons_DATA) \
+	doc            \
+	$(icons_DATA)  \
 	$(yabackupconfexamples_DATA)
 
+# Icons 
 icons_DATA = \
 	$(srcdir)/icons/yabackup_afpEncrypted_Icon.png        \
 	$(srcdir)/icons/yabackup_afp_Icon.png                 \
@@ -75,7 +77,9 @@ install-icons:
 		$(INSTALL_DATA) $$icon $(iconsdir); \
 	done 
 
-yabackupconfexamples_DATA = $(srcdir)/doc/yabackup.conf.example
+# yaBackup configuration examples
+yabackupconfexamples_DATA = \
+	$(srcdir)/doc/yabackup.conf.example
 
 yabackupconfexamplesdir   = $(datarootdir)/doc/yabackup/examples
 
@@ -87,11 +91,25 @@ install-yabackupconfexamples:
 
 install-data-local: install-icons install-yabackupconfexamples
 
-if generate_WEBSITE
-WEBSITEDIR=www
-endif
+# if generate_WEBSITE
+# WEBSITEDIR=www
+# endif
 
 CLEANFILES += *~ bin/yabackup doc/yabackup.1
+
+# Generation of the README from the elements in doc/ 
+README_depends = \
+	$(top_srcdir)/doc/README_HEADER.pod \
+	$(top_srcdir)/doc/INSTALL.pod
+
+README.pod : $(README_depends)
+	@echo "=> generating $@ from $^"
+	cat $^ > $@
+
+README: README.pod
+	@echo "=> generating $@ from $^"
+	$(POD2TEXT) $^ > README
+
 
 SUBDIRS = bin doc tests $(WEBSITEDIR)
 
