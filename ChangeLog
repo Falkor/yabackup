@@ -1,4 +1,6 @@
 2010-10-03  Sebastien Varrette <Sebastien.Varrette@uni.lu>
+	* update wml to reflect the new project name (yaBackup instead of iBackup)
+	* Update ChangeLog (using git-changelog retrieve from http://snipplr.com/view.php?codeview&id=6261)
 	* Correct README header
 	* Rework project documentation and automatic README generation
 
