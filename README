@@ -22,7 +22,17 @@ INSTALLATION GUIDE
     You can retrieve the sources of *yaBackup* using one of the following
     method:
 
-    *   Grab the current (potentially brocken) version of *yaBackup*
+    *   Grab the latest stable realease (version 1.0)
+
+        Go to <http://github.com/Falkor/yabackup/downloads> and download
+        "yabackup-1.0.tar.gz". Uncompress the archive and move into the
+        uncompressed folder:
+
+                   cd /path/to/yabackup-1.0.tar.gz
+                   tar xvzf yabackup-1.0.tar.gz
+                   cd yabackup-1.0
+
+    *   Grab the latest (potentially brocken) revision of *yaBackup*
 
         In this case, proceed as follows:
 
@@ -35,20 +45,10 @@ INSTALLATION GUIDE
                        tar xvzf /path/to/Falkor-yabackup-xxxxxxx.tar.gz
                        cd yabackup
 
-        *   retrieve the latest version using git by running:
+        *   retrieve the latest revision using git by running:
 
                        git clone git://github.com/Falkor/yabackup.git
                        cd yabackup
-
-    *   Grab the latest stable realease (version 1.0)
-
-        Go to <http://github.com/Falkor/yabackup/downloads> and download
-        "yabackup-1.0.tar.gz". Uncompress the archive and move into the
-        uncompressed folder:
-
-                   cd /path/to/yabackup-1.0.tar.gz
-                   tar xvzf yabackup-1.0.tar.gz
-                   cd yabackup-1.0
 
   AUTOTOOLS SETUP
     *yaBackup* rely on the Autotools to simplify its installation (i.e. via

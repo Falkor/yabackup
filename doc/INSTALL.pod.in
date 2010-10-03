@@ -6,7 +6,17 @@ You can retrieve the sources of I<yaBackup> using one of the following method:
 
 =over
 
-=item * Grab the current (potentially brocken) version of I<yaBackup>
+=item * Grab the latest stable realease (version @VERSION@)
+
+Go to L<http://github.com/Falkor/yabackup/downloads> and download 
+C<yabackup-@VERSION@.tar.gz>. Uncompress the archive and move into the
+uncompressed folder: 
+
+           cd /path/to/yabackup-@VERSION@.tar.gz
+           tar xvzf yabackup-@VERSION@.tar.gz
+           cd yabackup-@VERSION@
+
+=item * Grab the latest (potentially brocken) revision of I<yaBackup>
 
 In this case, proceed as follows: 
 
@@ -24,22 +34,12 @@ C<Falkor-yabackup-xxxxxxx.tar.gz> then run:
 
 =item *
 
-retrieve the latest version using git by running: 
+retrieve the latest revision using git by running: 
 
            git clone git://github.com/Falkor/yabackup.git
            cd yabackup
 
 =back
-
-=item * Grab the latest stable realease (version @VERSION@)
-
-Go to L<http://github.com/Falkor/yabackup/downloads> and download 
-C<yabackup-@VERSION@.tar.gz>. Uncompress the archive and move into the
-uncompressed folder: 
-
-           cd /path/to/yabackup-@VERSION@.tar.gz
-           tar xvzf yabackup-@VERSION@.tar.gz
-           cd yabackup-@VERSION@
 
 =back
 
