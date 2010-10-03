@@ -42,16 +42,24 @@ INSTALLATION GUIDE
 
     *   Grab the latest stable realease (version 1.0)
 
-        (Details incoming)
+        Go to <http://github.com/Falkor/yabackup/downloads> and download
+        "yabackup-1.0.tar.gz". Uncompress the archive and move into the
+        uncompressed folder:
+
+                   cd /path/to/yabackup-1.0.tar.gz
+                   tar xvzf yabackup-1.0.tar.gz
+                   cd yabackup-1.0
 
   AUTOTOOLS SETUP
     *yaBackup* rely on the Autotools to simplify its installation (i.e. via
     the classical "./configure; make; make install" procedure).
 
-    If the "configure" is absent (i.e. if you grab the latest version of
-    *yaBackup* from the GIT repository), or if for some reason you modify
-    any configuration file of the autotools (i.e. "configure.ac" or
-    "Makefile.am"), you have to run:
+    Except if you retrieved the archive of the latest stable version
+    ("yabackup-1.0.tar.gz") from the download area, the "configure" script
+    is absent. This applies if you grab the latest revision of *yaBackup*
+    from the GIT repository), or if for some reason you modify any
+    configuration file of the autotools (i.e. "configure.ac" or
+    "Makefile.am"). In this case, you can generate the script by running:
 
              ./bootstrap
 

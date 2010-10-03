@@ -30,6 +30,7 @@ EXTRA_DIST += \
 	config/m4      \
 	config/vars.am \
 	doc            \
+	tests/t        \
 	$(icons_DATA)  \
 	$(yabackupconfexamples_DATA)
 
@@ -91,9 +92,9 @@ install-yabackupconfexamples:
 
 install-data-local: install-icons install-yabackupconfexamples
 
-# if generate_WEBSITE
-# WEBSITEDIR=www
-# endif
+if generate_WEBSITE
+WEBSITEDIR=www
+endif
 
 CLEANFILES += *~ bin/yabackup doc/yabackup.1
 
