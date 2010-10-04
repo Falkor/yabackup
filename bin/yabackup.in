@@ -153,7 +153,7 @@ sub error_nolog(@) {
 ##
 sub error(@)    { $log::handler->error(@_); }
 sub debug(@)    { $log::handler->debug(@_) if $config::DEBUG;   }
-sub info(@)     { $log::handler->info(@_);  }
+sub info(@)     { $log::handler->info(@_)  unless ($config::QUIET);}
 sub verbose(@)  { info(@_) if $config::VERBOSE; }
 sub warning(@)  { $log::handler->warn(@_);  }
 sub warn(@)     { warning(@_); }
