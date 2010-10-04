@@ -1727,6 +1727,7 @@ sub set_cmd() {
 
     # Analyze the dst_rootdir to eventually complement $BACKUP_CMD_INFO{'dst'}
     my $dst_rootdir = format::interpret_cmd($config::SETTINGS{'dst_rootdir'});
+    $dst_rootdir .= "$src_rootdir";  # Add source rootdir
     $BACKUP_CMD_INFO{'dst'} .= '/'
       unless (($BACKUP_CMD_INFO{'proto'} eq 'ssh') or ($dst_rootdir =~ /^\//));
     $BACKUP_CMD_INFO{'dst'} .= "$dst_rootdir" unless ($dst_rootdir eq '/');
