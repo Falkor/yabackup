@@ -10,6 +10,14 @@
 # Copyright (c) 2009-2010 Sebastien Varrette <Sebastien.Varrette@uni.lu>
 #               See LICENSE for details
 #
+#                         ____             _
+#             _   _  __ _| __ )  __ _  ___| | ___   _ _ __
+#            | | | |/ _` |  _ \ / _` |/ __| |/ / | | | '_ \
+#            | |_| | (_| | |_) | (_| | (__|   <| |_| | |_) |
+#             \__, |\__,_|____/ \__,_|\___|_|\_\\__,_| .__/
+#             |___/                                  |_|
+#
+#
 # Description : a highly flexible script utility to backup directories from your
 #               local system on various targets (external drive, sparsebundle,
 #               remote server with SSH access, NAS with AFP access, EncFS volume
@@ -82,7 +90,10 @@ sub format::listdir_from($$@);
 
 sub hash::has_keys($@);
 
-sub log::initialize(@);
+sub log::initialize();
+sub log::initialize_other_targets(@);
+sub log::initialize_email($);
+sub log::initialize_logdir($);
 
 sub system::check_binary(@);
 sub system::check_has_directory(@);
@@ -515,21 +526,9 @@ our $timeformat = '%Y/%m/%d %H:%M:%S';
 our $msg_layout = '%T [%L] %m';
 
 ########
-# Initialize the log handler
-# Usage: initialize([logdir],[email])
-#        initialize([logdir])
-#        initialize([email])
-##
-sub initialize(@) {
-    my ($logdir, $email) = @_;
-
-    # Recognize a mail address instead of a directory as
-    if ((scalar(@_) == 1) &&
-        ($logdir =~ /\b[\w0-9._%+-]+@(?:[\w0-9-]+\.)+[\w]{2,4}\b/)) {
-        print "First argument is an email: $logdir\n";
-        $email  = $logdir;
-        $logdir = undef;
-    }
+# Initialize the log handler for screen rendering
+###
+sub initialize() {
     my $yellow_level  = format::color_msg('yellow',  '%L');
     my $magenta_level = format::color_msg('magenta', '%L');
     my $red_level     = format::color_msg('red',     '%L');
@@ -583,8 +582,14 @@ sub initialize(@) {
                              message_layout  => "$error_msg_layout",
                             }
                  );
+}
 
-    # ===  Initialize file log (in $logdir) ===
+####
+# initialize the log handler over a given logdir
+###
+sub initialize_logdir($) {
+    my $logdir = shift;
+        # ===  Initialize file log (in $logdir) ===
     if (defined($logdir)) {
         # ensure the directory exists
         print::error_and_exit(1,
@@ -615,7 +620,13 @@ sub initialize(@) {
                               }
                      );
     }
+}
 
+####
+# initialize the log handler over a given email address
+###
+sub initialize_email($) {
+    my $email = shift;
     # Eventually mail errors/warnings
     if (defined($email)) {
         chomp(my $username = `whoami`);
@@ -636,6 +647,27 @@ sub initialize(@) {
                                   }
                      );
     }
+}
+
+
+########
+# Initialize the log handler
+# Usage: initialize([logdir],[email])
+#        initialize([logdir])
+#        initialize([email])
+##
+sub initialize_other_targets(@) {
+    my ($logdir, $email) = @_;
+
+    # Recognize a mail address instead of a directory as
+    if ((scalar(@_) == 1) &&
+        ($logdir =~ /\b[\w0-9._%+-]+@(?:[\w0-9-]+\.)+[\w]{2,4}\b/)) {
+        print "First argument is an email: $logdir\n";
+        $email  = $logdir;
+        $logdir = undef;
+    }
+    initialize_logdir($logdir);
+    initialize_email($email);
 }
 
 ##############################################################################
@@ -2325,6 +2357,9 @@ foreach my $sec (@config::yaBackup_profiles) {
     config::set_profile('global');
     config::set_profile("$sec");
     print::hash_content(\%config::SETTINGS, 'backup settings configured');
+    # Update the log handler with the eventual email/logdir
+    log::initialize_logdir($SETTINGS{'logdir'}) if (defined($SETTINGS{'logdir'}));
+    log::initialize_email($SETTINGS{'email'})   if (defined($SETTINGS{'email'}));
 
     #try
     eval {
