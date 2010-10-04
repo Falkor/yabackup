@@ -1624,7 +1624,7 @@ sub run_cmd() {
     print::warning("This will lead to the",
                    format::color_msg('bold red',
                                      uc("deletion of files/directories in")),
-                   format::color_msg('bold',"$BACKUP_CMD_INFO{'src'}"))
+                   format::color_msg('bold',"$BACKUP_CMD_INFO{'dst'}"))
         if ($config::SYNC_MODE eq '--delete');
     print::really_continue() unless ($config::QUIET);
     print::notification('Starting ' .
