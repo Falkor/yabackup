@@ -304,7 +304,7 @@ sub interpret_cmd($) {
     my $string = my $res = shift;
     my @commands = $string =~ /`([^`]+)`/g; # retrieve commands to interpret
     foreach my $cmd (@commands) {
-        my $cmd_exec = `$cmd` || PRINT_ERROR_THEN_EXIT("Execute of $cmd failed or return and empty string: $!\n");
+        my $cmd_exec = `$cmd` || print::error_and_exit(1, "Execute of $cmd failed or return and empty string: $!");
         chomp($cmd_exec);
         $cmd =~ s/\$/\\\$/g;    # Serialize command
         $cmd =~ s/\|/\\\|/g;    # idem
